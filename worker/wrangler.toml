@@ -8,6 +8,6 @@ database_name = "task_portal"
 database_id = "your-d1-database-id"
 
 [vars]
-FRONTEND_URL = "https://yourname.github.io/task-portal"
+FRONTEND_URL = "https://soder1711.github.io/Key-to-Employment/"
 GOOGLE_CLIENT_ID = "1007247063474-g2p4p0rp78n46k9s1o0gvg934qrd0l51.apps.googleusercontent.com"
 # Never put secrets here. Use: wrangler secret put GOOGLE_CLIENT_SECRET
