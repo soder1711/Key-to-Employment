@@ -5,7 +5,7 @@ compatibility_date = "2026-09-01"
 [[d1_databases]]
 binding = "DB"
 database_name = "task_portal"
-database_id = "your-d1-database-id"
+database_id = "ecacaeb3-e99e-4d2b-9c5e-6f83e3effdc7"
 
 [vars]
 FRONTEND_URL = "https://soder1711.github.io/Key-to-Employment/"

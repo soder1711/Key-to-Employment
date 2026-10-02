@@ -1,5 +1,5 @@
 # Install wrangler
-npm install -g wrangler
+# npm install -g wrangler
 
 # Create D1 database
 wrangler d1 create task_portal
@@ -8,7 +8,8 @@ wrangler d1 create task_portal
 
 # wrangler d1 execute task_portal --local  --file=./schema/001_init.sql
 # wrangler d1 execute task_portal --local  --file=./schema/002_seed.sql
-
+echo "waiting for db to finish creation"
+sleep 20
 # Remote (production D1)
 wrangler d1 execute task_portal --remote --file=../schema/001_init.sql
 wrangler d1 execute task_portal --remote --file=../schema/002_seed.sql
