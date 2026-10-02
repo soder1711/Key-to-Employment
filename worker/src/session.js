@@ -90,6 +90,6 @@ export function buildSetCookie(name, value, opts = {}) {
   if (opts.maxAge) parts.push(`Max-Age=${opts.maxAge}`);
   if (opts.httpOnly !== false) parts.push('HttpOnly');
   if (opts.secure !== false) parts.push('Secure');
-  parts.push(`SameSite=${opts.sameSite || 'Lax'}`);
+  parts.push(`SameSite=${opts.sameSite || 'None'}`);
   return parts.join('; ');
 }

@@ -47,7 +47,7 @@ export async function handleLogin(request, env) {
     status: 302,
     headers: {
       'Location': authUrl.toString(),
-      'Set-Cookie': buildSetCookie('oauth_state', oauthCookie, { maxAge: 600 }),
+      'Set-Cookie': buildSetCookie('oauth_state', oauthCookie, { maxAge: 600, sameSite: 'None' }),
     },
   });
 }
@@ -128,7 +128,7 @@ export async function handleCallback(request, env) {
     status: 302,
     headers: {
       'Location': env.FRONTEND_URL + '/dashboard.html',
-      'Set-Cookie': buildSetCookie('session', session, { maxAge: 604800 }),
+      'Set-Cookie': buildSetCookie('session', session, { maxAge: 604800, sameSite: 'None'}),
     },
   });
 }
