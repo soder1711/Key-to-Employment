@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>My Tasks</title>
+</head>
+<body>
+  <h1>My Tasks</h1>
+  <div id="user"></div>
+  <ul id="tasks"></ul>
+
+  <script>
+    const WORKER = 'https://your-worker.workers.dev';
+
+    async function load() {
+      const me = await fetch(`${WORKER}/api/me`, { credentials: 'include' });
+      if (me.status === 401) {
+        // Not logged in → show sign-in button
+        document.body.innerHTML = `
+          <h1>Sign In</h1>
+          <a href="${WORKER}/auth/google">
+            <button>Sign in with Google</button>
+          </a>`;
+        return;
+      }
+      const user = await me.json();
+      document.getElementById('user').textContent = user.email;
+
+      const res = await fetch(`${WORKER}/api/me/tasks`, { credentials: 'include' });
+      const { tasks } = await res.json();
+
+      document.getElementById('tasks').innerHTML = tasks.map(t => `
+        <li>
+          <strong>${t.task_code}</strong>: ${t.title}
+          — ${t.assignment_status} (${t.completion_percentage}%)
+        </li>
+      `).join('');
+    }
+
+    load();
+  </script>
+</body>
+</html>
