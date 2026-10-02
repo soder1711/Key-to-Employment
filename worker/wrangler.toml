@@ -1,0 +1,13 @@
+name = "task-portal"
+main = "src/index.js"
+compatibility_date = "2026-09-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "task_portal"
+database_id = "your-d1-database-id"
+
+[vars]
+FRONTEND_URL = "https://yourname.github.io/task-portal"
+GOOGLE_CLIENT_ID = "your-client-id.apps.googleusercontent.com"
+# Never put secrets here. Use: wrangler secret put GOOGLE_CLIENT_SECRET
