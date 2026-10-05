@@ -139,7 +139,7 @@ export function handleLogout() {
   return new Response(null, {
     status: 302,
     headers: {
-      'Location': '/',
+      'Location': env.FRONTEND_URL + '/',
       'Set-Cookie': buildSetCookie('session', '', { maxAge: 0 }),
     },
   });

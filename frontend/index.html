@@ -7,6 +7,7 @@
 <body>
   <h1>My Tasks</h1>
   <div id="user"></div>
+  <button id="logout-btn" style="display:none;">Log out</button>
   <ul id="tasks"></ul>
 
   <script>
@@ -25,6 +26,12 @@
       }
       const user = await me.json();
       document.getElementById('user').textContent = user.email;
+
+      const logoutBtn = document.getElementById('logout-btn');
+      logoutBtn.style.display = 'inline-block';
+      logoutBtn.addEventListener('click', () => {
+        window.location.href = `${WORKER}/auth/logout`;
+      });
 
       const res = await fetch(`${WORKER}/api/me/tasks`, { credentials: 'include' });
       const { tasks } = await res.json();
