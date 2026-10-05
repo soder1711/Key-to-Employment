@@ -5,7 +5,7 @@ import { handleGetMyTasks, handleGetTask, handleUpdateProgress } from './api.js'
 // CORS: allow only your GitHub Pages origin
 function corsHeaders(env) {
   return {
-    'Access-Control-Allow-Origin': env.FRONTEND_URL,
+    'Access-Control-Allow-Origin': new URL(env.FRONTEND_URL).origin,
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type',
     'Access-Control-Allow-Credentials': 'true',
