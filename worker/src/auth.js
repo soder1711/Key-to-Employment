@@ -103,7 +103,8 @@ export async function handleCallback(request, env) {
 
   // Look up employee in D1 by email (or cf_sub for stability)
   let employee = await env.DB.prepare(
-    `SELECT employee_id, is_active FROM employees WHERE cf_sub = ? OR email = ? LIMIT 1`
+    `SELECT employee_id, cf_sub, is_active
+    FROM employees WHERE cf_sub = ? OR email = ? LIMIT 1`
   ).bind(sub, email).first();
 
   if (!employee || !employee.is_active) {
