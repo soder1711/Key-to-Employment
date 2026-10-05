@@ -135,7 +135,7 @@ export async function handleCallback(request, env) {
 }
 
 // Step 3: Logout
-export function handleLogout() {
+export function handleLogout(env) {
   return new Response(null, {
     status: 302,
     headers: {
