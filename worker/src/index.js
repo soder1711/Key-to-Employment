@@ -33,12 +33,6 @@ export default {
       return handleLogout(env);
     }
 
-    if (url.pathname === '/debug-env') {
-      return new Response(JSON.stringify({
-        frontendUrl: env.FRONTEND_URL || 'IT_IS_EMPTY'
-      }), { headers: { 'Content-Type': 'application/json' } });
-    }
-
     // -------- Protected routes --------
     const cookies = parseCookies(request.headers.get('Cookie'));
     const session = await readSession(cookies.session, env.SESSION_SECRET);
