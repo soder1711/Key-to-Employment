@@ -128,7 +128,7 @@ export async function handleCallback(request, env) {
   return new Response(null, {
     status: 302,
     headers: {
-      'Location': env.FRONTEND_URL + '/dashboard.html',
+      'Location': env.FRONTEND_URL + '/',
       'Set-Cookie': buildSetCookie('session', session, { maxAge: 604800, sameSite: 'None'}),
     },
   });

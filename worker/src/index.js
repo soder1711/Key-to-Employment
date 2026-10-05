@@ -30,7 +30,7 @@ export default {
       return handleCallback(request, env);
     }
     if (url.pathname === '/auth/logout') {
-      return handleLogout();
+      return handleLogout(env);
     }
 
     // -------- Protected routes --------
