@@ -1,4 +1,4 @@
-body { font-family: system-ui, sans-serif; max-width: 900px; margin: 2rem auto; padding: 0 1rem; }
+body { font-family: system-ui, sans-serif; max-width: 900px; margin: 2rem auto; padding: 0 1rem; background-color: #eee;}
 header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
 .muted { color: #666; font-size: 0.9rem; }
 ul { list-style: none; padding: 0; }
