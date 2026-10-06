@@ -1,0 +1,19 @@
+body { font-family: system-ui, sans-serif; max-width: 900px; margin: 2rem auto; padding: 0 1rem; }
+header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
+.muted { color: #666; font-size: 0.9rem; }
+ul { list-style: none; padding: 0; }
+li { padding: 0.75rem; border: 1px solid #ddd; border-radius: 6px; margin-bottom: 0.5rem; }
+li .meta { font-size: 0.85rem; color: #555; margin-top: 0.25rem; }
+.badge { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; background: #eee; margin-left: 0.5rem; }
+.badge.critical { background: #ffd5d5; }
+.badge.high { background: #ffe8cc; }
+.badge.medium { background: #e6f0ff; }
+.badge.low { background: #eee; }
+section { margin-top: 2rem; }
+.filters { display: flex; gap: 0.5rem; margin-bottom: 0.75rem; flex-wrap: wrap; }
+.filters select, .filters input { padding: 0.4rem; }
+.admin-tag { background: #cfe8ff; padding: 2px 8px; border-radius: 4px; font-size: 0.8rem; }
+.progress-form { margin-top: 0.5rem; display: flex; gap: 0.5rem; align-items: center; }
+.progress-form input { width: 60px; padding: 0.25rem; }
+.progress-form button { padding: 0.25rem 0.6rem; }
+.error { color: #b00020; }

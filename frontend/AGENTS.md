@@ -2,7 +2,7 @@
 
 ## Structure
 
-The frontend is currently a single static file: `index.html`. It is published as-is to GitHub Pages; there is no npm project, bundler, or frontend test harness.
+The frontend is a small static site consisting of `index.html`, `app.js`, and `styles.css`. It is published as-is to GitHub Pages; there is no npm project, bundler, or frontend test harness.
 
 ## Implementation conventions
 
