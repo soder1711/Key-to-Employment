@@ -2,30 +2,233 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>My Tasks</title>
+  <title>Task Portal</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 900px; margin: 2rem auto; padding: 0 1rem; }
+    header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
+    .muted { color: #666; font-size: 0.9rem; }
+    ul { list-style: none; padding: 0; }
+    li { padding: 0.75rem; border: 1px solid #ddd; border-radius: 6px; margin-bottom: 0.5rem; }
+    li .meta { font-size: 0.85rem; color: #555; margin-top: 0.25rem; }
+    .badge { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; background: #eee; margin-left: 0.5rem; }
+    .badge.critical { background: #ffd5d5; }
+    .badge.high { background: #ffe8cc; }
+    .badge.medium { background: #e6f0ff; }
+    .badge.low { background: #eee; }
+    section { margin-top: 2rem; }
+    .filters { display: flex; gap: 0.5rem; margin-bottom: 0.75rem; flex-wrap: wrap; }
+    .filters select, .filters input { padding: 0.4rem; }
+    .admin-tag { background: #cfe8ff; padding: 2px 8px; border-radius: 4px; font-size: 0.8rem; }
+    .progress-form { margin-top: 0.5rem; display: flex; gap: 0.5rem; align-items: center; }
+    .progress-form input { width: 60px; padding: 0.25rem; }
+    .progress-form button { padding: 0.25rem 0.6rem; }
+    .error { color: #b00020; }
+  </style>
 </head>
 <body>
-  <h1>My Tasks</h1>
-  <div id="user"></div>
-  <button id="logout-btn" style="display:none;">Log out</button>
-  <ul id="tasks"></ul>
+  <header>
+    <h1>Task Portal</h1>
+    <div>
+      <span id="user" class="muted"></span>
+      <button id="logout-btn" style="display:none; margin-left: 0.75rem;">Log out</button>
+    </div>
+  </header>
+
+  <section id="my-tasks-section" style="display:none;">
+    <h2>My Tasks</h2>
+    <ul id="my-tasks"></ul>
+    <div id="my-tasks-empty" class="muted" style="display:none;">No tasks assigned to you.</div>
+  </section>
+
+  <section id="admin-section" style="display:none;">
+    <h2>All Tasks <span class="admin-tag">admin</span></h2>
+    <div class="filters">
+      <select id="filter-status">
+        <option value="">All statuses</option>
+        <option value="pending">pending</option>
+        <option value="assigned">assigned</option>
+        <option value="in_progress">in_progress</option>
+        <option value="completed">completed</option>
+        <option value="cancelled">cancelled</option>
+      </select>
+      <input id="filter-employee" type="number" placeholder="Employee ID (optional)">
+      <button id="apply-filters">Apply</button>
+      <button id="clear-filters">Clear</button>
+    </div>
+    <ul id="all-tasks"></ul>
+    <div id="all-tasks-empty" class="muted" style="display:none;">No tasks match the filters.</div>
+    <div id="admin-error" class="error" style="display:none;"></div>
+  </section>
+
+  <section id="signin-section" style="display:none;">
+    <h1>Sign In</h1>
+    <a id="signin-link"><button>Sign in with Google</button></a>
+  </section>
 
   <script>
     const WORKER = 'https://task-portal.soder1234.workers.dev';
 
-    async function load() {
-      const me = await fetch(`${WORKER}/api/me`, { credentials: 'include' });
-      if (me.status === 401) {
-        // Not logged in → show sign-in button
-        document.body.innerHTML = `
-          <h1>Sign In</h1>
-          <a href="${WORKER}/auth/google">
-            <button>Sign in with Google</button>
-          </a>`;
+    // ---------- helpers ----------
+    async function api(path, opts = {}) {
+      return fetch(`${WORKER}${path}`, {
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', ...(opts.headers || {}) },
+        ...opts,
+      });
+    }
+
+    function priorityBadge(priority) {
+      return `<span class="badge ${priority}">${priority}</span>`;
+    }
+
+    function escapeHtml(s) {
+      return String(s ?? '').replace(/[&<>"']/g, c => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+      }[c]));
+    }
+
+    // ---------- renderers ----------
+    function renderMyTask(t) {
+      return `
+        <li>
+          <strong>${escapeHtml(t.task_code)}</strong>: ${escapeHtml(t.title)}
+          ${priorityBadge(t.priority)}
+          <div class="meta">
+            ${escapeHtml(t.assignment_status)} — ${t.completion_percentage}%
+            ${t.deadline ? '· due ' + escapeHtml(t.deadline) : ''}
+          </div>
+        </li>`;
+    }
+
+    function renderAdminTask(t) {
+      const assignee = t.employee_email
+        ? `${escapeHtml(t.first_name || '')} ${escapeHtml(t.last_name || '')} &lt;${escapeHtml(t.employee_email)}&gt;`
+        : '<em>unassigned</em>';
+      const hasAssignment = t.assignment_id != null;
+      return `
+        <li>
+          <strong>${escapeHtml(t.task_code)}</strong>: ${escapeHtml(t.title)}
+          ${priorityBadge(t.priority)}
+          <div class="meta">
+            task status: ${escapeHtml(t.status)}
+            ${t.deadline ? '· due ' + escapeHtml(t.deadline) : ''}
+            ${hasAssignment ? `· assigned to ${assignee} (${t.completion_percentage}%)` : ''}
+          </div>
+          ${hasAssignment ? `
+            <div class="progress-form" data-assignment-id="${t.assignment_id}">
+              <label>Progress:</label>
+              <input type="number" min="0" max="100" value="${t.completion_percentage}" />
+              <button type="button" class="save-progress">Save</button>
+            </div>
+          ` : ''}
+        </li>`;
+    }
+
+    // ---------- data loaders ----------
+    async function loadMyTasks() {
+      const res = await api('/api/me/tasks');
+      if (!res.ok) return;
+      const { tasks } = await res.json();
+      const ul = document.getElementById('my-tasks');
+      const empty = document.getElementById('my-tasks-empty');
+      if (!tasks.length) {
+        ul.innerHTML = '';
+        empty.style.display = 'block';
+      } else {
+        empty.style.display = 'none';
+        ul.innerHTML = tasks.map(renderMyTask).join('');
+      }
+      document.getElementById('my-tasks-section').style.display = 'block';
+    }
+
+    async function loadAllTasks(filters = {}) {
+      const params = new URLSearchParams();
+      if (filters.status) params.set('status', filters.status);
+      if (filters.employeeId) params.set('employeeId', filters.employeeId);
+      const qs = params.toString();
+      const res = await api('/api/admin/tasks' + (qs ? `?${qs}` : ''));
+      const errEl = document.getElementById('admin-error');
+      if (!res.ok) {
+        errEl.textContent = res.status === 403
+          ? 'Admin access required.'
+          : `Failed to load tasks (${res.status}).`;
+        errEl.style.display = 'block';
         return;
       }
+      errEl.style.display = 'none';
+      const { tasks } = await res.json();
+      const ul = document.getElementById('all-tasks');
+      const empty = document.getElementById('all-tasks-empty');
+      if (!tasks.length) {
+        ul.innerHTML = '';
+        empty.style.display = 'block';
+      } else {
+        empty.style.display = 'none';
+        ul.innerHTML = tasks.map(renderAdminTask).join('');
+      }
+      document.getElementById('admin-section').style.display = 'block';
+    }
+
+    // ---------- admin progress save (event delegation) ----------
+    document.getElementById('all-tasks').addEventListener('click', async (e) => {
+      if (!e.target.classList.contains('save-progress')) return;
+      const form = e.target.closest('.progress-form');
+      const assignmentId = parseInt(form.dataset.assignmentId, 10);
+      const input = form.querySelector('input[type="number"]');
+      const percentage = parseInt(input.value, 10);
+
+      if (Number.isNaN(percentage) || percentage < 0 || percentage > 100) {
+        alert('Percentage must be between 0 and 100');
+        return;
+      }
+
+      e.target.disabled = true;
+      e.target.textContent = 'Saving…';
+      try {
+        const res = await api('/api/admin/progress', {
+          method: 'POST',
+          body: JSON.stringify({ assignmentId, percentage, notes: '' }),
+        });
+        if (!res.ok) {
+          const txt = await res.text();
+          alert('Save failed: ' + txt);
+        } else {
+          e.target.textContent = 'Saved';
+          setTimeout(() => { e.target.textContent = 'Save'; e.target.disabled = false; }, 1200);
+        }
+      } catch (err) {
+        alert('Network error: ' + err.message);
+        e.target.textContent = 'Save';
+        e.target.disabled = false;
+      }
+    });
+
+    // ---------- filter buttons ----------
+    document.getElementById('apply-filters').addEventListener('click', () => {
+      loadAllTasks({
+        status: document.getElementById('filter-status').value,
+        employeeId: document.getElementById('filter-employee').value,
+      });
+    });
+    document.getElementById('clear-filters').addEventListener('click', () => {
+      document.getElementById('filter-status').value = '';
+      document.getElementById('filter-employee').value = '';
+      loadAllTasks();
+    });
+
+    // ---------- main ----------
+    async function load() {
+      const me = await api('/api/me');
+
+      if (me.status === 401) {
+        document.getElementById('signin-section').style.display = 'block';
+        document.getElementById('signin-link').href = `${WORKER}/auth/google`;
+        return;
+      }
+
       const user = await me.json();
-      document.getElementById('user').textContent = user.email;
+      document.getElementById('user').textContent =
+        user.email + (user.isAdmin ? ' (admin)' : '');
 
       const logoutBtn = document.getElementById('logout-btn');
       logoutBtn.style.display = 'inline-block';
@@ -33,15 +236,11 @@
         window.location.href = `${WORKER}/auth/logout`;
       });
 
-      const res = await fetch(`${WORKER}/api/me/tasks`, { credentials: 'include' });
-      const { tasks } = await res.json();
+      await loadMyTasks();
 
-      document.getElementById('tasks').innerHTML = tasks.map(t => `
-        <li>
-          <strong>${t.task_code}</strong>: ${t.title}
-          — ${t.assignment_status} (${t.completion_percentage}%)
-        </li>
-      `).join('');
+      if (user.isAdmin) {
+        await loadAllTasks();
+      }
     }
 
     load();

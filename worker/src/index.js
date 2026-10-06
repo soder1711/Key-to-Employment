@@ -1,6 +1,13 @@
 import { handleLogin, handleCallback, handleLogout } from './auth.js';
 import { readSession, parseCookies } from './session.js';
-import { handleGetMyTasks, handleGetTask, handleUpdateProgress } from './api.js';
+import {
+  handleGetMyTasks,
+  handleGetTask,
+  handleUpdateProgress,
+  handleAdminGetAllTasks,
+  handleAdminGetTask,
+  handleAdminUpdateProgress,
+} from './api.js';
 
 // CORS: allow only your GitHub Pages origin
 function corsHeaders(env) {
@@ -47,7 +54,15 @@ export default {
     try {
       let response;
 
-      if (url.pathname === '/api/me/tasks' && request.method === 'GET') {
+      // ---- User endpoints (self only) ----
+      if (url.pathname === '/api/me' && request.method === 'GET') {
+        response = Response.json({
+          email: session.email,
+          employeeId: session.employeeId,
+          isAdmin: !!session.isAdmin,
+        });
+      }
+      else if (url.pathname === '/api/me/tasks' && request.method === 'GET') {
         response = await handleGetMyTasks(env, session);
       }
       else if (url.pathname.match(/^\/api\/tasks\/\d+$/) && request.method === 'GET') {
@@ -58,14 +73,24 @@ export default {
         const body = await request.json();
         response = await handleUpdateProgress(env, session, body);
       }
-      else if (url.pathname === '/api/me') {
-        response = Response.json({ email: session.email, employeeId: session.employeeId });
+
+      // ---- Admin endpoints ----
+      else if (url.pathname === '/api/admin/tasks' && request.method === 'GET') {
+        response = await handleAdminGetAllTasks(env, session, url);
       }
+      else if (url.pathname.match(/^\/api\/admin\/tasks\/\d+$/) && request.method === 'GET') {
+        const taskId = parseInt(url.pathname.split('/').pop(), 10);
+        response = await handleAdminGetTask(env, session, taskId);
+      }
+      else if (url.pathname === '/api/admin/progress' && request.method === 'POST') {
+        const body = await request.json();
+        response = await handleAdminUpdateProgress(env, session, body);
+      }
+
       else {
         response = new Response('Not found', { status: 404 });
       }
 
-      // Attach CORS headers to every response
       const headers = new Headers(response.headers);
       Object.entries(corsHeaders(env)).forEach(([k, v]) => headers.set(k, v));
       return new Response(response.body, { status: response.status, headers });

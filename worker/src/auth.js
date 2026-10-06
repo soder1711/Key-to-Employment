@@ -103,7 +103,7 @@ export async function handleCallback(request, env) {
 
   // Look up employee in D1 by email (or cf_sub for stability)
   let employee = await env.DB.prepare(
-    `SELECT employee_id, cf_sub, is_active
+    `SELECT employee_id, cf_sub, is_active, is_admin
     FROM employees WHERE cf_sub = ? OR email = ? LIMIT 1`
   ).bind(sub, email).first();
 
@@ -120,7 +120,10 @@ export async function handleCallback(request, env) {
 
   // Create session cookie
   const session = await createSession(
-    { employeeId: employee.employee_id, email },
+    { employeeId: employee.employee_id, 
+      email,
+      isAdmin: employee.is_admin === 1,
+     },
     env.SESSION_SECRET
   );
 
