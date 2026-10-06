@@ -1,4 +1,13 @@
 // All queries use parameter binding — never string concatenation
+export async function getEmployeeAuth(db, employeeId) {
+  return await db.prepare(`
+    SELECT employee_id, email, is_active, is_admin
+    FROM employees
+    WHERE employee_id = ?
+    LIMIT 1
+  `).bind(employeeId).first();
+}
+
 export async function getEmployeeTasks(db, employeeId) {
   const { results } = await db.prepare(`
     SELECT

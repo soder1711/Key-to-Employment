@@ -1,5 +1,6 @@
 import { handleLogin, handleCallback, handleLogout } from './auth.js';
-import { readSession, parseCookies } from './session.js';
+import { readSession, parseCookies, buildSetCookie } from './session.js';
+import { getEmployeeAuth } from './db.js';
 import {
   handleGetMyTasks,
   handleGetTask,
@@ -52,39 +53,63 @@ export default {
     }
 
     try {
+      // Normal task routes use the authenticated, encrypted cookie directly.
+      // Re-check D1 only where current directory authorization is needed.
+      const isAdminRoute = url.pathname.startsWith('/api/admin/');
+      const isMeRoute = url.pathname === '/api/me' && request.method === 'GET';
+      const currentSession = { ...session };
+
+      if (isAdminRoute || isMeRoute) {
+        const employee = await getEmployeeAuth(env.DB, session.employeeId);
+
+        if (!employee || !employee.is_active) {
+          return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+            status: 401,
+            headers: {
+              ...corsHeaders(env),
+              'Content-Type': 'application/json',
+              'Set-Cookie': buildSetCookie('session', '', { maxAge: 0, sameSite: 'None' }),
+            },
+          });
+        }
+
+        currentSession.email = employee.email;
+        currentSession.isAdmin = employee.is_admin === 1;
+      }
+
       let response;
 
       // ---- User endpoints (self only) ----
       if (url.pathname === '/api/me' && request.method === 'GET') {
         response = Response.json({
-          email: session.email,
-          employeeId: session.employeeId,
-          isAdmin: !!session.isAdmin,
+          email: currentSession.email,
+          employeeId: currentSession.employeeId,
+          isAdmin: currentSession.isAdmin,
         });
       }
       else if (url.pathname === '/api/me/tasks' && request.method === 'GET') {
-        response = await handleGetMyTasks(env, session);
+        response = await handleGetMyTasks(env, currentSession);
       }
       else if (url.pathname.match(/^\/api\/tasks\/\d+$/) && request.method === 'GET') {
         const taskId = parseInt(url.pathname.split('/').pop(), 10);
-        response = await handleGetTask(env, session, taskId);
+        response = await handleGetTask(env, currentSession, taskId);
       }
       else if (url.pathname === '/api/progress' && request.method === 'POST') {
         const body = await request.json();
-        response = await handleUpdateProgress(env, session, body);
+        response = await handleUpdateProgress(env, currentSession, body);
       }
 
       // ---- Admin endpoints ----
       else if (url.pathname === '/api/admin/tasks' && request.method === 'GET') {
-        response = await handleAdminGetAllTasks(env, session, url);
+        response = await handleAdminGetAllTasks(env, currentSession, url);
       }
       else if (url.pathname.match(/^\/api\/admin\/tasks\/\d+$/) && request.method === 'GET') {
         const taskId = parseInt(url.pathname.split('/').pop(), 10);
-        response = await handleAdminGetTask(env, session, taskId);
+        response = await handleAdminGetTask(env, currentSession, taskId);
       }
       else if (url.pathname === '/api/admin/progress' && request.method === 'POST') {
         const body = await request.json();
-        response = await handleAdminUpdateProgress(env, session, body);
+        response = await handleAdminUpdateProgress(env, currentSession, body);
       }
 
       else {
