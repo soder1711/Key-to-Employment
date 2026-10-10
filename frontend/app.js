@@ -1,6 +1,5 @@
 const WORKER = 'https://task-portal.soder1234.workers.dev';
 
-// ---------- helpers ----------
 async function api(path, opts = {}) {
   return fetch(`${WORKER}${path}`, {
     credentials: 'include',
@@ -13,20 +12,32 @@ function priorityBadge(priority) {
   return `<span class="badge ${priority}">${priority}</span>`;
 }
 
+function progressBar(pct) {
+  const p = Math.max(0, Math.min(100, Number(pct) || 0));
+  return `
+    <div class="progress-row">
+      <div class="progress"><div class="progress-fill" style="width:${p}%"></div></div>
+      <span class="pct">${p}%</span>
+    </div>`;
+}
+
 function escapeHtml(s) {
   return String(s ?? '').replace(/[&<>"']/g, c => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
   }[c]));
 }
 
-// ---------- renderers ----------
 function renderMyTask(t) {
   return `
-    <li>
-      <strong>${escapeHtml(t.task_code)}</strong>: ${escapeHtml(t.title)}
-      ${priorityBadge(t.priority)}
+    <li class="task-item">
+      <div class="task-top">
+        <strong>${escapeHtml(t.task_code)}</strong>
+        <span class="task-title">${escapeHtml(t.title)}</span>
+        ${priorityBadge(t.priority)}
+      </div>
+      ${progressBar(t.completion_percentage)}
       <div class="meta">
-        ${escapeHtml(t.assignment_status)} — ${t.completion_percentage}%
+        ${escapeHtml(t.assignment_status)}
         ${t.deadline ? '· due ' + escapeHtml(t.deadline) : ''}
       </div>
     </li>`;
@@ -38,25 +49,27 @@ function renderAdminTask(t) {
     : '<em>unassigned</em>';
   const hasAssignment = t.assignment_id != null;
   return `
-    <li>
-      <strong>${escapeHtml(t.task_code)}</strong>: ${escapeHtml(t.title)}
-      ${priorityBadge(t.priority)}
+    <li class="task-item">
+      <div class="task-top">
+        <strong>${escapeHtml(t.task_code)}</strong>
+        <span class="task-title">${escapeHtml(t.title)}</span>
+        ${priorityBadge(t.priority)}
+      </div>
       <div class="meta">
         task status: ${escapeHtml(t.status)}
         ${t.deadline ? '· due ' + escapeHtml(t.deadline) : ''}
-        ${hasAssignment ? `· assigned to ${assignee} (${t.completion_percentage}%)` : ''}
+        ${hasAssignment ? `· assigned to ${assignee}` : ''}
       </div>
       ${hasAssignment ? `
+        ${progressBar(t.completion_percentage)}
         <div class="progress-form" data-assignment-id="${t.assignment_id}">
-          <label>Progress:</label>
           <input type="number" min="0" max="100" value="${t.completion_percentage}" />
-          <button type="button" class="save-progress">Save</button>
+          <button type="button" class="btn small save-progress">Save</button>
         </div>
       ` : ''}
     </li>`;
 }
 
-// ---------- data loaders ----------
 async function loadMyTasks() {
   const res = await api('/api/me/tasks');
   if (!res.ok) return;
@@ -101,7 +114,6 @@ async function loadAllTasks(filters = {}) {
   document.getElementById('admin-section').style.display = 'block';
 }
 
-// ---------- admin progress save (event delegation) ----------
 document.getElementById('all-tasks').addEventListener('click', async (e) => {
   if (!e.target.classList.contains('save-progress')) return;
   const form = e.target.closest('.progress-form');
@@ -135,7 +147,6 @@ document.getElementById('all-tasks').addEventListener('click', async (e) => {
   }
 });
 
-// ---------- filter buttons ----------
 document.getElementById('apply-filters').addEventListener('click', () => {
   loadAllTasks({
     status: document.getElementById('filter-status').value,
@@ -148,17 +159,17 @@ document.getElementById('clear-filters').addEventListener('click', () => {
   loadAllTasks();
 });
 
-// ---------- main ----------
 async function load() {
   const me = await api('/api/me');
 
   if (me.status === 401) {
-    document.getElementById('signin-section').style.display = 'block';
+    document.getElementById('signin-section').style.display = 'flex';
     document.getElementById('signin-link').href = `${WORKER}/auth/google`;
     return;
   }
 
   const user = await me.json();
+  document.getElementById('app').style.display = 'block';
   document.getElementById('user').textContent =
     user.email + (user.isAdmin ? ' (admin)' : '');
 
