@@ -2,12 +2,11 @@ import { handleLogin, handleCallback, handleLogout } from './auth.js';
 import { readSession, parseCookies, buildSetCookie } from './session.js';
 import { getEmployeeAuth } from './db.js';
 import {
-  handleGetMyTasks,
-  handleGetTask,
-  handleUpdateProgress,
-  handleAdminGetAllTasks,
-  handleAdminGetTask,
-  handleAdminUpdateProgress,
+  handleGetMyTasks, handleGetTask, handleUpdateProgress,
+  handleAdminGetAllTasks, handleAdminGetTask, handleAdminUpdateProgress,
+  handleGetMySchedule, handleAdminGetSchedule, handleAdminAssignSession,
+  handleAdminSessionStatus, handleAdminDeleteSession,
+  handleAdminMonthlySummary, handleAdminSetTarget,
 } from './api.js';
 
 // CORS: allow only your GitHub Pages origin
@@ -112,6 +111,33 @@ export default {
         response = await handleAdminUpdateProgress(env, currentSession, body);
       }
 
+            // ---- Schedule endpoints ----
+      else if (url.pathname === '/api/schedule' && request.method === 'GET') {
+        response = await handleGetMySchedule(env, currentSession, url);
+      }
+      else if (url.pathname === '/api/admin/schedule' && request.method === 'GET') {
+        response = await handleAdminGetSchedule(env, currentSession, url);
+      }
+      else if (url.pathname === '/api/admin/schedule/assign' && request.method === 'POST') {
+        const body = await request.json();
+        response = await handleAdminAssignSession(env, currentSession, body);
+      }
+      else if (url.pathname === '/api/admin/schedule/status' && request.method === 'POST') {
+        const body = await request.json();
+        response = await handleAdminSessionStatus(env, currentSession, body);
+      }
+      else if (url.pathname === '/api/admin/schedule/delete' && request.method === 'POST') {
+        const body = await request.json();
+        response = await handleAdminDeleteSession(env, currentSession, body);
+      }
+      else if (url.pathname === '/api/admin/schedule/monthly' && request.method === 'GET') {
+        response = await handleAdminMonthlySummary(env, currentSession, url);
+      }
+      else if (url.pathname === '/api/admin/schedule/target' && request.method === 'POST') {
+        const body = await request.json();
+        response = await handleAdminSetTarget(env, currentSession, body);
+      }
+
       else {
         response = new Response('Not found', { status: 404 });
       }
@@ -129,3 +155,4 @@ export default {
     }
   },
 };
+

@@ -279,3 +279,151 @@ button { font-family: inherit; }
   .topbar { padding: 0.75rem 1rem; }
   .user-chip { max-width: 10rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 }
+
+/* ---------- View navigation (dashboard toggle) ---------- */
+.view-nav {
+  display: flex; gap: 0.35rem;
+  background: var(--blue-50); border: 1px solid var(--blue-100);
+  padding: 4px; border-radius: 10px;
+}
+.nav-btn {
+  border: none; background: transparent; cursor: pointer;
+  padding: 0.4rem 0.95rem; border-radius: 8px;
+  font-weight: 600; font-size: 0.85rem; color: var(--muted); font-family: inherit;
+}
+.nav-btn.active {
+  background: #fff; color: var(--blue-700);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12);
+}
+
+/* ---------- Week / month navigation ---------- */
+.week-nav { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem; }
+.week-label { font-weight: 700; color: var(--blue-700); margin-left: 0.4rem; font-size: 0.95rem; }
+.view-toggle { margin-left: auto; display: flex; gap: 0.35rem; }
+.hint { color: var(--muted); font-size: 0.85rem; margin: 0 0 0.9rem; }
+
+/* ---------- Worker schedule table ---------- */
+.sched-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+.sched-table th {
+  text-align: left; font-size: 0.72rem; text-transform: uppercase;
+  letter-spacing: 0.04em; color: var(--muted);
+  padding: 0.5rem 0.6rem; border-bottom: 2px solid var(--line);
+}
+.sched-table td { padding: 0.55rem 0.6rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+.sched-table tr:hover td { background: var(--blue-50); }
+.cancelled-row { opacity: 0.55; }
+.pts { font-weight: 700; color: var(--blue-700); }
+
+.status-pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 0.72rem; font-weight: 600; }
+.status-pill.scheduled { background: var(--blue-100); color: var(--blue-700); }
+.status-pill.completed { background: #dcfce7; color: #15803d; }
+.status-pill.cancelled { background: #e2e8f0; color: #64748b; text-decoration: line-through; }
+
+.cat-tag { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 0.72rem; font-weight: 600; background: #e2e8f0; color: #475569; }
+.cat-tag.news { background: #dbeafe; color: #1d4ed8; }
+.cat-tag.music { background: #fae8ff; color: #a21caf; }
+.cat-tag.talk { background: #ffedd5; color: #c2410c; }
+.cat-tag.sports { background: #dcfce7; color: #15803d; }
+.cat-tag.live_event { background: #fee2e2; color: #b91c1c; }
+
+.mini-tag { display: inline-block; padding: 1px 6px; border-radius: 999px; font-size: 0.66rem; font-weight: 700; }
+.mini-tag.sudden { background: #fef3c7; color: #b45309; }
+
+/* ---------- Totals & monthly progress ---------- */
+.week-totals { margin-top: 0.9rem; }
+.totals-row {
+  display: flex; gap: 1.25rem; flex-wrap: wrap; font-size: 0.88rem; color: var(--muted);
+  background: var(--blue-50); border: 1px solid var(--blue-100);
+  padding: 0.6rem 0.9rem; border-radius: 8px;
+}
+.totals-row strong { color: var(--blue-700); }
+.month-progress { margin-top: 0.75rem; }
+.mp-label { font-size: 0.85rem; color: var(--muted); margin-bottom: 4px; }
+.mp-label strong { color: var(--blue-700); }
+.mp-excess { color: #15803d; font-weight: 600; font-size: 0.8rem; margin-top: 4px; }
+.mp-remaining { color: var(--muted); font-size: 0.8rem; margin-top: 4px; }
+
+/* ---------- Admin week grid ---------- */
+.grid-scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; }
+.sched-grid { border-collapse: collapse; width: 100%; min-width: 880px; font-size: 0.85rem; }
+.sched-grid th, .sched-grid td { border: 1px solid var(--line); }
+
+.day-head { padding: 0.4rem 0.3rem; text-align: center; min-width: 96px; background: #f8fafc; }
+.day-head.weekend { background: #f1f5f9; }
+.day-head.today { background: var(--blue-100); }
+.day-head .day-name { display: block; font-size: 0.66rem; color: var(--muted); text-transform: uppercase; }
+.day-head .day-num { display: block; font-size: 1rem; font-weight: 700; color: var(--ink); }
+.day-head.today .day-num { color: var(--blue-700); }
+.day-head .day-mon { display: block; font-size: 0.64rem; color: var(--muted); }
+
+.sched-grid .sticky-col {
+  position: sticky; left: 0; background: #fff; z-index: 2;
+  min-width: 140px; text-align: left; padding: 0.5rem; font-weight: 600;
+}
+.sched-grid thead .sticky-col { background: #f8fafc; z-index: 3; }
+
+.grid-cell { vertical-align: top; padding: 4px; min-width: 96px; height: 100%; cursor: pointer; }
+.grid-cell:hover { background: var(--blue-50); }
+.grid-cell.today { box-shadow: inset 0 0 0 2px var(--blue-600); }
+.pts-cell { text-align: center; font-weight: 700; color: var(--blue-700); min-width: 52px; }
+.pts-head { padding: 0.4rem; background: #f8fafc; font-size: 0.7rem; }
+
+.slot-chip {
+  display: inline-flex; align-items: center; margin: 2px; padding: 2px 7px;
+  border-radius: 6px; font-size: 0.72rem; font-weight: 700;
+  cursor: pointer; background: var(--blue-600); color: #fff;
+}
+.slot-chip.completed { background: #16a34a; }
+.slot-chip.cancelled { background: #94a3b8; text-decoration: line-through; }
+.slot-chip.sudden { outline: 2px dashed #b45309; outline-offset: -2px; }
+.slot-chip:hover { filter: brightness(1.1); }
+
+/* ---------- Month summary table ---------- */
+.month-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+.month-table th {
+  text-align: left; font-size: 0.72rem; text-transform: uppercase;
+  letter-spacing: 0.04em; color: var(--muted);
+  padding: 0.5rem 0.6rem; border-bottom: 2px solid var(--line);
+}
+.month-table td { padding: 0.5rem 0.6rem; border-bottom: 1px solid var(--line); }
+.target-input {
+  width: 80px; padding: 0.3rem 0.45rem; border: 1px solid var(--line);
+  border-radius: 6px; font: inherit; font-size: 0.85rem;
+}
+.target-input:focus { outline: none; border-color: var(--blue-600); box-shadow: 0 0 0 3px var(--blue-100); }
+
+/* ---------- Modal ---------- */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(15, 23, 42, 0.45);
+  display: flex; align-items: center; justify-content: center; z-index: 50; padding: 1rem;
+}
+.modal {
+  background: #fff; border-radius: 14px; width: 100%; max-width: 430px;
+  padding: 1.4rem; box-shadow: 0 24px 60px rgba(15, 23, 42, 0.25);
+  max-height: 90vh; overflow-y: auto;
+}
+.modal-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.9rem; }
+.modal-head h3 { margin: 0; font-size: 1.05rem; }
+.modal-x { border: none; background: transparent; font-size: 1.05rem; cursor: pointer; color: var(--muted); }
+.modal label { display: block; font-size: 0.78rem; font-weight: 600; color: var(--muted); margin: 0.7rem 0 0.25rem; }
+.modal select, .modal input[type="time"], .modal input[type="number"], .modal input[type="text"] {
+  width: 100%; padding: 0.45rem 0.55rem; border: 1px solid var(--line);
+  border-radius: 8px; font: inherit; font-size: 0.9rem;
+}
+.modal-row { display: flex; gap: 0.7rem; }
+.modal-row > div { flex: 1; }
+.check-row { display: flex !important; align-items: center; gap: 0.5rem; font-size: 0.85rem !important; color: var(--ink) !important; }
+.check-row input { width: auto !important; }
+.modal-submit { margin-top: 1.1rem; width: 100%; }
+.modal-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 1rem; }
+.btn.danger { background: #dc2626; }
+.btn.danger:hover { background: #b91c1c; }
+.modal-context {
+  background: var(--blue-50); border: 1px solid var(--blue-100); border-radius: 8px;
+  padding: 0.55rem 0.7rem; font-size: 0.85rem; color: var(--blue-700); margin: 0;
+}
+
+@media (max-width: 640px) {
+  .view-nav { order: 3; width: 100%; justify-content: center; }
+  .topbar { flex-wrap: wrap; }
+}

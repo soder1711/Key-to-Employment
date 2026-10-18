@@ -13,6 +13,10 @@
         <span class="brand-mark">TP</span>
         <span>Task Portal</span>
       </div>
+      <nav class="view-nav">
+        <button id="nav-tasks" class="nav-btn active">Tasks</button>
+        <button id="nav-schedule" class="nav-btn">Schedule</button>
+      </nav>
       <div class="user-area">
         <span id="user" class="user-chip"></span>
         <button id="logout-btn" class="btn ghost" style="display:none;">Log out</button>
@@ -50,6 +54,59 @@
         <div id="all-tasks-empty" class="empty" style="display:none;">No tasks match the filters.</div>
         <div id="admin-error" class="error" style="display:none;"></div>
       </section>
+
+      <section id="schedule-section" class="card" style="display:none;">
+        <div class="card-head">
+          <h2>Schedule</h2>
+          <span id="schedule-role-tag" class="admin-tag" style="display:none;">admin</span>
+          <div class="view-toggle">
+            <button id="sched-week-btn" class="btn small">Week</button>
+            <button id="sched-month-btn" class="btn small ghost">Month</button>
+          </div>
+        </div>
+
+        <div class="week-nav" id="week-controls">
+          <button id="sched-prev" class="btn ghost small">← Prev week</button>
+          <button id="sched-today" class="btn small">Today</button>
+          <button id="sched-next" class="btn ghost small">Next week →</button>
+          <span id="sched-week-label" class="week-label"></span>
+        </div>
+
+        <div class="week-nav" id="month-controls" style="display:none;">
+          <button id="month-prev" class="btn ghost small">←</button>
+          <span id="month-label" class="week-label"></span>
+          <button id="month-next" class="btn ghost small">→</button>
+        </div>
+
+        <div id="worker-schedule-wrap">
+          <table class="sched-table">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Program</th>
+                <th>Category</th>
+                <th>Time</th>
+                <th>Points</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="my-schedule-body"></tbody>
+          </table>
+          <div id="my-schedule-empty" class="empty" style="display:none;">No sessions scheduled for you this week.</div>
+          <div id="my-week-totals" class="week-totals"></div>
+        </div>
+
+        <div id="admin-schedule-wrap" style="display:none;">
+          <p class="hint">Click an empty cell to assign a session · click a chip to complete, cancel or delete it · Pts = completed points this week.</p>
+          <div class="grid-scroll">
+            <table class="sched-grid" id="admin-schedule-grid"></table>
+          </div>
+        </div>
+
+        <div id="month-view-wrap" style="display:none;">
+          <div id="month-summary-wrap"></div>
+        </div>
+      </section>
     </main>
   </div>
 
@@ -74,6 +131,49 @@
       </div>
     </div>
     <p class="login-footer">© 2026 Task Portal</p>
+  </div>
+
+  <div id="session-modal" class="modal-overlay" style="display:none;">
+    <div class="modal">
+      <div class="modal-head">
+        <h3 id="modal-title">Assign session</h3>
+        <button id="modal-close" class="modal-x" aria-label="Close">✕</button>
+      </div>
+
+      <div id="modal-assign-form">
+        <p id="assign-context" class="modal-context"></p>
+        <label for="assign-program">Program</label>
+        <select id="assign-program"></select>
+        <div class="modal-row">
+          <div>
+            <label for="assign-start">Start</label>
+            <input type="time" id="assign-start">
+          </div>
+          <div>
+            <label for="assign-end">End</label>
+            <input type="time" id="assign-end">
+          </div>
+        </div>
+        <label for="assign-points">Credited points</label>
+        <input type="number" id="assign-points" min="0" max="100" step="0.5">
+        <label class="check-row"><input type="checkbox" id="assign-sudden"> Sudden session (suggests ×2 points)</label>
+        <label for="assign-notes">Notes</label>
+        <input type="text" id="assign-notes" placeholder="optional">
+        <button id="assign-submit" class="btn modal-submit">Assign session</button>
+      </div>
+
+      <div id="modal-details" style="display:none;">
+        <div id="detail-info" class="modal-context"></div>
+        <div class="modal-actions">
+          <button class="btn small" data-status="completed">✓ Complete</button>
+          <button class="btn small ghost" data-status="scheduled">↺ Reopen</button>
+          <button class="btn small ghost" data-status="cancelled">✕ Cancel</button>
+          <button id="session-delete" class="btn small danger">Delete</button>
+        </div>
+      </div>
+
+      <p id="modal-error" class="error" style="display:none;"></p>
+    </div>
   </div>
 
   <script src="app.js" defer></script>
