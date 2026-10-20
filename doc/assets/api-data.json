@@ -1,0 +1,1292 @@
+[
+  {
+    "type": "post",
+    "url": "/api/admin/schedule/assign",
+    "title": "Assign schedule session",
+    "name": "AdminAssignSession",
+    "group": "AdminSchedule",
+    "header": {
+      "fields": {
+        "Header": [
+          {
+            "group": "Header",
+            "type": "String",
+            "optional": false,
+            "field": "Cookie",
+            "isArray": false,
+            "description": "<p>Encrypted admin session cookie.</p>"
+          }
+        ]
+      }
+    },
+    "body": [
+      {
+        "group": "Body",
+        "type": "Number",
+        "optional": false,
+        "field": "employeeId",
+        "isArray": false,
+        "description": "<p>Employee identifier.</p>"
+      },
+      {
+        "group": "Body",
+        "type": "String",
+        "optional": false,
+        "field": "date",
+        "isArray": false,
+        "description": "<p>Session date in YYYY-MM-DD format.</p>"
+      },
+      {
+        "group": "Body",
+        "type": "Number",
+        "optional": false,
+        "field": "programId",
+        "isArray": false,
+        "description": "<p>Program identifier.</p>"
+      },
+      {
+        "group": "Body",
+        "type": "String",
+        "optional": true,
+        "field": "startTime",
+        "isArray": false,
+        "description": "<p>Start time in HH:MM format.</p>"
+      },
+      {
+        "group": "Body",
+        "type": "String",
+        "optional": true,
+        "field": "endTime",
+        "isArray": false,
+        "description": "<p>End time in HH:MM format.</p>"
+      },
+      {
+        "group": "Body",
+        "type": "Number",
+        "optional": false,
+        "field": "points",
+        "isArray": false,
+        "description": "<p>Credited points from 0 to 100.</p>"
+      },
+      {
+        "group": "Body",
+        "type": "Boolean",
+        "optional": true,
+        "field": "isSudden",
+        "isArray": false,
+        "defaultValue": "false",
+        "description": "<p>Whether this is a sudden session.</p>",
+        "checked": true
+      },
+      {
+        "group": "Body",
+        "type": "String",
+        "optional": true,
+        "field": "notes",
+        "isArray": false,
+        "description": "<p>Optional notes.</p>"
+      }
+    ],
+    "success": {
+      "fields": {
+        "Success 200": [
+          {
+            "group": "Success 200",
+            "type": "Boolean",
+            "optional": false,
+            "field": "success",
+            "isArray": false,
+            "description": "<p>Always true when created.</p>"
+          },
+          {
+            "group": "Success 200",
+            "type": "Object",
+            "optional": false,
+            "field": "session",
+            "isArray": false,
+            "description": "<p>Created session.</p>"
+          }
+        ]
+      }
+    },
+    "error": {
+      "fields": {
+        "Error 4xx": [
+          {
+            "group": "Error 4xx",
+            "optional": false,
+            "field": "400",
+            "isArray": false,
+            "description": "<p>Invalid assignment payload.</p>"
+          },
+          {
+            "group": "Error 4xx",
+            "optional": false,
+            "field": "403",
+            "isArray": false,
+            "description": "<p>Admin access required.</p>"
+          }
+        ]
+      }
+    },
+    "version": "0.0.0",
+    "filename": "api.js",
+    "groupTitle": "AdminSchedule"
+  },
+  {
+    "type": "post",
+    "url": "/api/admin/schedule/delete",
+    "title": "Delete schedule session",
+    "name": "AdminDeleteSession",
+    "group": "AdminSchedule",
+    "header": {
+      "fields": {
+        "Header": [
+          {
+            "group": "Header",
+            "type": "String",
+            "optional": false,
+            "field": "Cookie",
+            "isArray": false,
+            "description": "<p>Encrypted admin session cookie.</p>"
+          }
+        ]
+      }
+    },
+    "body": [
+      {
+        "group": "Body",
+        "type": "Number",
+        "optional": false,
+        "field": "sessionId",
+        "isArray": false,
+        "description": "<p>Session identifier.</p>"
+      }
+    ],
+    "success": {
+      "fields": {
+        "Success 200": [
+          {
+            "group": "Success 200",
+            "type": "Boolean",
+            "optional": false,
+            "field": "success",
+            "isArray": false,
+            "description": "<p>Always true when deleted.</p>"
+          }
+        ]
+      }
+    },
+    "error": {
+      "fields": {
+        "Error 4xx": [
+          {
+            "group": "Error 4xx",
+            "optional": false,
+            "field": "400",
+            "isArray": false,
+            "description": "<p>Invalid session ID.</p>"
+          },
+          {
+            "group": "Error 4xx",
+            "optional": false,
+            "field": "403",
+            "isArray": false,
+            "description": "<p>Admin access required.</p>"
+          },
+          {
+            "group": "Error 4xx",
+            "optional": false,
+            "field": "404",
+            "isArray": false,
+            "description": "<p>Session not found.</p>"
+          }
+        ]
+      }
+    },
+    "version": "0.0.0",
+    "filename": "api.js",
+    "groupTitle": "AdminSchedule"
+  },
+  {
+    "type": "get",
+    "url": "/api/admin/schedule",
+    "title": "Get admin weekly schedule",
+    "name": "AdminGetSchedule",
+    "group": "AdminSchedule",
+    "header": {
+      "fields": {
+        "Header": [
+          {
+            "group": "Header",
+            "type": "String",
+            "optional": false,
+            "field": "Cookie",
+            "isArray": false,
+            "description": "<p>Encrypted admin session cookie.</p>"
+          }
+        ]
+      }
+    },
+    "query": [
+      {
+        "group": "Query",
+        "type": "String",
+        "optional": true,
+        "field": "start",
+        "isArray": false,
+        "description": "<p>Any date in the requested week; normalized to Monday.</p>"
+      }
+    ],
+    "success": {
+      "fields": {
+        "Success 200": [
+          {
+            "group": "Success 200",
+            "type": "String",
+            "optional": false,
+            "field": "weekStart",
+            "isArray": false,
+            "description": "<p>Monday for the requested week.</p>"
+          },
+          {
+            "group": "Success 200",
+            "type": "String[]",
+            "optional": false,
+            "field": "dates",
+            "isArray": true,
+            "description": "<p>Seven dates in the week.</p>"
+          },
+          {
+            "group": "Success 200",
+            "type": "Object[]",
+            "optional": false,
+            "field": "sessions",
+            "isArray": true,
+            "description": "<p>All sessions in the week.</p>"
+          },
+          {
+            "group": "Success 200",
+            "type": "Object[]",
+            "optional": false,
+            "field": "employees",
+            "isArray": true,
+            "description": "<p>Active employees.</p>"
+          },
+          {
+            "group": "Success 200",
+            "type": "Object[]",
+            "optional": false,
+            "field": "programs",
+            "isArray": true,
+            "description": "<p>Available programs.</p>"
+          }
+        ]
+      }
+    },
+    "error": {
+      "fields": {
+        "Error 4xx": [
+          {
+            "group": "Error 4xx",
+            "optional": false,
+            "field": "403",
+            "isArray": false,
+            "description": "<p>Admin access required.</p>"
+          }
+        ]
+      }
+    },
+    "version": "0.0.0",
+    "filename": "api.js",
+    "groupTitle": "AdminSchedule"
+  },
+  {
+    "type": "get",
+    "url": "/api/admin/schedule/monthly",
+    "title": "Get monthly schedule summary",
+    "name": "AdminMonthlySummary",
+    "group": "AdminSchedule",
+    "header": {
+      "fields": {
+        "Header": [
+          {
+            "group": "Header",
+            "type": "String",
+            "optional": false,
+            "field": "Cookie",
+            "isArray": false,
+            "description": "<p>Encrypted admin session cookie.</p>"
+          }
+        ]
+      }
+    },
+    "query": [
+      {
+        "group": "Query",
+        "type": "Number",
+        "optional": true,
+        "field": "year",
+        "isArray": false,
+        "description": "<p>UTC summary year; defaults to the current year.</p>"
+      },
+      {
+        "group": "Query",
+        "type": "Number",
+        "optional": true,
+        "field": "month",
+        "isArray": false,
+        "description": "<p>Summary month from 1 to 12; defaults to the current month.</p>"
+      }
+    ],
+    "success": {
+      "fields": {
+        "Success 200": [
+          {
+            "group": "Success 200",
+            "type": "Number",
+            "optional": false,
+            "field": "year",
+            "isArray": false,
+            "description": "<p>Summary year.</p>"
+          },
+          {
+            "group": "Success 200",
+            "type": "Number",
+            "optional": false,
+            "field": "month",
+            "isArray": false,
+            "description": "<p>Summary month.</p>"
+          },
+          {
+            "group": "Success 200",
+            "type": "Object[]",
+            "optional": false,
+            "field": "rows",
+            "isArray": true,
+            "description": "<p>Employee summary rows.</p>"
+          }
+        ]
+      }
+    },
+    "error": {
+      "fields": {
+        "Error 4xx": [
+          {
+            "group": "Error 4xx",
+            "optional": false,
+            "field": "400",
+            "isArray": false,
+            "description": "<p>Invalid month.</p>"
+          },
+          {
+            "group": "Error 4xx",
+            "optional": false,
+            "field": "403",
+            "isArray": false,
+            "description": "<p>Admin access required.</p>"
+          }
+        ]
+      }
+    },
+    "version": "0.0.0",
+    "filename": "api.js",
+    "groupTitle": "AdminSchedule"
+  },
+  {
+    "type": "post",
+    "url": "/api/admin/schedule/status",
+    "title": "Change session status",
+    "name": "AdminSessionStatus",
+    "group": "AdminSchedule",
+    "header": {
+      "fields": {
+        "Header": [
+          {
+            "group": "Header",
+            "type": "String",
+            "optional": false,
+            "field": "Cookie",
+            "isArray": false,
+            "description": "<p>Encrypted admin session cookie.</p>"
+          }
+        ]
+      }
+    },
+    "body": [
+      {
+        "group": "Body",
+        "type": "Number",
+        "optional": false,
+        "field": "sessionId",
+        "isArray": false,
+        "description": "<p>Session identifier.</p>"
+      },
+      {
+        "group": "Body",
+        "type": "String",
+        "optional": false,
+        "field": "status",
+        "isArray": false,
+        "description": "<p>One of scheduled, completed, or cancelled.</p>"
+      }
+    ],
+    "success": {
+      "fields": {
+        "Success 200": [
+          {
+            "group": "Success 200",
+            "type": "Boolean",
+            "optional": false,
+            "field": "success",
+            "isArray": false,
+            "description": "<p>Always true when updated.</p>"
+          }
+        ]
+      }
+    },
+    "error": {
+      "fields": {
+        "Error 4xx": [
+          {
+            "group": "Error 4xx",
+            "optional": false,
+            "field": "400",
+            "isArray": false,
+            "description": "<p>Invalid status change.</p>"
+          },
+          {
+            "group": "Error 4xx",
+            "optional": false,
+            "field": "403",
+            "isArray": false,
+            "description": "<p>Admin access required.</p>"
+          },
+          {
+            "group": "Error 4xx",
+            "optional": false,
+            "field": "404",
+            "isArray": false,
+            "description": "<p>Session not found.</p>"
+          }
+        ]
+      }
+    },
+    "version": "0.0.0",
+    "filename": "api.js",
+    "groupTitle": "AdminSchedule"
+  },
+  {
+    "type": "post",
+    "url": "/api/admin/schedule/target",
+    "title": "Set monthly points target",
+    "name": "AdminSetTarget",
+    "group": "AdminSchedule",
+    "header": {
+      "fields": {
+        "Header": [
+          {
+            "group": "Header",
+            "type": "String",
+            "optional": false,
+            "field": "Cookie",
+            "isArray": false,
+            "description": "<p>Encrypted admin session cookie.</p>"
+          }
+        ]
+      }
+    },
+    "body": [
+      {
+        "group": "Body",
+        "type": "Number",
+        "optional": false,
+        "field": "employeeId",
+        "isArray": false,
+        "description": "<p>Employee identifier.</p>"
+      },
+      {
+        "group": "Body",
+        "type": "Number",
+        "optional": false,
+        "field": "year",
+        "isArray": false,
+        "description": "<p>Target year.</p>"
+      },
+      {
+        "group": "Body",
+        "type": "Number",
+        "optional": false,
+        "field": "month",
+        "isArray": false,
+        "description": "<p>Target month from 1 to 12.</p>"
+      },
+      {
+        "group": "Body",
+        "type": "Number",
+        "optional": false,
+        "field": "targetPoints",
+        "isArray": false,
+        "description": "<p>Target points from 0 to 10000.</p>"
+      }
+    ],
+    "success": {
+      "fields": {
+        "Success 200": [
+          {
+            "group": "Success 200",
+            "type": "Boolean",
+            "optional": false,
+            "field": "success",
+            "isArray": false,
+            "description": "<p>Always true when saved.</p>"
+          }
+        ]
+      }
+    },
+    "error": {
+      "fields": {
+        "Error 4xx": [
+          {
+            "group": "Error 4xx",
+            "optional": false,
+            "field": "400",
+            "isArray": false,
+            "description": "<p>Invalid target payload or points.</p>"
+          },
+          {
+            "group": "Error 4xx",
+            "optional": false,
+            "field": "403",
+            "isArray": false,
+            "description": "<p>Admin access required.</p>"
+          }
+        ]
+      }
+    },
+    "version": "0.0.0",
+    "filename": "api.js",
+    "groupTitle": "AdminSchedule"
+  },
+  {
+    "type": "get",
+    "url": "/api/admin/tasks/:taskId",
+    "title": "Get any task",
+    "name": "AdminGetTask",
+    "group": "AdminTasks",
+    "header": {
+      "fields": {
+        "Header": [
+          {
+            "group": "Header",
+            "type": "String",
+            "optional": false,
+            "field": "Cookie",
+            "isArray": false,
+            "description": "<p>Encrypted admin session cookie.</p>"
+          }
+        ]
+      }
+    },
+    "parameter": {
+      "fields": {
+        "Parameter": [
+          {
+            "group": "Parameter",
+            "type": "Number",
+            "optional": false,
+            "field": "taskId",
+            "isArray": false,
+            "description": "<p>Task identifier.</p>"
+          }
+        ]
+      }
+    },
+    "success": {
+      "fields": {
+        "Success 200": [
+          {
+            "group": "Success 200",
+            "type": "Object",
+            "optional": false,
+            "field": "task",
+            "isArray": false,
+            "description": "<p>Task details and assignment data.</p>"
+          }
+        ]
+      }
+    },
+    "error": {
+      "fields": {
+        "Error 4xx": [
+          {
+            "group": "Error 4xx",
+            "optional": false,
+            "field": "403",
+            "isArray": false,
+            "description": "<p>Admin access required.</p>"
+          },
+          {
+            "group": "Error 4xx",
+            "optional": false,
+            "field": "404",
+            "isArray": false,
+            "description": "<p>Task not found.</p>"
+          }
+        ]
+      }
+    },
+    "version": "0.0.0",
+    "filename": "api.js",
+    "groupTitle": "AdminTasks"
+  },
+  {
+    "type": "get",
+    "url": "/api/admin/tasks",
+    "title": "List all tasks",
+    "name": "AdminGetTasks",
+    "group": "AdminTasks",
+    "header": {
+      "fields": {
+        "Header": [
+          {
+            "group": "Header",
+            "type": "String",
+            "optional": false,
+            "field": "Cookie",
+            "isArray": false,
+            "description": "<p>Encrypted admin session cookie.</p>"
+          }
+        ]
+      }
+    },
+    "query": [
+      {
+        "group": "Query",
+        "type": "String",
+        "optional": true,
+        "field": "status",
+        "isArray": false,
+        "description": "<p>Filter by task status.</p>"
+      },
+      {
+        "group": "Query",
+        "type": "Number",
+        "optional": true,
+        "field": "employeeId",
+        "isArray": false,
+        "description": "<p>Filter by assigned employee.</p>"
+      }
+    ],
+    "success": {
+      "fields": {
+        "Success 200": [
+          {
+            "group": "Success 200",
+            "type": "Object[]",
+            "optional": false,
+            "field": "tasks",
+            "isArray": true,
+            "description": "<p>All matching tasks and assignments.</p>"
+          }
+        ]
+      }
+    },
+    "error": {
+      "fields": {
+        "Error 4xx": [
+          {
+            "group": "Error 4xx",
+            "optional": false,
+            "field": "403",
+            "isArray": false,
+            "description": "<p>Admin access required.</p>"
+          }
+        ]
+      }
+    },
+    "version": "0.0.0",
+    "filename": "api.js",
+    "groupTitle": "AdminTasks"
+  },
+  {
+    "type": "post",
+    "url": "/api/admin/progress",
+    "title": "Update any task progress",
+    "name": "AdminUpdateProgress",
+    "group": "AdminTasks",
+    "header": {
+      "fields": {
+        "Header": [
+          {
+            "group": "Header",
+            "type": "String",
+            "optional": false,
+            "field": "Cookie",
+            "isArray": false,
+            "description": "<p>Encrypted admin session cookie.</p>"
+          }
+        ]
+      }
+    },
+    "body": [
+      {
+        "group": "Body",
+        "type": "Number",
+        "optional": false,
+        "field": "assignmentId",
+        "isArray": false,
+        "description": "<p>Assignment identifier.</p>"
+      },
+      {
+        "group": "Body",
+        "type": "Number",
+        "optional": false,
+        "field": "percentage",
+        "isArray": false,
+        "description": "<p>Completion percentage from 0 to 100.</p>"
+      },
+      {
+        "group": "Body",
+        "type": "String",
+        "optional": true,
+        "field": "notes",
+        "isArray": false,
+        "description": "<p>Optional progress notes.</p>"
+      }
+    ],
+    "success": {
+      "fields": {
+        "Success 200": [
+          {
+            "group": "Success 200",
+            "type": "Boolean",
+            "optional": false,
+            "field": "success",
+            "isArray": false,
+            "description": "<p>Always true when the update succeeds.</p>"
+          }
+        ]
+      }
+    },
+    "error": {
+      "fields": {
+        "Error 4xx": [
+          {
+            "group": "Error 4xx",
+            "optional": false,
+            "field": "403",
+            "isArray": false,
+            "description": "<p>Admin access required.</p>"
+          },
+          {
+            "group": "Error 4xx",
+            "optional": false,
+            "field": "400",
+            "isArray": false,
+            "description": "<p>Invalid percentage.</p>"
+          },
+          {
+            "group": "Error 4xx",
+            "optional": false,
+            "field": "404",
+            "isArray": false,
+            "description": "<p>Assignment not found.</p>"
+          }
+        ]
+      }
+    },
+    "version": "0.0.0",
+    "filename": "api.js",
+    "groupTitle": "AdminTasks"
+  },
+  {
+    "type": "get",
+    "url": "/auth/google/callback",
+    "title": "Complete Google sign-in",
+    "name": "CompleteGoogleSignIn",
+    "group": "Authentication",
+    "query": [
+      {
+        "group": "Query",
+        "type": "String",
+        "optional": false,
+        "field": "code",
+        "isArray": false,
+        "description": "<p>Authorization code returned by Google.</p>"
+      },
+      {
+        "group": "Query",
+        "type": "String",
+        "optional": false,
+        "field": "state",
+        "isArray": false,
+        "description": "<p>OAuth state value returned by Google.</p>"
+      }
+    ],
+    "success": {
+      "fields": {
+        "Redirect": [
+          {
+            "group": "Redirect",
+            "type": "String",
+            "optional": false,
+            "field": "Location",
+            "isArray": false,
+            "description": "<p>Configured frontend URL.</p>"
+          }
+        ]
+      }
+    },
+    "error": {
+      "fields": {
+        "400": [
+          {
+            "group": "400",
+            "optional": false,
+            "field": "MissingCodeOrState",
+            "isArray": false,
+            "description": "<p>Required OAuth parameters are missing.</p>"
+          }
+        ],
+        "403": [
+          {
+            "group": "403",
+            "optional": false,
+            "field": "InvalidState",
+            "isArray": false,
+            "description": "<p>The OAuth state cookie does not match.</p>"
+          }
+        ]
+      }
+    },
+    "version": "0.0.0",
+    "filename": "auth.js",
+    "groupTitle": "Authentication"
+  },
+  {
+    "type": "get",
+    "url": "/auth/logout",
+    "title": "Log out",
+    "name": "Logout",
+    "group": "Authentication",
+    "success": {
+      "fields": {
+        "Redirect": [
+          {
+            "group": "Redirect",
+            "type": "String",
+            "optional": false,
+            "field": "Location",
+            "isArray": false,
+            "description": "<p>Configured frontend URL.</p>"
+          }
+        ],
+        "Cookie": [
+          {
+            "group": "Cookie",
+            "type": "String",
+            "optional": false,
+            "field": "session",
+            "isArray": false,
+            "description": "<p>Expired session cookie.</p>"
+          }
+        ]
+      }
+    },
+    "version": "0.0.0",
+    "filename": "auth.js",
+    "groupTitle": "Authentication"
+  },
+  {
+    "type": "get",
+    "url": "/auth/google",
+    "title": "Start Google sign-in",
+    "name": "StartGoogleSignIn",
+    "group": "Authentication",
+    "description": "<p>Starts the OAuth 2.0 Authorization Code flow with PKCE and redirects to Google.</p>",
+    "success": {
+      "fields": {
+        "Redirect": [
+          {
+            "group": "Redirect",
+            "type": "String",
+            "optional": false,
+            "field": "Location",
+            "isArray": false,
+            "description": "<p>Google authorization URL.</p>"
+          }
+        ],
+        "Cookie": [
+          {
+            "group": "Cookie",
+            "type": "String",
+            "optional": false,
+            "field": "oauth_state",
+            "isArray": false,
+            "description": "<p>Short-lived signed OAuth state cookie.</p>"
+          }
+        ]
+      },
+      "examples": [
+        {
+          "title": "Success:",
+          "content": "HTTP/1.1 302 Found\nLocation: https://accounts.google.com/o/oauth2/v2/auth",
+          "type": "http"
+        }
+      ]
+    },
+    "version": "0.0.0",
+    "filename": "auth.js",
+    "groupTitle": "Authentication"
+  },
+  {
+    "type": "get",
+    "url": "/api/schedule",
+    "title": "Get my weekly schedule",
+    "name": "GetMySchedule",
+    "group": "Schedule",
+    "header": {
+      "fields": {
+        "Header": [
+          {
+            "group": "Header",
+            "type": "String",
+            "optional": false,
+            "field": "Cookie",
+            "isArray": false,
+            "description": "<p>Encrypted session cookie.</p>"
+          }
+        ]
+      }
+    },
+    "query": [
+      {
+        "group": "Query",
+        "type": "String",
+        "optional": true,
+        "field": "start",
+        "isArray": false,
+        "description": "<p>Any date in the requested week; normalized to Monday.</p>"
+      },
+      {
+        "group": "Query",
+        "type": "Number",
+        "optional": true,
+        "field": "year",
+        "isArray": false,
+        "description": "<p>Summary year.</p>"
+      },
+      {
+        "group": "Query",
+        "type": "Number",
+        "optional": true,
+        "field": "month",
+        "isArray": false,
+        "description": "<p>Summary month from 1 to 12.</p>"
+      }
+    ],
+    "success": {
+      "fields": {
+        "Success 200": [
+          {
+            "group": "Success 200",
+            "type": "String",
+            "optional": false,
+            "field": "weekStart",
+            "isArray": false,
+            "description": "<p>Monday for the requested week.</p>"
+          },
+          {
+            "group": "Success 200",
+            "type": "String[]",
+            "optional": false,
+            "field": "dates",
+            "isArray": true,
+            "description": "<p>Seven dates in the week.</p>"
+          },
+          {
+            "group": "Success 200",
+            "type": "Object[]",
+            "optional": false,
+            "field": "sessions",
+            "isArray": true,
+            "description": "<p>Sessions assigned to the employee.</p>"
+          },
+          {
+            "group": "Success 200",
+            "type": "Object",
+            "optional": false,
+            "field": "summary",
+            "isArray": false,
+            "description": "<p>Monthly progress summary, or null.</p>"
+          }
+        ]
+      }
+    },
+    "version": "0.0.0",
+    "filename": "api.js",
+    "groupTitle": "Schedule"
+  },
+  {
+    "type": "get",
+    "url": "/api/tasks/:taskId",
+    "title": "Get my task",
+    "name": "GetMyTask",
+    "group": "Tasks",
+    "header": {
+      "fields": {
+        "Header": [
+          {
+            "group": "Header",
+            "type": "String",
+            "optional": false,
+            "field": "Cookie",
+            "isArray": false,
+            "description": "<p>Encrypted session cookie.</p>"
+          }
+        ]
+      }
+    },
+    "parameter": {
+      "fields": {
+        "Parameter": [
+          {
+            "group": "Parameter",
+            "type": "Number",
+            "optional": false,
+            "field": "taskId",
+            "isArray": false,
+            "description": "<p>Task identifier.</p>"
+          }
+        ]
+      }
+    },
+    "success": {
+      "fields": {
+        "Success 200": [
+          {
+            "group": "Success 200",
+            "type": "Object",
+            "optional": false,
+            "field": "task",
+            "isArray": false,
+            "description": "<p>Task details for the authenticated employee.</p>"
+          }
+        ]
+      }
+    },
+    "error": {
+      "fields": {
+        "Error 4xx": [
+          {
+            "group": "Error 4xx",
+            "optional": false,
+            "field": "404",
+            "isArray": false,
+            "description": "<p>Task not found or not assigned to the employee.</p>"
+          }
+        ]
+      }
+    },
+    "version": "0.0.0",
+    "filename": "api.js",
+    "groupTitle": "Tasks"
+  },
+  {
+    "type": "get",
+    "url": "/api/me/tasks",
+    "title": "List my tasks",
+    "name": "GetMyTasks",
+    "group": "Tasks",
+    "header": {
+      "fields": {
+        "Header": [
+          {
+            "group": "Header",
+            "type": "String",
+            "optional": false,
+            "field": "Cookie",
+            "isArray": false,
+            "description": "<p>Encrypted session cookie.</p>"
+          }
+        ]
+      }
+    },
+    "success": {
+      "fields": {
+        "Success 200": [
+          {
+            "group": "Success 200",
+            "type": "Object[]",
+            "optional": false,
+            "field": "tasks",
+            "isArray": true,
+            "description": "<p>Tasks assigned to the authenticated employee.</p>"
+          }
+        ]
+      },
+      "examples": [
+        {
+          "title": "Success:",
+          "content": "{ \"tasks\": [] }",
+          "type": "json"
+        }
+      ]
+    },
+    "version": "0.0.0",
+    "filename": "api.js",
+    "groupTitle": "Tasks"
+  },
+  {
+    "type": "post",
+    "url": "/api/progress",
+    "title": "Update my task progress",
+    "name": "UpdateMyProgress",
+    "group": "Tasks",
+    "header": {
+      "fields": {
+        "Header": [
+          {
+            "group": "Header",
+            "type": "String",
+            "optional": false,
+            "field": "Cookie",
+            "isArray": false,
+            "description": "<p>Encrypted session cookie.</p>"
+          }
+        ]
+      }
+    },
+    "body": [
+      {
+        "group": "Body",
+        "type": "Number",
+        "optional": false,
+        "field": "assignmentId",
+        "isArray": false,
+        "description": "<p>Assignment identifier.</p>"
+      },
+      {
+        "group": "Body",
+        "type": "Number",
+        "optional": false,
+        "field": "percentage",
+        "isArray": false,
+        "description": "<p>Completion percentage from 0 to 100.</p>"
+      },
+      {
+        "group": "Body",
+        "type": "String",
+        "optional": true,
+        "field": "notes",
+        "isArray": false,
+        "description": "<p>Optional progress notes.</p>"
+      }
+    ],
+    "success": {
+      "fields": {
+        "Success 200": [
+          {
+            "group": "Success 200",
+            "type": "Boolean",
+            "optional": false,
+            "field": "success",
+            "isArray": false,
+            "description": "<p>Always true when the update succeeds.</p>"
+          }
+        ]
+      }
+    },
+    "error": {
+      "fields": {
+        "Error 4xx": [
+          {
+            "group": "Error 4xx",
+            "optional": false,
+            "field": "400",
+            "isArray": false,
+            "description": "<p>Invalid percentage.</p>"
+          },
+          {
+            "group": "Error 4xx",
+            "optional": false,
+            "field": "404",
+            "isArray": false,
+            "description": "<p>Assignment not found or not owned by the employee.</p>"
+          }
+        ]
+      }
+    },
+    "version": "0.0.0",
+    "filename": "api.js",
+    "groupTitle": "Tasks"
+  },
+  {
+    "type": "get",
+    "url": "/api/me",
+    "title": "Get current user",
+    "name": "GetCurrentUser",
+    "group": "Users",
+    "header": {
+      "fields": {
+        "Header": [
+          {
+            "group": "Header",
+            "type": "String",
+            "optional": false,
+            "field": "Cookie",
+            "isArray": false,
+            "description": "<p>Encrypted session cookie.</p>"
+          }
+        ]
+      }
+    },
+    "success": {
+      "fields": {
+        "Success 200": [
+          {
+            "group": "Success 200",
+            "type": "String",
+            "optional": false,
+            "field": "email",
+            "isArray": false,
+            "description": "<p>Signed-in employee email.</p>"
+          },
+          {
+            "group": "Success 200",
+            "type": "Number",
+            "optional": false,
+            "field": "employeeId",
+            "isArray": false,
+            "description": "<p>Employee identifier.</p>"
+          },
+          {
+            "group": "Success 200",
+            "type": "Boolean",
+            "optional": false,
+            "field": "isAdmin",
+            "isArray": false,
+            "description": "<p>Whether the employee is an administrator.</p>"
+          }
+        ]
+      }
+    },
+    "error": {
+      "fields": {
+        "Error 4xx": [
+          {
+            "group": "Error 4xx",
+            "optional": false,
+            "field": "401",
+            "isArray": false,
+            "description": "<p>Unauthorized or inactive employee.</p>"
+          }
+        ]
+      }
+    },
+    "version": "0.0.0",
+    "filename": "index.js",
+    "groupTitle": "Users"
+  }
+]

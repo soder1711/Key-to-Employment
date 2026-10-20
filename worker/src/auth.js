@@ -18,6 +18,17 @@ async function sha256Base64Url(input) {
     .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
+/**
+ * @api {get} /auth/google Start Google sign-in
+ * @apiName StartGoogleSignIn
+ * @apiGroup Authentication
+ * @apiDescription Starts the OAuth 2.0 Authorization Code flow with PKCE and redirects to Google.
+ * @apiSuccess (Redirect) {String} Location Google authorization URL.
+ * @apiSuccess (Cookie) {String} oauth_state Short-lived signed OAuth state cookie.
+ * @apiSuccessExample {http} Success:
+ *     HTTP/1.1 302 Found
+ *     Location: https://accounts.google.com/o/oauth2/v2/auth
+ */
 // Step 1: Redirect to Google
 export async function handleLogin(request, env) {
   const url = new URL(request.url);
@@ -52,6 +63,16 @@ export async function handleLogin(request, env) {
   });
 }
 
+/**
+ * @api {get} /auth/google/callback Complete Google sign-in
+ * @apiName CompleteGoogleSignIn
+ * @apiGroup Authentication
+ * @apiQuery {String} code Authorization code returned by Google.
+ * @apiQuery {String} state OAuth state value returned by Google.
+ * @apiSuccess (Redirect) {String} Location Configured frontend URL.
+ * @apiError (400) MissingCodeOrState Required OAuth parameters are missing.
+ * @apiError (403) InvalidState The OAuth state cookie does not match.
+ */
 // Step 2: Handle callback from Google
 export async function handleCallback(request, env) {
   const url = new URL(request.url);
@@ -137,6 +158,13 @@ export async function handleCallback(request, env) {
   });
 }
 
+/**
+ * @api {get} /auth/logout Log out
+ * @apiName Logout
+ * @apiGroup Authentication
+ * @apiSuccess (Redirect) {String} Location Configured frontend URL.
+ * @apiSuccess (Cookie) {String} session Expired session cookie.
+ */
 // Step 3: Logout
 export function handleLogout(env) {
   return new Response(null, {

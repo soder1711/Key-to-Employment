@@ -7,7 +7,8 @@ A small employee task and schedule portal built with a static frontend and a Clo
 - `frontend/` — static HTML, CSS, and browser JavaScript deployed to GitHub Pages.
 - `worker/` — the Cloudflare Worker API, including Google OAuth, sessions, and D1 queries.
 - `schema/` — SQL used to initialize and seed the Cloudflare D1 database.
-- [APIDOC.md](APIDOC.md) — HTTP endpoint reference for authentication, task, schedule, and admin APIs.
+- [APIDOC.md](APIDOC.md) — Markdown HTTP endpoint reference for authentication, task, schedule, and admin APIs.
+- [doc/index.html](doc/index.html) — Generated interactive API documentation.
 - `.github/workflows/` — GitHub Actions workflows for frontend and Worker deployments.
 
 ## How it works

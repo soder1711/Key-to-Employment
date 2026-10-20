@@ -78,6 +78,16 @@ export default {
 
       let response;
 
+      /**
+       * @api {get} /api/me Get current user
+       * @apiName GetCurrentUser
+       * @apiGroup Users
+       * @apiHeader {String} Cookie Encrypted session cookie.
+       * @apiSuccess {String} email Signed-in employee email.
+       * @apiSuccess {Number} employeeId Employee identifier.
+       * @apiSuccess {Boolean} isAdmin Whether the employee is an administrator.
+       * @apiError 401 Unauthorized or inactive employee.
+       */
       // ---- User endpoints (self only) ----
       if (url.pathname === '/api/me' && request.method === 'GET') {
         response = Response.json({

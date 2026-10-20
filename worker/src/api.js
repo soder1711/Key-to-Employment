@@ -6,17 +6,47 @@ import {
   deleteSession, logScheduleHistory, getMonthlySummary, setMonthlyTarget,
 } from './db.js';
 
+/**
+ * @api {get} /api/me/tasks List my tasks
+ * @apiName GetMyTasks
+ * @apiGroup Tasks
+ * @apiHeader {String} Cookie Encrypted session cookie.
+ * @apiSuccess {Object[]} tasks Tasks assigned to the authenticated employee.
+ * @apiSuccessExample {json} Success:
+ *     { "tasks": [] }
+ */
 export async function handleGetMyTasks(env, session) {
   const tasks = await getEmployeeTasks(env.DB, session.employeeId);
   return Response.json({ tasks });
 }
 
+/**
+ * @api {get} /api/tasks/:taskId Get my task
+ * @apiName GetMyTask
+ * @apiGroup Tasks
+ * @apiHeader {String} Cookie Encrypted session cookie.
+ * @apiParam {Number} taskId Task identifier.
+ * @apiSuccess {Object} task Task details for the authenticated employee.
+ * @apiError 404 Task not found or not assigned to the employee.
+ */
 export async function handleGetTask(env, session, taskId) {
   const task = await getTaskDetail(env.DB, taskId, session.employeeId);
   if (!task) return new Response('Not found', { status: 404 });
   return Response.json({ task });
 }
 
+/**
+ * @api {post} /api/progress Update my task progress
+ * @apiName UpdateMyProgress
+ * @apiGroup Tasks
+ * @apiHeader {String} Cookie Encrypted session cookie.
+ * @apiBody {Number} assignmentId Assignment identifier.
+ * @apiBody {Number} percentage Completion percentage from 0 to 100.
+ * @apiBody {String} [notes] Optional progress notes.
+ * @apiSuccess {Boolean} success Always true when the update succeeds.
+ * @apiError 400 Invalid percentage.
+ * @apiError 404 Assignment not found or not owned by the employee.
+ */
 export async function handleUpdateProgress(env, session, body) {
   const { assignmentId, percentage, notes } = body;
 
@@ -44,6 +74,16 @@ function requireAdmin(session) {
 
 // ---------- Admin handlers ----------
 
+/**
+ * @api {get} /api/admin/tasks List all tasks
+ * @apiName AdminGetTasks
+ * @apiGroup AdminTasks
+ * @apiHeader {String} Cookie Encrypted admin session cookie.
+ * @apiQuery {String} [status] Filter by task status.
+ * @apiQuery {Number} [employeeId] Filter by assigned employee.
+ * @apiSuccess {Object[]} tasks All matching tasks and assignments.
+ * @apiError 403 Admin access required.
+ */
 export async function handleAdminGetAllTasks(env, session, url) {
   const denied = requireAdmin(session);
   if (denied) return denied;
@@ -56,6 +96,16 @@ export async function handleAdminGetAllTasks(env, session, url) {
   return Response.json({ tasks });
 }
 
+/**
+ * @api {get} /api/admin/tasks/:taskId Get any task
+ * @apiName AdminGetTask
+ * @apiGroup AdminTasks
+ * @apiHeader {String} Cookie Encrypted admin session cookie.
+ * @apiParam {Number} taskId Task identifier.
+ * @apiSuccess {Object} task Task details and assignment data.
+ * @apiError 403 Admin access required.
+ * @apiError 404 Task not found.
+ */
 export async function handleAdminGetTask(env, session, taskId) {
   const denied = requireAdmin(session);
   if (denied) return denied;
@@ -65,6 +115,19 @@ export async function handleAdminGetTask(env, session, taskId) {
   return Response.json({ task });
 }
 
+/**
+ * @api {post} /api/admin/progress Update any task progress
+ * @apiName AdminUpdateProgress
+ * @apiGroup AdminTasks
+ * @apiHeader {String} Cookie Encrypted admin session cookie.
+ * @apiBody {Number} assignmentId Assignment identifier.
+ * @apiBody {Number} percentage Completion percentage from 0 to 100.
+ * @apiBody {String} [notes] Optional progress notes.
+ * @apiSuccess {Boolean} success Always true when the update succeeds.
+ * @apiError 403 Admin access required.
+ * @apiError 400 Invalid percentage.
+ * @apiError 404 Assignment not found.
+ */
 export async function handleAdminUpdateProgress(env, session, body) {
   const denied = requireAdmin(session);
   if (denied) return denied;
@@ -90,6 +153,19 @@ export async function handleAdminUpdateProgress(env, session, body) {
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const TIME_RE = /^\d{2}:\d{2}$/;
 
+/**
+ * @api {get} /api/schedule Get my weekly schedule
+ * @apiName GetMySchedule
+ * @apiGroup Schedule
+ * @apiHeader {String} Cookie Encrypted session cookie.
+ * @apiQuery {String} [start] Any date in the requested week; normalized to Monday.
+ * @apiQuery {Number} [year] Summary year.
+ * @apiQuery {Number} [month] Summary month from 1 to 12.
+ * @apiSuccess {String} weekStart Monday for the requested week.
+ * @apiSuccess {String[]} dates Seven dates in the week.
+ * @apiSuccess {Object[]} sessions Sessions assigned to the employee.
+ * @apiSuccess {Object} summary Monthly progress summary, or null.
+ */
 export async function handleGetMySchedule(env, session, url) {
   const start = weekStartFrom(url.searchParams.get('start'));
   const dates = weekDates(start);
@@ -112,6 +188,19 @@ export async function handleGetMySchedule(env, session, url) {
   });
 }
 
+/**
+ * @api {get} /api/admin/schedule Get admin weekly schedule
+ * @apiName AdminGetSchedule
+ * @apiGroup AdminSchedule
+ * @apiHeader {String} Cookie Encrypted admin session cookie.
+ * @apiQuery {String} [start] Any date in the requested week; normalized to Monday.
+ * @apiSuccess {String} weekStart Monday for the requested week.
+ * @apiSuccess {String[]} dates Seven dates in the week.
+ * @apiSuccess {Object[]} sessions All sessions in the week.
+ * @apiSuccess {Object[]} employees Active employees.
+ * @apiSuccess {Object[]} programs Available programs.
+ * @apiError 403 Admin access required.
+ */
 export async function handleAdminGetSchedule(env, session, url) {
   const denied = requireAdmin(session);
   if (denied) return denied;
@@ -126,6 +215,24 @@ export async function handleAdminGetSchedule(env, session, url) {
   return Response.json({ weekStart: start, dates, sessions, employees, programs });
 }
 
+/**
+ * @api {post} /api/admin/schedule/assign Assign schedule session
+ * @apiName AdminAssignSession
+ * @apiGroup AdminSchedule
+ * @apiHeader {String} Cookie Encrypted admin session cookie.
+ * @apiBody {Number} employeeId Employee identifier.
+ * @apiBody {String} date Session date in YYYY-MM-DD format.
+ * @apiBody {Number} programId Program identifier.
+ * @apiBody {String} [startTime] Start time in HH:MM format.
+ * @apiBody {String} [endTime] End time in HH:MM format.
+ * @apiBody {Number} points Credited points from 0 to 100.
+ * @apiBody {Boolean} [isSudden=false] Whether this is a sudden session.
+ * @apiBody {String} [notes] Optional notes.
+ * @apiSuccess {Boolean} success Always true when created.
+ * @apiSuccess {Object} session Created session.
+ * @apiError 400 Invalid assignment payload.
+ * @apiError 403 Admin access required.
+ */
 export async function handleAdminAssignSession(env, session, body) {
   const denied = requireAdmin(session);
   if (denied) return denied;
@@ -159,6 +266,18 @@ export async function handleAdminAssignSession(env, session, body) {
   return Response.json({ success: true, session: created });
 }
 
+/**
+ * @api {post} /api/admin/schedule/status Change session status
+ * @apiName AdminSessionStatus
+ * @apiGroup AdminSchedule
+ * @apiHeader {String} Cookie Encrypted admin session cookie.
+ * @apiBody {Number} sessionId Session identifier.
+ * @apiBody {String} status One of scheduled, completed, or cancelled.
+ * @apiSuccess {Boolean} success Always true when updated.
+ * @apiError 400 Invalid status change.
+ * @apiError 403 Admin access required.
+ * @apiError 404 Session not found.
+ */
 export async function handleAdminSessionStatus(env, session, body) {
   const denied = requireAdmin(session);
   if (denied) return denied;
@@ -182,6 +301,17 @@ export async function handleAdminSessionStatus(env, session, body) {
   return Response.json({ success: true });
 }
 
+/**
+ * @api {post} /api/admin/schedule/delete Delete schedule session
+ * @apiName AdminDeleteSession
+ * @apiGroup AdminSchedule
+ * @apiHeader {String} Cookie Encrypted admin session cookie.
+ * @apiBody {Number} sessionId Session identifier.
+ * @apiSuccess {Boolean} success Always true when deleted.
+ * @apiError 400 Invalid session ID.
+ * @apiError 403 Admin access required.
+ * @apiError 404 Session not found.
+ */
 export async function handleAdminDeleteSession(env, session, body) {
   const denied = requireAdmin(session);
   if (denied) return denied;
@@ -200,6 +330,19 @@ export async function handleAdminDeleteSession(env, session, body) {
   return Response.json({ success: true });
 }
 
+/**
+ * @api {get} /api/admin/schedule/monthly Get monthly schedule summary
+ * @apiName AdminMonthlySummary
+ * @apiGroup AdminSchedule
+ * @apiHeader {String} Cookie Encrypted admin session cookie.
+ * @apiQuery {Number} [year] UTC summary year; defaults to the current year.
+ * @apiQuery {Number} [month] Summary month from 1 to 12; defaults to the current month.
+ * @apiSuccess {Number} year Summary year.
+ * @apiSuccess {Number} month Summary month.
+ * @apiSuccess {Object[]} rows Employee summary rows.
+ * @apiError 400 Invalid month.
+ * @apiError 403 Admin access required.
+ */
 export async function handleAdminMonthlySummary(env, session, url) {
   const denied = requireAdmin(session);
   if (denied) return denied;
@@ -212,6 +355,19 @@ export async function handleAdminMonthlySummary(env, session, url) {
   return Response.json({ year, month, rows });
 }
 
+/**
+ * @api {post} /api/admin/schedule/target Set monthly points target
+ * @apiName AdminSetTarget
+ * @apiGroup AdminSchedule
+ * @apiHeader {String} Cookie Encrypted admin session cookie.
+ * @apiBody {Number} employeeId Employee identifier.
+ * @apiBody {Number} year Target year.
+ * @apiBody {Number} month Target month from 1 to 12.
+ * @apiBody {Number} targetPoints Target points from 0 to 10000.
+ * @apiSuccess {Boolean} success Always true when saved.
+ * @apiError 400 Invalid target payload or points.
+ * @apiError 403 Admin access required.
+ */
 export async function handleAdminSetTarget(env, session, body) {
   const denied = requireAdmin(session);
   if (denied) return denied;
