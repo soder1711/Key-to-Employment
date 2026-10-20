@@ -2,7 +2,7 @@
 
 ## Repository overview
 
-Key-to-Employment is a small task portal with two independently deployed parts:
+Task-portal is a small task portal with two independently deployed parts:
 
 - `frontend/` is a static HTML frontend deployed to GitHub Pages.
 - `worker/` is a vanilla JavaScript Cloudflare Worker backed by Cloudflare D1.
