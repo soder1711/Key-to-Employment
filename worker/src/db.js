@@ -186,16 +186,6 @@ export async function getSessionsBetween(db, startDate, endDate, employeeId = nu
   return results;
 }
 
-export async function getEmployeePlanSessions(db, employeeId) {
-  const { results } = await db.prepare(
-    SESSION_SELECT + `
-      WHERE s.employee_id = ? AND s.status != 'cancelled'
-      ORDER BY s.session_date, s.start_time, s.session_id
-      LIMIT 500`
-  ).bind(employeeId).all();
-  return results;
-}
-
 export async function getSessionById(db, sessionId) {
   return await db.prepare(
     SESSION_SELECT + ` WHERE s.session_id = ? LIMIT 1`

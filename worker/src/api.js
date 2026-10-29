@@ -2,7 +2,7 @@ import {
   getEmployeeTasks, getTaskDetail, updateAssignmentProgress,
   getAllTasks, getAnyTaskDetail, updateAssignmentProgressAsAdmin,
   weekStartFrom, weekDates, getPrograms, getActiveEmployees,
-  getSessionsBetween, getEmployeePlanSessions, getSessionById, createSession, setSessionStatus,
+  getSessionsBetween, getSessionById, createSession, setSessionStatus,
   deleteSession, logScheduleHistory, getMonthlySummary, setMonthlyTarget,
   reassignSession,
 } from './db.js';
@@ -215,35 +215,6 @@ export async function handleAdminGetSchedule(env, session, url) {
     getPrograms(env.DB),
   ]);
   return Response.json({ weekStart: start, dates, sessions, employees, programs });
-}
-
-/**
- * @api {get} /api/plan Get the read-only weekly plan
- * @apiName GetPlan
- * @apiGroup Plan
- * @apiHeader {String} Cookie Encrypted session cookie.
- * @apiQuery {String} [start] Any date in the requested week; normalized to Monday.
- * @apiSuccess {String} weekStart Monday for the requested week.
- * @apiSuccess {String[]} dates Seven dates in the week.
- * @apiSuccess {Object[]} sessions All sessions in the week.
- */
-export async function handleGetPlan(env, url) {
-  const start = weekStartFrom(url.searchParams.get('start'));
-  const dates = weekDates(start);
-  const sessions = await getSessionsBetween(env.DB, dates[0], dates[6]);
-  return Response.json({ weekStart: start, dates, sessions });
-}
-
-/**
- * @api {get} /api/me/plan List my Plan assignments
- * @apiName GetMyPlanAssignments
- * @apiGroup Plan
- * @apiHeader {String} Cookie Encrypted session cookie.
- * @apiSuccess {Object[]} sessions Plan assignments belonging to the signed-in employee.
- */
-export async function handleGetMyPlanAssignments(env, session) {
-  const sessions = await getEmployeePlanSessions(env.DB, session.employeeId);
-  return Response.json({ sessions });
 }
 
 /**
