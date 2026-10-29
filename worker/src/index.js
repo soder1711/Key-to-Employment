@@ -4,7 +4,8 @@ import { getEmployeeAuth } from './db.js';
 import {
   handleGetMyTasks, handleGetTask, handleUpdateProgress,
   handleAdminGetAllTasks, handleAdminGetTask, handleAdminUpdateProgress,
-  handleGetMySchedule, handleAdminGetSchedule, handleAdminAssignSession,
+  handleGetMySchedule, handleGetPlan, handleGetMyPlanAssignments,
+  handleAdminGetSchedule, handleAdminAssignSession,
   handleAdminSessionStatus, handleAdminDeleteSession,
   handleAdminMonthlySummary, handleAdminSetTarget,
   handleAdminReassignSession,
@@ -125,6 +126,12 @@ export default {
       // ---- Schedule endpoints ----
       else if (url.pathname === '/api/schedule' && request.method === 'GET') {
         response = await handleGetMySchedule(env, currentSession, url);
+      }
+      else if (url.pathname === '/api/plan' && request.method === 'GET') {
+        response = await handleGetPlan(env, url);
+      }
+      else if (url.pathname === '/api/me/plan' && request.method === 'GET') {
+        response = await handleGetMyPlanAssignments(env, currentSession);
       }
       else if (url.pathname === '/api/admin/schedule' && request.method === 'GET') {
         response = await handleAdminGetSchedule(env, currentSession, url);

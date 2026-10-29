@@ -15,7 +15,7 @@
       </div>
       <nav class="view-nav">
         <button id="nav-tasks" class="nav-btn active">Tasks</button>
-        <button id="nav-plan" class="nav-btn" style="display:none;">Plan</button>
+        <button id="nav-plan" class="nav-btn">Plan</button>
       </nav>
       <div class="user-area">
         <span id="user" class="user-chip"></span>
@@ -38,7 +38,7 @@
             <tbody id="my-tasks"></tbody>
           </table>
         </div>
-        <div id="my-tasks-empty" class="empty" style="display:none;">No tasks or Plan assignments yet.</div>
+        <div id="my-tasks-empty" class="empty" style="display:none;">No Plan tasks assigned to you.</div>
         <div id="project-tasks-error" class="error" style="display:none;"></div>
         <div id="planned-tasks-error" class="error" style="display:none;"></div>
       </section>
@@ -47,17 +47,20 @@
       <section id="plan-section" class="card" style="display:none;">
         <div class="card-head">
           <h2>Weekly plan</h2>
-          <span class="admin-tag">admin</span>
+          <span id="plan-admin-tag" class="admin-tag" style="display:none;">admin</span>
         </div>
-        <p class="hint">Drag a person from the top onto a task to give it a person.
-          Points are added up automatically. Click a task for options.</p>
+        <p id="plan-admin-hint" class="hint" style="display:none;">
+          Drag a person from the top onto a task to give it a person.
+          Points are added up automatically. Click a task for options.
+        </p>
+        <p id="plan-viewer-hint" class="hint" style="display:none;">Read-only weekly plan.</p>
         <div class="week-nav">
           <button id="plan-prev" class="btn ghost small">← Previous week</button>
           <button id="plan-today" class="btn small">This week</button>
           <button id="plan-next" class="btn ghost small">Next week →</button>
           <span id="plan-week-label" class="week-label"></span>
         </div>
-        <div class="people-pool">
+        <div id="people-pool" class="people-pool" style="display:none;">
           <span class="pool-label">People</span>
           <div id="pool-chips" class="pool-chips"></div>
         </div>
@@ -122,7 +125,7 @@
 
       <div id="modal-details" style="display:none;">
         <div id="detail-info" class="modal-context"></div>
-        <div class="modal-actions">
+        <div id="modal-actions" class="modal-actions">
           <button class="btn small" data-status="completed">✓ Complete</button>
           <button class="btn small ghost" data-status="scheduled">↺ Reopen</button>
           <button class="btn small ghost" data-status="cancelled">✕ Cancel</button>

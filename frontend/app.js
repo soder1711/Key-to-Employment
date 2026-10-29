@@ -63,10 +63,9 @@ function renderMyTaskRow(t) {
 }
 
 async function loadMyTasks() {
-  const start = planWeekStart || mondayOf();
   const [tasksResult, planResult] = await Promise.all([
     api('/api/me/tasks'),
-    api(`/api/schedule?start=${start}`),
+    api('/api/me/plan'),
   ]);
   const taskError = document.getElementById('project-tasks-error');
   const planError = document.getElementById('planned-tasks-error');
@@ -83,10 +82,8 @@ async function loadMyTasks() {
   let planSessions = [];
   if (planResult.ok) {
     const data = await planResult.json();
-    planSessions = data.sessions.filter(s => s.status !== 'cancelled');
-    planWeekStart = data.weekStart;
-    document.getElementById('my-tasks-week').textContent =
-      `${fmtShort(data.dates[0])} – ${fmtShort(data.dates[6])}`;
+    planSessions = data.sessions;
+    document.getElementById('my-tasks-week').textContent = 'All dates';
     planError.style.display = 'none';
   } else {
     planError.textContent = `Failed to load Plan assignments (${planResult.status}).`;
@@ -141,9 +138,6 @@ async function load() {
 
   await loadMyTasks();
 
-  if (user.isAdmin) {
-    document.getElementById('nav-plan').style.display = 'inline-block';
-  }
 }
 
 // ================= Schedule feature (dates & state) =================
@@ -204,7 +198,15 @@ function switchView(view) {
 
   document.getElementById('my-tasks-section').style.display = showTasks ? 'block' : 'none';
   document.getElementById('plan-section').style.display =
-    showPlan && currentUser?.isAdmin ? 'block' : 'none';
+    showPlan ? 'block' : 'none';
+  document.getElementById('plan-admin-tag').style.display =
+    currentUser?.isAdmin ? 'inline-block' : 'none';
+  document.getElementById('plan-admin-hint').style.display =
+    currentUser?.isAdmin ? 'block' : 'none';
+  document.getElementById('plan-viewer-hint').style.display =
+    currentUser?.isAdmin ? 'none' : 'block';
+  document.getElementById('people-pool').style.display =
+    currentUser?.isAdmin ? 'flex' : 'none';
 
   if (showPlan && !planLoaded) initPlan();
   if (showTasks) loadMyTasks();
@@ -462,12 +464,19 @@ function renderPool() {
 
 function planCells(s) {
   if (!s) return '<td></td><td></td><td></td>';
+  const personName = s.employee_id != null
+    ? adminEmployees.length
+      ? planEmployeeName(s.employee_id)
+      : `${s.first_name || ''} ${s.last_name || ''}`.trim() || 'Assigned'
+    : null;
   const person = s.employee_id != null
     ? `<span class="person-chip assigned" data-employee-id="${s.employee_id}"
               data-session-id="${s.session_id}"
-              title="Click for options — drop a new name here to replace">
-         ${escapeHtml(planEmployeeName(s.employee_id))}</span>`
-    : '<span class="drop-here">Drop person here</span>';
+              title="${currentUser?.isAdmin ? 'Click for options — drop a new name here to replace' : ''}">
+         ${escapeHtml(personName)}</span>`
+    : currentUser?.isAdmin
+      ? '<span class="drop-here">Drop person here</span>'
+      : '<span class="unassigned">Unassigned</span>';
   return `
     <td class="cell-task">
       <button type="button" class="task-link" data-session-id="${s.session_id}"
@@ -502,13 +511,14 @@ function renderDayTable(date) {
       body += `<tr>${planCells(morning[i])}${planCells(afternoon[i])}</tr>`;
     }
   }
-  body += `
+  if (currentUser?.isAdmin) body += `
     <tr class="add-row">
       <td colspan="3"><button type="button" class="add-task-btn"
             data-date="${date}" data-period="morning">+ Add task…</button></td>
       <td colspan="3"><button type="button" class="add-task-btn"
             data-date="${date}" data-period="afternoon">+ Add task…</button></td>
-    </tr>
+    </tr>`;
+  body += `
     <tr class="total-row">
       <td colspan="2" class="total-label">Points total</td>
       <td class="cell-pts">${total(morning)}</td>
@@ -560,7 +570,7 @@ function destroyPlanSortables() {
 
 function initPlanSortables() {
   destroyPlanSortables();
-  if (typeof Sortable === 'undefined') return; // SortableJS failed to load
+  if (!currentUser?.isAdmin || typeof Sortable === 'undefined') return;
 
   const pool = document.getElementById('pool-chips');
   if (pool) {
@@ -602,7 +612,10 @@ async function onPersonDropped(evt) {
 
 async function loadPlanBoard() {
   const errEl = document.getElementById('plan-error');
-  const res = await api(`/api/admin/schedule?start=${planWeekStart}`);
+  const path = currentUser?.isAdmin
+    ? `/api/admin/schedule?start=${planWeekStart}`
+    : `/api/plan?start=${planWeekStart}`;
+  const res = await api(path);
   if (!res.ok) {
     errEl.textContent = `Failed to load plan (${res.status}).`;
     errEl.style.display = 'block';
@@ -613,8 +626,8 @@ async function loadPlanBoard() {
   planWeekStart = data.weekStart;
   planDates = data.dates;
   planSessions = data.sessions;
-  adminEmployees = data.employees;
-  adminPrograms = data.programs;
+  adminEmployees = data.employees || [];
+  adminPrograms = data.programs || [];
   sessionById = new Map(data.sessions.map(s => [s.session_id, s]));
   document.getElementById('plan-week-label').textContent =
     `${fmtShort(data.dates[0])} – ${fmtShort(data.dates[6])}`;
@@ -723,6 +736,8 @@ function openDetailsModal(sessionId) {
     ? `${escapeHtml(s.first_name)} ${escapeHtml(s.last_name)}`
     : '<em>Unassigned</em>';
   document.getElementById('modal-title').textContent = 'Task details';
+  document.getElementById('modal-actions').style.display =
+    currentUser?.isAdmin ? 'flex' : 'none';
   document.getElementById('detail-info').innerHTML = `
     <strong>${escapeHtml(s.program_name)}</strong> (${escapeHtml(s.category)})<br>
     ${person} · ${fmtCellDate(s.session_date)}<br>
@@ -753,7 +768,10 @@ document.getElementById('plan-today').addEventListener('click', () => {
 // ---- Plan board clicks ----
 document.getElementById('plan-days').addEventListener('click', (e) => {
   const addBtn = e.target.closest('.add-task-btn');
-  if (addBtn) { openPlanAddModal(addBtn.dataset.date, addBtn.dataset.period); return; }
+  if (addBtn && currentUser?.isAdmin) {
+    openPlanAddModal(addBtn.dataset.date, addBtn.dataset.period);
+    return;
+  }
   const taskLink = e.target.closest('.task-link');
   if (taskLink) { openDetailsModal(Number(taskLink.dataset.sessionId)); return; }
   const chip = e.target.closest('.person-chip.assigned');
