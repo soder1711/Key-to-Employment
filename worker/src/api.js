@@ -4,6 +4,7 @@ import {
   weekStartFrom, weekDates, getPrograms, getActiveEmployees,
   getSessionsBetween, getSessionById, createSession, setSessionStatus,
   deleteSession, logScheduleHistory, getMonthlySummary, setMonthlyTarget,
+  reassignSession,
 } from './db.js';
 
 /**
@@ -63,6 +64,7 @@ export async function handleUpdateProgress(env, session, body) {
   }
   return Response.json({ success: true });
 }
+
 // ---------- Admin guard ----------
 
 function requireAdmin(session) {
@@ -220,13 +222,13 @@ export async function handleAdminGetSchedule(env, session, url) {
  * @apiName AdminAssignSession
  * @apiGroup AdminSchedule
  * @apiHeader {String} Cookie Encrypted admin session cookie.
- * @apiBody {Number} employeeId Employee identifier.
+ * @apiBody {Number} [employeeId] Employee identifier, or null for an unassigned task.
  * @apiBody {String} date Session date in YYYY-MM-DD format.
  * @apiBody {Number} programId Program identifier.
  * @apiBody {String} [startTime] Start time in HH:MM format.
  * @apiBody {String} [endTime] End time in HH:MM format.
- * @apiBody {Number} points Credited points from 0 to 100.
- * @apiBody {Boolean} [isSudden=false] Whether this is a sudden session.
+ * @apiBody {Number} [points] Credited points; calculated from the program when omitted.
+ * @apiBody {Boolean} [isSudden=false] Whether this is a sudden session (doubles points).
  * @apiBody {String} [notes] Optional notes.
  * @apiSuccess {Boolean} success Always true when created.
  * @apiSuccess {Object} session Created session.
@@ -237,33 +239,106 @@ export async function handleAdminAssignSession(env, session, body) {
   const denied = requireAdmin(session);
   if (denied) return denied;
 
-  const { employeeId, date, programId, startTime, endTime, points, isSudden, notes } = body;
-  if (!Number.isInteger(employeeId) || !Number.isInteger(programId) || !DATE_RE.test(date || '')) {
-    return new Response('Invalid assignment payload', { status: 400 });
+  const {
+    employeeId: requestedEmployeeId,
+    date, programId, startTime, endTime, points, isSudden, notes,
+  } = body;
+  const employeeId = requestedEmployeeId == null || requestedEmployeeId === ''
+    ? null
+    : Number(requestedEmployeeId);
+  const parsedProgramId = Number(programId);
+  const sessionDate = typeof date === 'string' ? date.slice(0, 10) : '';
+  const invalidFields = [];
+  if (employeeId !== null && (!Number.isSafeInteger(employeeId) || employeeId < 1)) {
+    invalidFields.push('employeeId');
+  }
+  if (!Number.isSafeInteger(parsedProgramId) || parsedProgramId < 1) {
+    invalidFields.push('programId');
+  }
+  if (!DATE_RE.test(sessionDate)) {
+    invalidFields.push('date');
+  }
+  if (invalidFields.length) {
+    return new Response(
+      `Invalid assignment payload: ${invalidFields.join(', ')}`,
+      { status: 400 }
+    );
   }
   if (startTime && !TIME_RE.test(startTime)) return new Response('Invalid start time', { status: 400 });
   if (endTime && !TIME_RE.test(endTime)) return new Response('Invalid end time', { status: 400 });
-  const pts = Number(points);
+
+  // Automatic point calculation: derive from the program default when not provided
+  let pts = Number(points);
+  if (!Number.isFinite(pts)) {
+    const prog = await env.DB.prepare(
+      'SELECT default_points FROM programs WHERE program_id = ?'
+    ).bind(programId).first();
+    pts = Number(prog?.default_points || 0) * (isSudden ? 2 : 1);
+  }
   if (!Number.isFinite(pts) || pts < 0 || pts > 100) {
     return new Response('Invalid points', { status: 400 });
   }
 
   const result = await createSession(env.DB, {
-    sessionDate: date, programId, employeeId,
+    sessionDate, programId: parsedProgramId, employeeId,
     startTime, endTime, points: pts,
     isSudden: !!isSudden, notes, createdBy: session.employeeId,
   });
 
   const sessionId = result.meta.last_row_id;
   const created = await getSessionById(env.DB, sessionId);
+  const who = created?.first_name
+    ? `${created.first_name} ${created.last_name}`
+    : 'no person yet';
   await logScheduleHistory(
     env.DB, session.email, 'create', 'session', sessionId,
-    `Assigned "${created?.program_name ?? programId}" on ${date}` +
-    ` (${startTime || '—'}–${endTime || '—'}) to ` +
-    `${created ? created.first_name + ' ' + created.last_name : 'employee ' + employeeId}` +
-    ` for ${pts} points${isSudden ? ' [sudden]' : ''}`
+    `Added "${created?.program_name ?? parsedProgramId}" on ${sessionDate}` +
+    ` (${startTime || '—'}–${endTime || '—'}) for ${pts} points` +
+    `${isSudden ? ' [sudden]' : ''} — ${who}`
   );
   return Response.json({ success: true, session: created });
+}
+
+/**
+ * @api {post} /api/admin/schedule/reassign Change the person of a session
+ * @apiName AdminReassignSession
+ * @apiGroup AdminSchedule
+ * @apiHeader {String} Cookie Encrypted admin session cookie.
+ * @apiBody {Number} sessionId Session identifier.
+ * @apiBody {Number} employeeId New employee identifier.
+ * @apiSuccess {Boolean} success Always true when updated.
+ * @apiError 400 Invalid payload or unknown employee.
+ * @apiError 403 Admin access required.
+ * @apiError 404 Session not found.
+ */
+export async function handleAdminReassignSession(env, session, body) {
+  const denied = requireAdmin(session);
+  if (denied) return denied;
+
+  const { sessionId, employeeId } = body;
+  if (!Number.isInteger(sessionId) || !Number.isInteger(employeeId)) {
+    return new Response('Invalid reassign payload', { status: 400 });
+  }
+  const employee = await env.DB.prepare(
+    `SELECT employee_id, is_active, first_name, last_name
+     FROM employees WHERE employee_id = ?`
+  ).bind(employeeId).first();
+  if (!employee || !employee.is_active) {
+    return new Response('Unknown or inactive employee', { status: 400 });
+  }
+  const before = await getSessionById(env.DB, sessionId);
+  if (!before) return new Response('Session not found', { status: 404 });
+
+  const result = await reassignSession(env.DB, sessionId, employeeId);
+  if (result.meta.changes === 0) return new Response('Session not found', { status: 404 });
+
+  await logScheduleHistory(
+    env.DB, session.email, 'reassign', 'session', sessionId,
+    `"${before.program_name}" ${before.session_date}: ` +
+    `${before.first_name ? before.first_name + ' ' + before.last_name : 'unassigned'}` +
+    ` -> ${employee.first_name} ${employee.last_name}`
+  );
+  return Response.json({ success: true });
 }
 
 /**

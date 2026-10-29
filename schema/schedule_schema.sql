@@ -17,12 +17,12 @@ CREATE TABLE IF NOT EXISTS programs (
 );
 CREATE INDEX IF NOT EXISTS idx_programs_active ON programs(is_active);
 
--- Sessions: one occurrence of a program, one responsible staff member
+-- Sessions: one occurrence of a program, optionally assigned to a staff member
 CREATE TABLE IF NOT EXISTS schedule_sessions (
     session_id   INTEGER PRIMARY KEY AUTOINCREMENT,
     session_date DATE NOT NULL,
     program_id   INTEGER NOT NULL,
-    employee_id  INTEGER NOT NULL,
+    employee_id  INTEGER,
     start_time   TEXT,
     end_time     TEXT,
     status       TEXT NOT NULL DEFAULT 'scheduled'

@@ -7,6 +7,7 @@ import {
   handleGetMySchedule, handleAdminGetSchedule, handleAdminAssignSession,
   handleAdminSessionStatus, handleAdminDeleteSession,
   handleAdminMonthlySummary, handleAdminSetTarget,
+  handleAdminReassignSession,
 } from './api.js';
 
 // CORS: allow only your GitHub Pages origin
@@ -121,7 +122,7 @@ export default {
         response = await handleAdminUpdateProgress(env, currentSession, body);
       }
 
-            // ---- Schedule endpoints ----
+      // ---- Schedule endpoints ----
       else if (url.pathname === '/api/schedule' && request.method === 'GET') {
         response = await handleGetMySchedule(env, currentSession, url);
       }
@@ -131,6 +132,10 @@ export default {
       else if (url.pathname === '/api/admin/schedule/assign' && request.method === 'POST') {
         const body = await request.json();
         response = await handleAdminAssignSession(env, currentSession, body);
+      }
+      else if (url.pathname === '/api/admin/schedule/reassign' && request.method === 'POST') {
+        const body = await request.json();
+        response = await handleAdminReassignSession(env, currentSession, body);
       }
       else if (url.pathname === '/api/admin/schedule/status' && request.method === 'POST') {
         const body = await request.json();
@@ -165,4 +170,3 @@ export default {
     }
   },
 };
-

@@ -59,6 +59,7 @@ export async function logTimeEntry(db, assignmentId, employeeId, taskId, hours, 
     VALUES (?, ?, ?, DATE('now'), ?, ?)
   `).bind(assignmentId, employeeId, taskId, hours, description).run();
 }
+
 export async function getAllTasks(db, { status, employeeId } = {}) {
   let sql = `
     SELECT
@@ -163,14 +164,15 @@ export async function getActiveEmployees(db) {
   return results;
 }
 
+// LEFT JOIN so sessions without a person yet still appear (Plan board)
 const SESSION_SELECT = `
   SELECT s.session_id, s.session_date, s.start_time, s.end_time, s.status,
-         s.points, s.is_sudden, s.notes,
+         s.points, s.is_sudden, s.notes, s.employee_id,
          p.code AS program_code, p.name AS program_name, p.category,
-         e.employee_id, e.first_name, e.last_name, e.email AS employee_email
+         e.first_name, e.last_name, e.email AS employee_email
   FROM schedule_sessions s
   JOIN programs p ON p.program_id = s.program_id
-  JOIN employees e ON e.employee_id = s.employee_id`;
+  LEFT JOIN employees e ON e.employee_id = s.employee_id`;
 
 export async function getSessionsBetween(db, startDate, endDate, employeeId = null) {
   const sql = SESSION_SELECT + `
@@ -199,6 +201,12 @@ export async function createSession(db, s) {
   ).bind(s.sessionDate, s.programId, s.employeeId, s.startTime || null,
          s.endTime || null, s.points, s.isSudden ? 1 : 0, s.notes || null,
          s.createdBy || null).run();
+}
+
+export async function reassignSession(db, sessionId, employeeId) {
+  return await db.prepare(
+    `UPDATE schedule_sessions SET employee_id = ? WHERE session_id = ?`
+  ).bind(employeeId, sessionId).run();
 }
 
 export async function setSessionStatus(db, sessionId, status) {

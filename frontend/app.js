@@ -1,4 +1,8 @@
+// ================= Configuration & shared helpers =================
+
 const WORKER = 'https://task-portal.soder1234.workers.dev';
+
+let currentUser = null;
 
 async function api(path, opts = {}) {
   return fetch(`${WORKER}${path}`, {
@@ -8,8 +12,15 @@ async function api(path, opts = {}) {
   });
 }
 
+function escapeHtml(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[c]));
+}
+
 function priorityBadge(priority) {
-  return `<span class="badge ${priority}">${priority}</span>`;
+  const p = escapeHtml(priority || 'low');
+  return `<span class="badge ${p}">${p}</span>`;
 }
 
 function progressBar(pct) {
@@ -21,143 +32,91 @@ function progressBar(pct) {
     </div>`;
 }
 
-function escapeHtml(s) {
-  return String(s ?? '').replace(/[&<>"']/g, c => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-  }[c]));
+function statusPill(status) {
+  return `<span class="status-pill ${escapeHtml(status)}">${escapeHtml(status)}</span>`;
 }
 
-function renderMyTask(t) {
-  return `
-    <li class="task-item">
-      <div class="task-top">
-        <strong>${escapeHtml(t.task_code)}</strong>
-        <span class="task-title">${escapeHtml(t.title)}</span>
-        ${priorityBadge(t.priority)}
-      </div>
-      ${progressBar(t.completion_percentage)}
-      <div class="meta">
-        ${escapeHtml(t.assignment_status)}
-        ${t.deadline ? '· due ' + escapeHtml(t.deadline) : ''}
-      </div>
-    </li>`;
+const DAY_NAMES = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const MONTH_NAMES = ['January','February','March','April','May','June',
+  'July','August','September','October','November','December'];
+
+const pad2 = n => String(n).padStart(2, '0');
+const todayISO = () => new Date().toISOString().slice(0, 10);
+
+function fmtDue(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso + 'T00:00:00Z');
+  return `${DAY_NAMES[d.getUTCDay()]} ${d.getUTCDate()} ${MONTH_NAMES[d.getUTCMonth()].slice(0, 3)}`;
 }
 
-function renderAdminTask(t) {
-  const assignee = t.employee_email
-    ? `${escapeHtml(t.first_name || '')} ${escapeHtml(t.last_name || '')} &lt;${escapeHtml(t.employee_email)}&gt;`
-    : '<em>unassigned</em>';
-  const hasAssignment = t.assignment_id != null;
+// ================= Tasks (table view) =================
+
+function renderMyTaskRow(t) {
   return `
-    <li class="task-item">
-      <div class="task-top">
-        <strong>${escapeHtml(t.task_code)}</strong>
-        <span class="task-title">${escapeHtml(t.title)}</span>
-        ${priorityBadge(t.priority)}
-      </div>
-      <div class="meta">
-        task status: ${escapeHtml(t.status)}
-        ${t.deadline ? '· due ' + escapeHtml(t.deadline) : ''}
-        ${hasAssignment ? `· assigned to ${assignee}` : ''}
-      </div>
-      ${hasAssignment ? `
-        ${progressBar(t.completion_percentage)}
-        <div class="progress-form" data-assignment-id="${t.assignment_id}">
-          <input type="number" min="0" max="100" value="${t.completion_percentage}" />
-          <button type="button" class="btn small save-progress">Save</button>
-        </div>
-      ` : ''}
-    </li>`;
+    <tr>
+      <td class="cell-task"><span class="task-name">${escapeHtml(t.title)}</span></td>
+      <td>${priorityBadge(t.priority)}</td>
+      <td>${statusPill(t.assignment_status)}</td>
+      <td class="cell-due">${fmtDue(t.deadline)}</td>
+      <td class="cell-progress">${progressBar(t.completion_percentage)}</td>
+    </tr>`;
 }
 
 async function loadMyTasks() {
-  const res = await api('/api/me/tasks');
-  if (!res.ok) return;
-  const { tasks } = await res.json();
-  const ul = document.getElementById('my-tasks');
+  const start = planWeekStart || mondayOf();
+  const [tasksResult, planResult] = await Promise.all([
+    api('/api/me/tasks'),
+    api(`/api/schedule?start=${start}`),
+  ]);
+  const taskError = document.getElementById('project-tasks-error');
+  const planError = document.getElementById('planned-tasks-error');
+
+  let tasks = [];
+  if (tasksResult.ok) {
+    ({ tasks } = await tasksResult.json());
+    taskError.style.display = 'none';
+  } else {
+    taskError.textContent = `Failed to load project tasks (${tasksResult.status}).`;
+    taskError.style.display = 'block';
+  }
+
+  let planSessions = [];
+  if (planResult.ok) {
+    const data = await planResult.json();
+    planSessions = data.sessions.filter(s => s.status !== 'cancelled');
+    planWeekStart = data.weekStart;
+    document.getElementById('my-tasks-week').textContent =
+      `${fmtShort(data.dates[0])} – ${fmtShort(data.dates[6])}`;
+    planError.style.display = 'none';
+  } else {
+    planError.textContent = `Failed to load Plan assignments (${planResult.status}).`;
+    planError.style.display = 'block';
+  }
+
+  const tbody = document.getElementById('my-tasks');
   const empty = document.getElementById('my-tasks-empty');
-  if (!tasks.length) {
-    ul.innerHTML = '';
+  const rows = [
+    ...tasks.map(renderMyTaskRow),
+    ...planSessions.map(s => `
+      <tr>
+        <td class="cell-task"><span class="task-name">${escapeHtml(s.program_name)}</span></td>
+        <td><span class="cat-tag ${escapeHtml(s.category)}">${escapeHtml(s.category)}</span></td>
+        <td>${statusPill(s.status)}</td>
+        <td class="cell-due">${fmtCellDate(s.session_date)} · ${fmtTime(s.start_time)}${s.end_time ? '–' + fmtTime(s.end_time) : ''}</td>
+        <td class="cell-progress">${Number(s.points || 0).toFixed(1)} pts</td>
+      </tr>`),
+  ];
+  if (!rows.length && tasksResult.ok && planResult.ok) {
+    tbody.innerHTML = '';
     empty.style.display = 'block';
   } else {
     empty.style.display = 'none';
-    ul.innerHTML = tasks.map(renderMyTask).join('');
+    tbody.innerHTML = rows.join('');
   }
   document.getElementById('my-tasks-section').style.display = 'block';
 }
 
-async function loadAllTasks(filters = {}) {
-  const params = new URLSearchParams();
-  if (filters.status) params.set('status', filters.status);
-  if (filters.employeeId) params.set('employeeId', filters.employeeId);
-  const qs = params.toString();
-  const res = await api('/api/admin/tasks' + (qs ? `?${qs}` : ''));
-  const errEl = document.getElementById('admin-error');
-  if (!res.ok) {
-    errEl.textContent = res.status === 403
-      ? 'Admin access required.'
-      : `Failed to load tasks (${res.status}).`;
-    errEl.style.display = 'block';
-    return;
-  }
-  errEl.style.display = 'none';
-  const { tasks } = await res.json();
-  const ul = document.getElementById('all-tasks');
-  const empty = document.getElementById('all-tasks-empty');
-  if (!tasks.length) {
-    ul.innerHTML = '';
-    empty.style.display = 'block';
-  } else {
-    empty.style.display = 'none';
-    ul.innerHTML = tasks.map(renderAdminTask).join('');
-  }
-  document.getElementById('admin-section').style.display = 'block';
-}
-
-document.getElementById('all-tasks').addEventListener('click', async (e) => {
-  if (!e.target.classList.contains('save-progress')) return;
-  const form = e.target.closest('.progress-form');
-  const assignmentId = parseInt(form.dataset.assignmentId, 10);
-  const input = form.querySelector('input[type="number"]');
-  const percentage = parseInt(input.value, 10);
-
-  if (Number.isNaN(percentage) || percentage < 0 || percentage > 100) {
-    alert('Percentage must be between 0 and 100');
-    return;
-  }
-
-  e.target.disabled = true;
-  e.target.textContent = 'Saving…';
-  try {
-    const res = await api('/api/admin/progress', {
-      method: 'POST',
-      body: JSON.stringify({ assignmentId, percentage, notes: '' }),
-    });
-    if (!res.ok) {
-      const txt = await res.text();
-      alert('Save failed: ' + txt);
-    } else {
-      e.target.textContent = 'Saved';
-      setTimeout(() => { e.target.textContent = 'Save'; e.target.disabled = false; }, 1200);
-    }
-  } catch (err) {
-    alert('Network error: ' + err.message);
-    e.target.textContent = 'Save';
-    e.target.disabled = false;
-  }
-});
-
-document.getElementById('apply-filters').addEventListener('click', () => {
-  loadAllTasks({
-    status: document.getElementById('filter-status').value,
-    employeeId: document.getElementById('filter-employee').value,
-  });
-});
-document.getElementById('clear-filters').addEventListener('click', () => {
-  document.getElementById('filter-status').value = '';
-  document.getElementById('filter-employee').value = '';
-  loadAllTasks();
-});
+// ================= Sign-in / bootstrap =================
 
 async function load() {
   const me = await api('/api/me');
@@ -183,15 +142,12 @@ async function load() {
   await loadMyTasks();
 
   if (user.isAdmin) {
-    await loadAllTasks();
+    document.getElementById('nav-plan').style.display = 'inline-block';
   }
 }
 
-load();
+// ================= Schedule feature (dates & state) =================
 
-// ================= Schedule feature =================
-
-let currentUser = null;
 let scheduleWeekStart = null;
 let scheduleLoaded = false;
 let schedMode = 'week';
@@ -202,13 +158,6 @@ let sessionById = new Map();
 let modalEmployeeId = null;
 let modalDate = null;
 let currentSession = null;
-
-const DAY_NAMES = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-const MONTH_NAMES = ['January','February','March','April','May','June',
-  'July','August','September','October','November','December'];
-
-const pad2 = n => String(n).padStart(2, '0');
-const todayISO = () => new Date().toISOString().slice(0, 10);
 
 function mondayOf(dateStr) {
   const base = dateStr && /^\d{4}-\d{2}-\d{2}$/.test(dateStr) ? dateStr : todayISO();
@@ -248,15 +197,17 @@ function fmtDayHeader(iso) {
 
 function switchView(view) {
   const showTasks = view === 'tasks';
+  const showPlan = view === 'plan';
+
   document.getElementById('nav-tasks').classList.toggle('active', showTasks);
-  document.getElementById('nav-schedule').classList.toggle('active', !showTasks);
+  document.getElementById('nav-plan').classList.toggle('active', showPlan);
 
   document.getElementById('my-tasks-section').style.display = showTasks ? 'block' : 'none';
-  document.getElementById('admin-section').style.display =
-    showTasks && currentUser?.isAdmin ? 'block' : 'none';
-  document.getElementById('schedule-section').style.display = showTasks ? 'none' : 'block';
+  document.getElementById('plan-section').style.display =
+    showPlan && currentUser?.isAdmin ? 'block' : 'none';
 
-  if (!showTasks && !scheduleLoaded) initSchedule();
+  if (showPlan && !planLoaded) initPlan();
+  if (showTasks) loadMyTasks();
 }
 
 function initSchedule() {
@@ -380,6 +331,7 @@ async function loadAdminSchedule() {
 
   const byEmp = {};
   for (const s of data.sessions) {
+    if (s.employee_id == null) continue;
     (byEmp[s.employee_id] ??= {});
     (byEmp[s.employee_id][s.session_date] ??= []).push(s);
   }
@@ -477,7 +429,225 @@ function shiftMonth(delta) {
   loadMonthView();
 }
 
-// ---------- Modal ----------
+// ================= Plan board (drag & drop, one table per day) =================
+
+let planWeekStart = null;
+let planLoaded = false;
+let planDates = [];
+let planSessions = [];
+let planPeriod = null;
+const planSortables = [];
+
+function planEmployeeName(id) {
+  const e = adminEmployees.find(x => x.employee_id === id);
+  return e ? `${e.first_name} ${e.last_name}`.trim() : 'Unknown';
+}
+
+function renderPool() {
+  const pts = new Map();
+  for (const s of planSessions) {
+    if (s.status === 'cancelled' || s.employee_id == null) continue;
+    pts.set(s.employee_id, (pts.get(s.employee_id) || 0) + Number(s.points || 0));
+  }
+  document.getElementById('pool-chips').innerHTML = adminEmployees.map(e => {
+    const name = `${e.first_name} ${e.last_name}`.trim();
+    const p = (pts.get(e.employee_id) || 0).toFixed(1);
+    return `
+      <span class="person-chip pool" data-employee-id="${e.employee_id}"
+            title="${escapeHtml(name)} — ${p} points this week">
+        ${escapeHtml(name)}<span class="chip-pts">${p}</span>
+      </span>`;
+  }).join('') || '<span class="empty">No active employees.</span>';
+}
+
+function planCells(s) {
+  if (!s) return '<td></td><td></td><td></td>';
+  const person = s.employee_id != null
+    ? `<span class="person-chip assigned" data-employee-id="${s.employee_id}"
+              data-session-id="${s.session_id}"
+              title="Click for options — drop a new name here to replace">
+         ${escapeHtml(planEmployeeName(s.employee_id))}</span>`
+    : '<span class="drop-here">Drop person here</span>';
+  return `
+    <td class="cell-task">
+      <button type="button" class="task-link" data-session-id="${s.session_id}"
+              title="Click for options">${escapeHtml(s.program_name)}</button>
+      ${s.is_sudden ? '<span class="mini-tag sudden">sudden</span>' : ''}
+      <span class="task-sub">${fmtTime(s.start_time)}${s.end_time ? '–' + fmtTime(s.end_time) : ''}</span>
+    </td>
+    <td class="cell-pts">${Number(s.points || 0).toFixed(1)}</td>
+    <td class="cell-person-slot" data-session-id="${s.session_id}">${person}</td>`;
+}
+
+function renderDayTable(date) {
+  const daySessions = planSessions
+    .filter(s => s.session_date === date && s.status !== 'cancelled');
+  const morning = daySessions.filter(s => (s.start_time || '09:00') < '12:00');
+  const afternoon = daySessions.filter(s => (s.start_time || '09:00') >= '12:00');
+  const total = list =>
+    list.reduce((a, s) => a + Number(s.points || 0), 0).toFixed(1);
+  const d = new Date(date + 'T00:00:00Z');
+  const isToday = date === todayISO();
+
+  let body = '';
+  if (!morning.length && !afternoon.length) {
+    body = `
+      <tr>
+        <td colspan="3" class="no-tasks">No tasks yet</td>
+        <td colspan="3" class="no-tasks">No tasks yet</td>
+      </tr>`;
+  } else {
+    const rows = Math.max(morning.length, afternoon.length);
+    for (let i = 0; i < rows; i++) {
+      body += `<tr>${planCells(morning[i])}${planCells(afternoon[i])}</tr>`;
+    }
+  }
+  body += `
+    <tr class="add-row">
+      <td colspan="3"><button type="button" class="add-task-btn"
+            data-date="${date}" data-period="morning">+ Add task…</button></td>
+      <td colspan="3"><button type="button" class="add-task-btn"
+            data-date="${date}" data-period="afternoon">+ Add task…</button></td>
+    </tr>
+    <tr class="total-row">
+      <td colspan="2" class="total-label">Points total</td>
+      <td class="cell-pts">${total(morning)}</td>
+      <td colspan="2" class="total-label">Points total</td>
+      <td class="cell-pts">${total(afternoon)}</td>
+    </tr>`;
+
+  return `
+    <div class="day-block${isToday ? ' today' : ''}">
+      <div class="day-block-head">
+        <span class="db-day">${DAY_NAMES[d.getUTCDay()]}</span>
+        <span class="db-date">${d.getUTCDate()} ${MONTH_NAMES[d.getUTCMonth()]}</span>
+        ${isToday ? '<span class="mini-tag today-tag">today</span>' : ''}
+      </div>
+      <div class="table-scroll">
+        <table class="plan-table">
+          <colgroup>
+            <col class="col-task"><col class="col-pts"><col class="col-person">
+            <col class="col-task"><col class="col-pts"><col class="col-person">
+          </colgroup>
+          <thead>
+            <tr>
+              <th colspan="3" class="period-head morning">Morning</th>
+              <th colspan="3" class="period-head afternoon">Afternoon and evening</th>
+            </tr>
+            <tr class="col-heads">
+              <th>Task</th><th>Points</th><th>Person</th>
+              <th>Task</th><th>Points</th><th>Person</th>
+            </tr>
+          </thead>
+          <tbody>${body}</tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+function renderPlanBoard() {
+  renderPool();
+  document.getElementById('plan-days').innerHTML =
+    planDates.map(renderDayTable).join('');
+  initPlanSortables();
+}
+
+function destroyPlanSortables() {
+  while (planSortables.length) {
+    try { planSortables.pop().destroy(); } catch { /* ignore */ }
+  }
+}
+
+function initPlanSortables() {
+  destroyPlanSortables();
+  if (typeof Sortable === 'undefined') return; // SortableJS failed to load
+
+  const pool = document.getElementById('pool-chips');
+  if (pool) {
+    planSortables.push(new Sortable(pool, {
+      group: { name: 'people', pull: 'clone', put: false },
+      sort: false,
+      draggable: '.person-chip',
+    }));
+  }
+  document.querySelectorAll('.cell-person-slot').forEach(cell => {
+    planSortables.push(new Sortable(cell, {
+      group: { name: 'people', pull: false, put: true },
+      sort: false,
+      draggable: '.person-chip',
+      onAdd: onPersonDropped,
+    }));
+  });
+}
+
+async function onPersonDropped(evt) {
+  const employeeId = Number(evt.item.dataset.employeeId);
+  const sessionId = Number(evt.to.dataset.sessionId);
+  if (!Number.isInteger(employeeId) || !Number.isInteger(sessionId)) {
+    renderPlanBoard();
+    return;
+  }
+  try {
+    const res = await api('/api/admin/schedule/reassign', {
+      method: 'POST',
+      body: JSON.stringify({ sessionId, employeeId }),
+    });
+    if (!res.ok) alert('Could not assign person: ' + (await res.text()));
+  } catch (err) {
+    alert('Network error: ' + err.message);
+  }
+  await loadPlanBoard(); // always re-render from saved data
+  await loadMyTasks();
+}
+
+async function loadPlanBoard() {
+  const errEl = document.getElementById('plan-error');
+  const res = await api(`/api/admin/schedule?start=${planWeekStart}`);
+  if (!res.ok) {
+    errEl.textContent = `Failed to load plan (${res.status}).`;
+    errEl.style.display = 'block';
+    return;
+  }
+  errEl.style.display = 'none';
+  const data = await res.json();
+  planWeekStart = data.weekStart;
+  planDates = data.dates;
+  planSessions = data.sessions;
+  adminEmployees = data.employees;
+  adminPrograms = data.programs;
+  sessionById = new Map(data.sessions.map(s => [s.session_id, s]));
+  document.getElementById('plan-week-label').textContent =
+    `${fmtShort(data.dates[0])} – ${fmtShort(data.dates[6])}`;
+  renderPlanBoard();
+}
+
+function initPlan() {
+  planLoaded = true;
+  planWeekStart = mondayOf();
+  loadPlanBoard();
+}
+
+function refreshScheduleViews() {
+  loadPlanBoard();
+  loadMyTasks();
+}
+
+function openPlanAddModal(date, period) {
+  planPeriod = period;
+  modalEmployeeId = null; // person is added afterwards by dragging
+  modalDate = date;
+  document.getElementById('modal-title').textContent = 'Add task';
+  document.getElementById('assign-context').textContent =
+    `${fmtCellDate(date)} · ${period === 'morning' ? 'Morning' : 'Afternoon and evening'}` +
+    ' — drag a person onto the task afterwards';
+  populatePrograms();
+  document.getElementById('assign-sudden').checked = false;
+  document.getElementById('assign-notes').value = '';
+  refreshAssignDefaults();
+  openModal('assign');
+}
+
+// ================= Modal =================
 
 const modal = document.getElementById('session-modal');
 
@@ -508,17 +678,30 @@ function populatePrograms() {
 
 function refreshAssignDefaults() {
   const sel = document.getElementById('assign-program');
-  const sudden = document.getElementById('assign-sudden');
   const p = adminPrograms.find(x => x.program_id === Number(sel.value));
   if (!p) return;
-  document.getElementById('assign-start').value = p.default_start || '';
-  document.getElementById('assign-end').value = p.default_end || '';
-  let pts = Number(p.default_points || 0);
-  if (sudden.checked) pts *= 2;
-  document.getElementById('assign-points').value = pts;
+
+  let start = p.default_start || '';
+  let end = p.default_end || '';
+  if (planPeriod) {
+    const fallback = planPeriod === 'morning' ? ['09:00', '10:00'] : ['14:00', '15:00'];
+    const wrongPeriod = start && ((planPeriod === 'morning' && start >= '12:00') ||
+                                  (planPeriod === 'afternoon' && start < '12:00'));
+    if (!start || wrongPeriod) { start = fallback[0]; end = fallback[1]; }
+  }
+  document.getElementById('assign-start').value = start;
+  document.getElementById('assign-end').value = end;
+
+  // Automatic: program default points, doubled for sudden sessions
+  const pts = Number(p.default_points || 0) *
+    (document.getElementById('assign-sudden').checked ? 2 : 1);
+  const ptsInput = document.getElementById('assign-points');
+  ptsInput.value = pts;
+  ptsInput.readOnly = true;
 }
 
 function openAssignModal(employeeId, date) {
+  planPeriod = null;
   modalEmployeeId = employeeId;
   modalDate = date;
   const emp = adminEmployees.find(e => e.employee_id === employeeId);
@@ -536,10 +719,13 @@ function openDetailsModal(sessionId) {
   const s = sessionById.get(sessionId);
   if (!s) return;
   currentSession = s;
-  document.getElementById('modal-title').textContent = 'Session details';
+  const person = s.first_name
+    ? `${escapeHtml(s.first_name)} ${escapeHtml(s.last_name)}`
+    : '<em>Unassigned</em>';
+  document.getElementById('modal-title').textContent = 'Task details';
   document.getElementById('detail-info').innerHTML = `
     <strong>${escapeHtml(s.program_name)}</strong> (${escapeHtml(s.category)})<br>
-    ${escapeHtml(s.first_name)} ${escapeHtml(s.last_name)} · ${fmtCellDate(s.session_date)}<br>
+    ${person} · ${fmtCellDate(s.session_date)}<br>
     ${fmtTime(s.start_time)}${s.end_time ? '–' + fmtTime(s.end_time) : ''} ·
     ${Number(s.points).toFixed(1)} pts${s.is_sudden ? ' · sudden' : ''} ·
     <span class="status-pill ${s.status}">${s.status}</span>
@@ -547,48 +733,34 @@ function openDetailsModal(sessionId) {
   openModal('details');
 }
 
-// ---------- Schedule event wiring ----------
+// ================= Event wiring =================
 
+// ---- Navigation & view switching ----
 document.getElementById('nav-tasks').addEventListener('click', () => switchView('tasks'));
-document.getElementById('nav-schedule').addEventListener('click', () => switchView('schedule'));
-document.getElementById('sched-week-btn').addEventListener('click', () => setSchedMode('week'));
-document.getElementById('sched-month-btn').addEventListener('click', () => setSchedMode('month'));
-document.getElementById('sched-prev').addEventListener('click', () => {
-  scheduleWeekStart = shiftISO(scheduleWeekStart, -7); refreshWeek();
-});
-document.getElementById('sched-next').addEventListener('click', () => {
-  scheduleWeekStart = shiftISO(scheduleWeekStart, 7); refreshWeek();
-});
-document.getElementById('sched-today').addEventListener('click', () => {
-  scheduleWeekStart = mondayOf(); refreshWeek();
-});
-document.getElementById('month-prev').addEventListener('click', () => shiftMonth(-1));
-document.getElementById('month-next').addEventListener('click', () => shiftMonth(1));
+document.getElementById('nav-plan').addEventListener('click', () => switchView('plan'));
 
-document.getElementById('admin-schedule-grid').addEventListener('click', (e) => {
-  const chip = e.target.closest('.slot-chip');
-  if (chip) { openDetailsModal(Number(chip.dataset.sessionId)); return; }
-  const cell = e.target.closest('.grid-cell');
-  if (cell && cell.dataset.employeeId && cell.dataset.date) {
-    openAssignModal(Number(cell.dataset.employeeId), cell.dataset.date);
-  }
+// ---- Plan board navigation ----
+document.getElementById('plan-prev').addEventListener('click', () => {
+  planWeekStart = shiftISO(planWeekStart, -7); loadPlanBoard();
+});
+document.getElementById('plan-next').addEventListener('click', () => {
+  planWeekStart = shiftISO(planWeekStart, 7); loadPlanBoard();
+});
+document.getElementById('plan-today').addEventListener('click', () => {
+  planWeekStart = mondayOf(); loadPlanBoard();
 });
 
-document.getElementById('month-summary-wrap').addEventListener('change', async (e) => {
-  if (!e.target.classList.contains('target-input')) return;
-  const val = Number(e.target.value);
-  if (!Number.isFinite(val) || val < 0) { alert('Invalid target'); return; }
-  const res = await api('/api/admin/schedule/target', {
-    method: 'POST',
-    body: JSON.stringify({
-      employeeId: Number(e.target.dataset.employeeId),
-      year: monthCursor.year, month: monthCursor.month, targetPoints: val,
-    }),
-  });
-  if (res.ok) loadAdminMonth();
-  else alert('Failed to save target');
+// ---- Plan board clicks ----
+document.getElementById('plan-days').addEventListener('click', (e) => {
+  const addBtn = e.target.closest('.add-task-btn');
+  if (addBtn) { openPlanAddModal(addBtn.dataset.date, addBtn.dataset.period); return; }
+  const taskLink = e.target.closest('.task-link');
+  if (taskLink) { openDetailsModal(Number(taskLink.dataset.sessionId)); return; }
+  const chip = e.target.closest('.person-chip.assigned');
+  if (chip) openDetailsModal(Number(chip.dataset.sessionId));
 });
 
+// ---- Modal wiring ----
 document.getElementById('modal-close').addEventListener('click', closeModal);
 modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
 document.getElementById('assign-program').addEventListener('change', refreshAssignDefaults);
@@ -615,7 +787,7 @@ document.getElementById('assign-submit').addEventListener('click', async (e) => 
       showModalError('Save failed: ' + (await res.text()));
     } else {
       closeModal();
-      loadAdminSchedule();
+      refreshScheduleViews();
     }
   } catch (err) {
     showModalError('Network error: ' + err.message);
@@ -631,18 +803,22 @@ document.querySelectorAll('#modal-details [data-status]').forEach(b => {
       method: 'POST',
       body: JSON.stringify({ sessionId: currentSession.session_id, status: b.dataset.status }),
     });
-    if (res.ok) { closeModal(); loadAdminSchedule(); }
+    if (res.ok) { closeModal(); refreshScheduleViews(); }
     else alert('Status update failed');
   });
 });
 
 document.getElementById('session-delete').addEventListener('click', async () => {
   if (!currentSession) return;
-  if (!confirm('Delete this session? The deletion is recorded in history.')) return;
+  if (!confirm('Delete this task? The deletion is recorded in history.')) return;
   const res = await api('/api/admin/schedule/delete', {
     method: 'POST',
     body: JSON.stringify({ sessionId: currentSession.session_id }),
   });
-  if (res.ok) { closeModal(); loadAdminSchedule(); }
+  if (res.ok) { closeModal(); refreshScheduleViews(); }
   else alert('Delete failed');
 });
+
+// ================= Boot =================
+
+load();

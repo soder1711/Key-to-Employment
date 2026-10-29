@@ -15,7 +15,7 @@
       </div>
       <nav class="view-nav">
         <button id="nav-tasks" class="nav-btn active">Tasks</button>
-        <button id="nav-schedule" class="nav-btn">Schedule</button>
+        <button id="nav-plan" class="nav-btn" style="display:none;">Plan</button>
       </nav>
       <div class="user-area">
         <span id="user" class="user-chip"></span>
@@ -24,89 +24,47 @@
     </header>
 
     <main class="container">
+      <!-- ===== My tasks (table view) ===== -->
       <section id="my-tasks-section" class="card" style="display:none;">
         <div class="card-head">
-          <h2>My Tasks</h2>
+          <h2>My tasks</h2>
+          <span id="my-tasks-week" class="week-label"></span>
         </div>
-        <ul id="my-tasks" class="task-list"></ul>
-        <div id="my-tasks-empty" class="empty" style="display:none;">No tasks assigned to you.</div>
+        <div class="table-scroll">
+          <table class="data-table">
+            <thead><tr>
+              <th>Task</th><th>Priority / category</th><th>Status</th><th>Date / time</th><th>Progress / points</th>
+            </tr></thead>
+            <tbody id="my-tasks"></tbody>
+          </table>
+        </div>
+        <div id="my-tasks-empty" class="empty" style="display:none;">No tasks or Plan assignments yet.</div>
+        <div id="project-tasks-error" class="error" style="display:none;"></div>
+        <div id="planned-tasks-error" class="error" style="display:none;"></div>
       </section>
 
-      <section id="admin-section" class="card" style="display:none;">
+      <!-- ===== Admin: weekly plan board (drag & drop) ===== -->
+      <section id="plan-section" class="card" style="display:none;">
         <div class="card-head">
-          <h2>All Tasks</h2>
+          <h2>Weekly plan</h2>
           <span class="admin-tag">admin</span>
         </div>
-        <div class="filters">
-          <select id="filter-status">
-            <option value="">All statuses</option>
-            <option value="pending">pending</option>
-            <option value="assigned">assigned</option>
-            <option value="in_progress">in_progress</option>
-            <option value="completed">completed</option>
-            <option value="cancelled">cancelled</option>
-          </select>
-          <input id="filter-employee" type="number" placeholder="Employee ID (optional)">
-          <button id="apply-filters" class="btn">Apply</button>
-          <button id="clear-filters" class="btn ghost">Clear</button>
+        <p class="hint">Drag a person from the top onto a task to give it a person.
+          Points are added up automatically. Click a task for options.</p>
+        <div class="week-nav">
+          <button id="plan-prev" class="btn ghost small">← Previous week</button>
+          <button id="plan-today" class="btn small">This week</button>
+          <button id="plan-next" class="btn ghost small">Next week →</button>
+          <span id="plan-week-label" class="week-label"></span>
         </div>
-        <ul id="all-tasks" class="task-list"></ul>
-        <div id="all-tasks-empty" class="empty" style="display:none;">No tasks match the filters.</div>
-        <div id="admin-error" class="error" style="display:none;"></div>
+        <div class="people-pool">
+          <span class="pool-label">People</span>
+          <div id="pool-chips" class="pool-chips"></div>
+        </div>
+        <div id="plan-days"></div>
+        <div id="plan-error" class="error" style="display:none;"></div>
       </section>
 
-      <section id="schedule-section" class="card" style="display:none;">
-        <div class="card-head">
-          <h2>Schedule</h2>
-          <span id="schedule-role-tag" class="admin-tag" style="display:none;">admin</span>
-          <div class="view-toggle">
-            <button id="sched-week-btn" class="btn small">Week</button>
-            <button id="sched-month-btn" class="btn small ghost">Month</button>
-          </div>
-        </div>
-
-        <div class="week-nav" id="week-controls">
-          <button id="sched-prev" class="btn ghost small">← Prev week</button>
-          <button id="sched-today" class="btn small">Today</button>
-          <button id="sched-next" class="btn ghost small">Next week →</button>
-          <span id="sched-week-label" class="week-label"></span>
-        </div>
-
-        <div class="week-nav" id="month-controls" style="display:none;">
-          <button id="month-prev" class="btn ghost small">←</button>
-          <span id="month-label" class="week-label"></span>
-          <button id="month-next" class="btn ghost small">→</button>
-        </div>
-
-        <div id="worker-schedule-wrap">
-          <table class="sched-table">
-            <thead>
-              <tr>
-                <th>Date</th>
-                <th>Program</th>
-                <th>Category</th>
-                <th>Time</th>
-                <th>Points</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody id="my-schedule-body"></tbody>
-          </table>
-          <div id="my-schedule-empty" class="empty" style="display:none;">No sessions scheduled for you this week.</div>
-          <div id="my-week-totals" class="week-totals"></div>
-        </div>
-
-        <div id="admin-schedule-wrap" style="display:none;">
-          <p class="hint">Click an empty cell to assign a session · click a chip to complete, cancel or delete it · Pts = completed points this week.</p>
-          <div class="grid-scroll">
-            <table class="sched-grid" id="admin-schedule-grid"></table>
-          </div>
-        </div>
-
-        <div id="month-view-wrap" style="display:none;">
-          <div id="month-summary-wrap"></div>
-        </div>
-      </section>
     </main>
   </div>
 
@@ -142,7 +100,7 @@
 
       <div id="modal-assign-form">
         <p id="assign-context" class="modal-context"></p>
-        <label for="assign-program">Program</label>
+        <label for="assign-program">Task</label>
         <select id="assign-program"></select>
         <div class="modal-row">
           <div>
@@ -154,12 +112,12 @@
             <input type="time" id="assign-end">
           </div>
         </div>
-        <label for="assign-points">Credited points</label>
-        <input type="number" id="assign-points" min="0" max="100" step="0.5">
-        <label class="check-row"><input type="checkbox" id="assign-sudden"> Sudden session (suggests ×2 points)</label>
+        <label for="assign-points">Points (calculated automatically)</label>
+        <input type="number" id="assign-points" min="0" max="100" step="0.5" readonly>
+        <label class="check-row"><input type="checkbox" id="assign-sudden"> Sudden session (doubles the points)</label>
         <label for="assign-notes">Notes</label>
         <input type="text" id="assign-notes" placeholder="optional">
-        <button id="assign-submit" class="btn modal-submit">Assign session</button>
+        <button id="assign-submit" class="btn modal-submit">Add task</button>
       </div>
 
       <div id="modal-details" style="display:none;">
@@ -176,6 +134,7 @@
     </div>
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js"></script>
   <script src="app.js" defer></script>
 </body>
 </html>

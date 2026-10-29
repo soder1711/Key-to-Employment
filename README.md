@@ -46,10 +46,15 @@ For local development, initialize a local D1 copy:
 ```sh
 wrangler d1 execute task_portal --local --file=../schema/001_init.sql
 wrangler d1 execute task_portal --local --file=../schema/002_seed.sql
+wrangler d1 execute task_portal --local --file=../schema/schedule_schema.sql
+wrangler d1 execute task_portal --local --file=../schema/schedule_seed.sql
 wrangler dev
 ```
 
-Do not use `--remote` unless you intend to modify production data.
+For a database that already has the schedule tables, apply
+`schema/003_schedule_unassigned_sessions.sql` once to allow plan tasks to be
+created before assigning a person. Do not use `--remote` unless you intend to
+modify production data.
 
 ## Deployment
 
@@ -57,7 +62,7 @@ Do not use `--remote` unless you intend to modify production data.
 - Changes under `worker/` on `main` deploy automatically with Wrangler through `deploy-worker.yml`.
 - Worker deployment requires the GitHub `CLOUDFLARE_API_TOKEN` secret.
 
-For a manual Worker deployment, run `wrangler deploy` from `worker/` after checking the account, D1 binding, frontend URL, and secrets.
+For a manual Worker deployment, run `wrangler deploy --config wrangler.toml` from `worker/` after checking the account, D1 binding, frontend URL, and secrets.
 
 ## Validation
 
