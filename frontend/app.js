@@ -216,42 +216,18 @@ function switchView(view) {
       scheduleWeekStart = mondayOf();
       scheduleLoaded = true;
     }
-    loadMySchedule();
+    loadSchedule();
   }
 }
 
-function initSchedule() {
-  scheduleWeekStart = mondayOf();
-  scheduleLoaded = true;
-  setSchedMode('week');
-}
-
-function setSchedMode(mode) {
-  schedMode = mode;
-  document.getElementById('sched-week-btn').classList.toggle('ghost', mode !== 'week');
-  document.getElementById('sched-month-btn').classList.toggle('ghost', mode !== 'month');
-
-  document.getElementById('week-controls').style.display = mode === 'week' ? 'flex' : 'none';
-  document.getElementById('month-controls').style.display = mode === 'month' ? 'flex' : 'none';
-  document.getElementById('month-view-wrap').style.display = mode === 'month' ? 'block' : 'none';
-  document.getElementById('schedule-role-tag').style.display =
-    currentUser?.isAdmin ? 'inline-block' : 'none';
-  document.getElementById('worker-schedule-wrap').style.display =
-    mode === 'week' && !currentUser?.isAdmin ? 'block' : 'none';
-  document.getElementById('admin-schedule-wrap').style.display =
-    mode === 'week' && currentUser?.isAdmin ? 'block' : 'none';
-
-  if (mode === 'week') {
-    refreshWeek();
-  } else {
-    const mid = new Date(shiftISO(scheduleWeekStart, 3) + 'T00:00:00Z');
-    monthCursor = { year: mid.getUTCFullYear(), month: mid.getUTCMonth() + 1 };
-    loadMonthView();
-  }
-}
-
-function refreshWeek() {
-  if (currentUser?.isAdmin) loadAdminSchedule();
+function loadSchedule() {
+  const isAdmin = currentUser?.isAdmin;
+  document.getElementById('admin-schedule-hint').style.display = isAdmin ? 'block' : 'none';
+  document.getElementById('admin-schedule-wrap').style.display = isAdmin ? 'block' : 'none';
+  document.getElementById('worker-schedule-wrap').style.display = isAdmin ? 'none' : 'block';
+  document.getElementById('my-schedule-empty').style.display = 'none';
+  document.getElementById('my-week-totals').style.display = isAdmin ? 'none' : 'block';
+  if (isAdmin) loadAdminSchedule();
   else loadMySchedule();
 }
 
@@ -335,56 +311,60 @@ function renderMonthProgress(summary, label) {
 // ---------- Admin week grid ----------
 
 async function loadAdminSchedule() {
-  const res = await api(`/api/admin/schedule?start=${scheduleWeekStart}`);
-  if (!res.ok) {
-    document.getElementById('sched-week-label').textContent = 'Failed to load schedule';
-    return;
-  }
-  const data = await res.json();
-  scheduleWeekStart = data.weekStart;
-  adminPrograms = data.programs;
-  adminEmployees = data.employees;
-  sessionById = new Map(data.sessions.map(s => [s.session_id, s]));
+  const error = document.getElementById('schedule-error');
+  try {
+    const res = await api(`/api/admin/schedule?start=${scheduleWeekStart}`);
+    if (!res.ok) throw new Error(`Request failed (${res.status})`);
+    const data = await res.json();
+    scheduleWeekStart = data.weekStart;
+    adminPrograms = data.programs;
+    adminEmployees = data.employees;
+    sessionById = new Map(data.sessions.map(s => [s.session_id, s]));
 
-  document.getElementById('sched-week-label').textContent =
-    `${fmtShort(data.dates[0])} – ${fmtShort(data.dates[6])}`;
+    document.getElementById('schedule-week-label').textContent =
+      `${fmtShort(data.dates[0])} – ${fmtShort(data.dates[6])}`;
+    error.style.display = 'none';
 
-  const byEmp = {};
-  for (const s of data.sessions) {
-    if (s.employee_id == null) continue;
-    (byEmp[s.employee_id] ??= {});
-    (byEmp[s.employee_id][s.session_date] ??= []).push(s);
-  }
-
-  const today = todayISO();
-  let html = '<thead><tr><th class="sticky-col">Employee</th>';
-  for (const d of data.dates) {
-    const wd = new Date(d + 'T00:00:00Z').getUTCDay();
-    const cls = (d === today ? ' today' : '') + (wd === 0 || wd === 6 ? ' weekend' : '');
-    html += `<th class="day-head${cls}">${fmtDayHeader(d)}</th>`;
-  }
-  html += '<th class="pts-head">Pts</th></tr></thead><tbody>';
-
-  for (const emp of data.employees) {
-    const name = `${emp.first_name} ${emp.last_name}`.trim();
-    html += `<tr><td class="sticky-col emp-cell" title="${escapeHtml(emp.email)}">${escapeHtml(name)}</td>`;
-    let weekPts = 0;
-    for (const d of data.dates) {
-      const list = (byEmp[emp.employee_id] || {})[d] || [];
-      weekPts += list.filter(s => s.status === 'completed')
-                     .reduce((a, s) => a + Number(s.points), 0);
-      const chips = list.map(s => `
-        <span class="slot-chip ${s.status}${s.is_sudden ? ' sudden' : ''}"
-              data-session-id="${s.session_id}"
-              title="${escapeHtml(s.program_name)} · ${fmtTime(s.start_time)} · ${Number(s.points).toFixed(1)} pts · ${s.status}">
-          ${escapeHtml(s.program_code)}${s.start_time ? ' ' + fmtTime(s.start_time) : ''}
-        </span>`).join('');
-      html += `<td class="grid-cell${list.length ? ' has' : ''}${d === today ? ' today' : ''}"
-                  data-employee-id="${emp.employee_id}" data-date="${d}">${chips}</td>`;
+    const byEmp = {};
+    for (const s of data.sessions) {
+      if (s.employee_id == null) continue;
+      (byEmp[s.employee_id] ??= {});
+      (byEmp[s.employee_id][s.session_date] ??= []).push(s);
     }
-    html += `<td class="pts-cell">${weekPts ? weekPts.toFixed(1) : ''}</td></tr>`;
+
+    const today = todayISO();
+    let html = '<thead><tr><th class="sticky-col">Employee</th>';
+    for (const d of data.dates) {
+      const wd = new Date(d + 'T00:00:00Z').getUTCDay();
+      const cls = (d === today ? ' today' : '') + (wd === 0 || wd === 6 ? ' weekend' : '');
+      html += `<th class="day-head${cls}">${fmtDayHeader(d)}</th>`;
+    }
+    html += '<th class="pts-head">Pts</th></tr></thead><tbody>';
+
+    for (const emp of data.employees) {
+      const name = `${emp.first_name} ${emp.last_name}`.trim();
+      html += `<tr><td class="sticky-col emp-cell" title="${escapeHtml(emp.email)}">${escapeHtml(name)}</td>`;
+      let weekPts = 0;
+      for (const d of data.dates) {
+        const list = (byEmp[emp.employee_id] || {})[d] || [];
+        weekPts += list.filter(s => s.status === 'completed')
+                       .reduce((a, s) => a + Number(s.points), 0);
+        const chips = list.map(s => `
+          <span class="slot-chip ${escapeHtml(s.status)}${s.is_sudden ? ' sudden' : ''}"
+                data-session-id="${s.session_id}"
+                title="${escapeHtml(s.program_name)} · ${fmtTime(s.start_time)} · ${Number(s.points).toFixed(1)} pts · ${escapeHtml(s.status)}">
+            ${escapeHtml(s.program_code)}${s.start_time ? ' ' + fmtTime(s.start_time) : ''}
+          </span>`).join('');
+        html += `<td class="grid-cell${list.length ? ' has' : ''}${d === today ? ' today' : ''}"
+                    data-employee-id="${emp.employee_id}" data-date="${d}">${chips}</td>`;
+      }
+      html += `<td class="pts-cell">${weekPts ? weekPts.toFixed(1) : ''}</td></tr>`;
+    }
+    document.getElementById('admin-schedule-grid').innerHTML = html + '</tbody>';
+  } catch (err) {
+    error.textContent = `Failed to load schedule: ${err.message}`;
+    error.style.display = 'block';
   }
-  document.getElementById('admin-schedule-grid').innerHTML = html + '</tbody>';
 }
 
 // ---------- Month view ----------
@@ -648,7 +628,8 @@ function initPlan() {
 }
 
 function refreshScheduleViews() {
-  loadPlanBoard();
+  if (planLoaded) loadPlanBoard();
+  if (scheduleLoaded) loadSchedule();
   loadMyTasks();
 }
 
@@ -762,15 +743,25 @@ document.getElementById('nav-plan').addEventListener('click', () => switchView('
 
 document.getElementById('schedule-prev').addEventListener('click', () => {
   scheduleWeekStart = shiftISO(scheduleWeekStart, -7);
-  loadMySchedule();
+  loadSchedule();
 });
 document.getElementById('schedule-next').addEventListener('click', () => {
   scheduleWeekStart = shiftISO(scheduleWeekStart, 7);
-  loadMySchedule();
+  loadSchedule();
 });
 document.getElementById('schedule-today').addEventListener('click', () => {
   scheduleWeekStart = mondayOf();
-  loadMySchedule();
+  loadSchedule();
+});
+
+document.getElementById('admin-schedule-grid').addEventListener('click', (e) => {
+  const chip = e.target.closest('.slot-chip');
+  if (chip) {
+    openDetailsModal(Number(chip.dataset.sessionId));
+    return;
+  }
+  const cell = e.target.closest('.grid-cell');
+  if (cell) openAssignModal(Number(cell.dataset.employeeId), cell.dataset.date);
 });
 
 // ---- Plan board navigation ----

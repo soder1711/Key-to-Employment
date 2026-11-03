@@ -50,12 +50,16 @@
           <h2>Schedule</h2>
         </div>
         <div class="week-nav">
-          <button id="schedule-prev" class="btn ghost small">← Previous week</button>
-          <button id="schedule-today" class="btn small">This week</button>
+          <button id="schedule-prev" class="btn ghost small">← Prev week</button>
+          <button id="schedule-today" class="btn small">Today</button>
           <button id="schedule-next" class="btn ghost small">Next week →</button>
           <span id="schedule-week-label" class="week-label"></span>
         </div>
-        <div class="table-scroll">
+        <p id="admin-schedule-hint" class="hint" style="display:none;">Click an empty cell to assign a session · click a chip to complete, cancel or delete it · Pts = completed points this week.</p>
+        <div id="admin-schedule-wrap" class="grid-scroll" style="display:none;">
+          <table class="sched-grid" id="admin-schedule-grid"></table>
+        </div>
+        <div id="worker-schedule-wrap" class="table-scroll">
           <table class="sched-table">
             <thead><tr>
               <th>Date</th><th>Program</th><th>Category</th><th>Time</th><th>Points</th><th>Status</th>
@@ -64,7 +68,7 @@
           </table>
         </div>
         <div id="my-schedule-empty" class="empty" style="display:none;">No sessions scheduled for you this week.</div>
-        <div id="my-week-totals" class="week-totals"></div>
+        <div id="my-week-totals" class="week-totals" style="display:none;"></div>
         <div id="schedule-error" class="error" style="display:none;"></div>
       </section>
 
