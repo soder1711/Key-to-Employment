@@ -197,17 +197,27 @@ function fmtDayHeader(iso) {
 
 function switchView(view) {
   const showTasks = view === 'tasks';
+  const showSchedule = view === 'schedule';
   const showPlan = view === 'plan';
 
   document.getElementById('nav-tasks').classList.toggle('active', showTasks);
+  document.getElementById('nav-schedule').classList.toggle('active', showSchedule);
   document.getElementById('nav-plan').classList.toggle('active', showPlan);
 
   document.getElementById('my-tasks-section').style.display = showTasks ? 'block' : 'none';
+  document.getElementById('schedule-section').style.display = showSchedule ? 'block' : 'none';
   document.getElementById('plan-section').style.display =
     showPlan && currentUser?.isAdmin ? 'block' : 'none';
 
   if (showPlan && !planLoaded) initPlan();
   if (showTasks) loadMyTasks();
+  if (showSchedule) {
+    if (!scheduleLoaded) {
+      scheduleWeekStart = mondayOf();
+      scheduleLoaded = true;
+    }
+    loadMySchedule();
+  }
 }
 
 function initSchedule() {
@@ -248,47 +258,57 @@ function refreshWeek() {
 // ---------- Worker week ----------
 
 async function loadMySchedule() {
-  const res = await api(`/api/schedule?start=${scheduleWeekStart}`);
-  if (!res.ok) return;
-  const data = await res.json();
-  scheduleWeekStart = data.weekStart;
-
-  document.getElementById('sched-week-label').textContent =
-    `${fmtShort(data.dates[0])} – ${fmtShort(data.dates[6])}`;
-
   const tbody = document.getElementById('my-schedule-body');
   const empty = document.getElementById('my-schedule-empty');
-  const visible = data.sessions.filter(s => s.status !== 'cancelled');
+  const error = document.getElementById('schedule-error');
+  const totals = document.getElementById('my-week-totals');
 
-  if (!data.sessions.length) {
+  try {
+    const res = await api(`/api/schedule?start=${scheduleWeekStart}`);
+    if (!res.ok) throw new Error(`Request failed (${res.status})`);
+    const data = await res.json();
+    scheduleWeekStart = data.weekStart;
+    document.getElementById('schedule-week-label').textContent =
+      `${fmtShort(data.dates[0])} – ${fmtShort(data.dates[6])}`;
+    error.style.display = 'none';
+
+    const visible = data.sessions.filter(s => s.status !== 'cancelled');
+    if (!data.sessions.length) {
+      tbody.innerHTML = '';
+      empty.style.display = 'block';
+    } else {
+      empty.style.display = 'none';
+      tbody.innerHTML = data.sessions.map(s => `
+        <tr${s.status === 'cancelled' ? ' class="cancelled-row"' : ''}>
+          <td>${fmtCellDate(s.session_date)}</td>
+          <td>${escapeHtml(s.program_name)}${s.is_sudden ? ' <span class="mini-tag sudden">sudden</span>' : ''}</td>
+          <td><span class="cat-tag ${escapeHtml(s.category)}">${escapeHtml(s.category)}</span></td>
+          <td>${s.start_time ? fmtTime(s.start_time) : '—'}${s.end_time ? '–' + fmtTime(s.end_time) : ''}</td>
+          <td class="pts">${Number(s.points).toFixed(1)}</td>
+          <td><span class="status-pill ${escapeHtml(s.status)}">${escapeHtml(s.status)}</span></td>
+        </tr>`).join('');
+    }
+
+    const done = data.sessions.filter(s => s.status === 'completed');
+    const earned = done.reduce((a, s) => a + Number(s.points), 0);
+    const planned = visible.reduce((a, s) => a + Number(s.points), 0);
+
+    totals.innerHTML = `
+      <div class="totals-row">
+        <span>Sessions: <strong>${visible.length}</strong></span>
+        <span>Completed: <strong>${done.length}</strong></span>
+        <span>Points earned: <strong>${earned.toFixed(1)}</strong></span>
+        <span>If all done: <strong>${planned.toFixed(1)}</strong></span>
+      </div>
+      ${renderMonthProgress(data.summary,
+        data.summaryMonth ? MONTH_NAMES[data.summaryMonth.month - 1] : '')}`;
+  } catch (err) {
     tbody.innerHTML = '';
-    empty.style.display = 'block';
-  } else {
     empty.style.display = 'none';
-    tbody.innerHTML = data.sessions.map(s => `
-      <tr${s.status === 'cancelled' ? ' class="cancelled-row"' : ''}>
-        <td>${fmtCellDate(s.session_date)}</td>
-        <td>${escapeHtml(s.program_name)}${s.is_sudden ? ' <span class="mini-tag sudden">sudden</span>' : ''}</td>
-        <td><span class="cat-tag ${escapeHtml(s.category)}">${escapeHtml(s.category)}</span></td>
-        <td>${s.start_time ? fmtTime(s.start_time) : '—'}${s.end_time ? '–' + fmtTime(s.end_time) : ''}</td>
-        <td class="pts">${Number(s.points).toFixed(1)}</td>
-        <td><span class="status-pill ${s.status}">${s.status}</span></td>
-      </tr>`).join('');
+    totals.innerHTML = '';
+    error.textContent = `Failed to load schedule: ${err.message}`;
+    error.style.display = 'block';
   }
-
-  const done = data.sessions.filter(s => s.status === 'completed');
-  const earned = done.reduce((a, s) => a + Number(s.points), 0);
-  const planned = visible.reduce((a, s) => a + Number(s.points), 0);
-
-  document.getElementById('my-week-totals').innerHTML = `
-    <div class="totals-row">
-      <span>Sessions: <strong>${visible.length}</strong></span>
-      <span>Completed: <strong>${done.length}</strong></span>
-      <span>Points earned: <strong>${earned.toFixed(1)}</strong></span>
-      <span>If all done: <strong>${planned.toFixed(1)}</strong></span>
-    </div>
-    ${renderMonthProgress(data.summary,
-      data.summaryMonth ? MONTH_NAMES[data.summaryMonth.month - 1] : '')}`;
 }
 
 function renderMonthProgress(summary, label) {
@@ -737,7 +757,21 @@ function openDetailsModal(sessionId) {
 
 // ---- Navigation & view switching ----
 document.getElementById('nav-tasks').addEventListener('click', () => switchView('tasks'));
+document.getElementById('nav-schedule').addEventListener('click', () => switchView('schedule'));
 document.getElementById('nav-plan').addEventListener('click', () => switchView('plan'));
+
+document.getElementById('schedule-prev').addEventListener('click', () => {
+  scheduleWeekStart = shiftISO(scheduleWeekStart, -7);
+  loadMySchedule();
+});
+document.getElementById('schedule-next').addEventListener('click', () => {
+  scheduleWeekStart = shiftISO(scheduleWeekStart, 7);
+  loadMySchedule();
+});
+document.getElementById('schedule-today').addEventListener('click', () => {
+  scheduleWeekStart = mondayOf();
+  loadMySchedule();
+});
 
 // ---- Plan board navigation ----
 document.getElementById('plan-prev').addEventListener('click', () => {
