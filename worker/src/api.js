@@ -6,6 +6,7 @@ import {
   deleteSession, logScheduleHistory, getMonthlySummary, setMonthlyTarget,
   reassignSession, getAllPrograms, getProgramById, getProgramByCode,
   createProgram, deactivateProgram, hardDeleteProgram, countProgramSessions,
+  findSeriesSessionsFrom,
 } from './db.js';
 
 /**
@@ -258,6 +259,17 @@ export async function handleAdminUpdateProgress(env, session, body) {
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const TIME_RE = /^\d{2}:\d{2}$/;
 
+// Repeat caps: one year of weekly repeats, max.
+const MAX_REPEAT_WEEKS = 53;
+// Empty weeks box in the UI = fixed weekly schedule -> materialized for one year.
+const FIXED_REPEAT_WEEKS = 53;
+
+function addDaysISO(iso, days) {
+  const d = new Date(iso + 'T00:00:00Z');
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
 /**
  * @api {get} /api/schedule Get my weekly schedule
  * @apiName GetMySchedule
@@ -332,9 +344,15 @@ export async function handleAdminGetSchedule(env, session, url) {
  * @apiBody {String} [endTime] End time in HH:MM format.
  * @apiBody {Number} [points] Credited points; calculated from the program when omitted.
  * @apiBody {Boolean} [isSudden=false] Whether this is a sudden session (doubles points).
+ * @apiBody {Number} [repeatWeeks=1] Also create the same session on this weekday
+ *   for the next N-1 weeks. 1 = only this week; capped at 53 (one year).
+ * @apiBody {Boolean} [repeatFixed=false] Empty weeks box in the UI: fixed weekly
+ *   schedule — same as repeatWeeks = 53 (one year), regardless of repeatWeeks.
  * @apiBody {String} [notes] Optional notes.
  * @apiSuccess {Boolean} success Always true when created.
- * @apiSuccess {Object} session Created session.
+ * @apiSuccess {Object} session The first created session.
+ * @apiSuccess {Number} repeatedWeeks How many weeks the session was created for.
+ * @apiSuccess {Boolean} repeatFixed Whether it was created as a fixed schedule.
  * @apiError 400 Invalid assignment payload.
  * @apiError 403 Admin access required.
  */
@@ -345,6 +363,7 @@ export async function handleAdminAssignSession(env, session, body) {
   const {
     employeeId: requestedEmployeeId,
     date, programId, startTime, endTime, points, isSudden, notes,
+    repeatWeeks, repeatFixed,
   } = body;
   const employeeId = requestedEmployeeId == null || requestedEmployeeId === ''
     ? null
@@ -370,25 +389,46 @@ export async function handleAdminAssignSession(env, session, body) {
   if (startTime && !TIME_RE.test(startTime)) return new Response('Invalid start time', { status: 400 });
   if (endTime && !TIME_RE.test(endTime)) return new Response('Invalid end time', { status: 400 });
 
+  // Repeat check:
+  //   repeatWeeks = 1        -> only this week (default, old behaviour)
+  //   repeatWeeks = N (>1)   -> same weekday/time for N weeks, capped at 53
+  //   repeatFixed = true      -> empty weeks box: fixed weekly schedule,
+  //                              materialized for one year (FIXED_REPEAT_WEEKS)
+  let repeat = 1;
+  if (repeatFixed === true) {
+    repeat = FIXED_REPEAT_WEEKS;
+  } else {
+    repeat = Number(repeatWeeks);
+    if (!Number.isInteger(repeat) || repeat < 1) repeat = 1;
+    if (repeat > MAX_REPEAT_WEEKS) repeat = MAX_REPEAT_WEEKS;
+  }
+
   // Automatic point calculation: derive from the program default when not provided
   let pts = Number(points);
   if (!Number.isFinite(pts)) {
     const prog = await env.DB.prepare(
       'SELECT default_points FROM programs WHERE program_id = ?'
-    ).bind(programId).first();
+    ).bind(parsedProgramId).first();
     pts = Number(prog?.default_points || 0) * (isSudden ? 2 : 1);
   }
   if (!Number.isFinite(pts) || pts < 0 || pts > 100) {
     return new Response('Invalid points', { status: 400 });
   }
 
-  const result = await createSession(env.DB, {
-    sessionDate, programId: parsedProgramId, employeeId,
-    startTime, endTime, points: pts,
-    isSudden: !!isSudden, notes, createdBy: session.employeeId,
-  });
+  // Create one session per week: this week + repeat-1 subsequent weeks.
+  // Every week is a real row, so the task is visible when browsing later weeks.
+  const createdIds = [];
+  for (let i = 0; i < repeat; i++) {
+    const repeatDate = addDaysISO(sessionDate, i * 7);
+    const result = await createSession(env.DB, {
+      sessionDate: repeatDate, programId: parsedProgramId, employeeId,
+      startTime, endTime, points: pts,
+      isSudden: !!isSudden, notes, createdBy: session.employeeId,
+    });
+    createdIds.push(result.meta.last_row_id);
+  }
 
-  const sessionId = result.meta.last_row_id;
+  const sessionId = createdIds[0];
   const created = await getSessionById(env.DB, sessionId);
   const who = created?.first_name
     ? `${created.first_name} ${created.last_name}`
@@ -397,9 +437,15 @@ export async function handleAdminAssignSession(env, session, body) {
     env.DB, session.email, 'create', 'session', sessionId,
     `Added "${created?.program_name ?? parsedProgramId}" on ${sessionDate}` +
     ` (${startTime || '—'}–${endTime || '—'}) for ${pts} points` +
-    `${isSudden ? ' [sudden]' : ''} — ${who}`
+    `${isSudden ? ' [sudden]' : ''} — ${who}` +
+    (repeat > 1 ? ` — repeated for ${repeat} week(s) (same weekday)` : '')
   );
-  return Response.json({ success: true, session: created });
+  return Response.json({
+    success: true,
+    session: created,
+    repeatedWeeks: repeat,
+    repeatFixed: repeatFixed === true,
+  });
 }
 
 /**
@@ -485,7 +531,13 @@ export async function handleAdminSessionStatus(env, session, body) {
  * @apiGroup AdminSchedule
  * @apiHeader {String} Cookie Encrypted admin session cookie.
  * @apiBody {Number} sessionId Session identifier.
+ * @apiBody {Boolean} [deleteFollowing=false] Also delete every subsequent
+ *   occurrence of the same weekly series (same task, person, start/end time
+ *   and weekday) from this date onward. Weeks before this date are never
+ *   touched; completed later sessions are kept so points/history survive.
  * @apiSuccess {Boolean} success Always true when deleted.
+ * @apiSuccess {Number} deletedCount How many sessions were removed.
+ * @apiSuccess {Boolean} deletedFollowing Whether the whole series tail was removed.
  * @apiError 400 Invalid session ID.
  * @apiError 403 Admin access required.
  * @apiError 404 Session not found.
@@ -493,11 +545,37 @@ export async function handleAdminSessionStatus(env, session, body) {
 export async function handleAdminDeleteSession(env, session, body) {
   const denied = requireAdmin(session);
   if (denied) return denied;
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return new Response('Invalid delete payload', { status: 400 });
+  }
 
-  const { sessionId } = body;
+  const { sessionId, deleteFollowing } = body;
   if (!Number.isInteger(sessionId)) return new Response('Invalid session id', { status: 400 });
   const before = await getSessionById(env.DB, sessionId);
   if (!before) return new Response('Session not found', { status: 404 });
+
+  if (deleteFollowing === true) {
+    // Delete this session AND all later occurrences of the same weekly series
+    // (same task, person, start/end time, weekday) from this date onward.
+    // Earlier weeks are untouched. Completed sessions are kept (points/history),
+    // except the session that started the deletion itself.
+    const following = await findSeriesSessionsFrom(env.DB, before);
+    for (const row of following) {
+      await deleteSession(env.DB, row.session_id);
+    }
+    await logScheduleHistory(
+      env.DB, session.email, 'delete', 'session', sessionId,
+      `Deleted "${before.program_name}" ${before.session_date} ` +
+      `(${before.first_name} ${before.last_name}, was ${before.status}) ` +
+      `plus ${Math.max(0, following.length - 1)} subsequent weekly occurrence(s) ` +
+      `from this date onward`
+    );
+    return Response.json({
+      success: true,
+      deletedCount: following.length,
+      deletedFollowing: true,
+    });
+  }
 
   await deleteSession(env.DB, sessionId);
   await logScheduleHistory(
@@ -505,7 +583,7 @@ export async function handleAdminDeleteSession(env, session, body) {
     `Deleted "${before.program_name}" ${before.session_date} ` +
     `(${before.first_name} ${before.last_name}, was ${before.status})`
   );
-  return Response.json({ success: true });
+  return Response.json({ success: true, deletedCount: 1 });
 }
 
 /**

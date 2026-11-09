@@ -749,7 +749,7 @@ function refreshAssignDefaults() {
 
 function resetAssignRepeat() {
   document.getElementById('assign-repeat').checked = false;
-  document.getElementById('assign-repeat-weeks').value = 4;
+  document.getElementById('assign-repeat-weeks').value = ''; // empty = fixed schedule
   document.getElementById('assign-repeat-row').style.display = 'none';
 }
 
@@ -923,11 +923,16 @@ document.getElementById('assign-submit').addEventListener('click', async (e) => 
   const btn = e.target;
   btn.disabled = true;
   try {
-    // 1 = only this day; checked = also all subsequent weeks (same weekday)
+    // Repeat check:
+    //   unchecked             -> repeatWeeks 1 (only this day, old behaviour)
+    //   checked + number      -> that many weeks, capped at 53
+    //   checked + empty box   -> repeatFixed: fixed weekly schedule,
+    //                            backend creates one year (53 weeks)
     const repeatOn = document.getElementById('assign-repeat').checked;
-    const repeatWeeks = repeatOn
-      ? Math.min(53, Math.max(1,
-          parseInt(document.getElementById('assign-repeat-weeks').value, 10) || 1))
+    const weeksRaw = document.getElementById('assign-repeat-weeks').value.trim();
+    const repeatFixed = repeatOn && weeksRaw === '';
+    const repeatWeeks = repeatOn && !repeatFixed
+      ? Math.min(53, Math.max(1, parseInt(weeksRaw, 10) || 1))
       : 1;
 
     const res = await api('/api/admin/schedule/assign', {
@@ -942,6 +947,7 @@ document.getElementById('assign-submit').addEventListener('click', async (e) => 
         isSudden: document.getElementById('assign-sudden').checked,
         notes: document.getElementById('assign-notes').value || null,
         repeatWeeks,
+        repeatFixed,
       }),
     });
     if (!res.ok) {
@@ -950,8 +956,12 @@ document.getElementById('assign-submit').addEventListener('click', async (e) => 
       const data = await res.json().catch(() => null);
       closeModal();
       refreshScheduleViews();
-      if (data?.repeatedWeeks > 1) {
-        alert(`Task added to ${data.repeatedWeeks} weeks (same weekday, same time).`);
+      if (data?.repeatFixed) {
+        alert('Fixed schedule added: the task repeats every week for one year (53 weeks). ' +
+              'Browse to later weeks to see it.');
+      } else if (data?.repeatedWeeks > 1) {
+        alert(`Task added to ${data.repeatedWeeks} weeks (same weekday, same time). ` +
+              'Browse to later weeks to see it.');
       }
     }
   } catch (err) {
@@ -973,6 +983,7 @@ document.querySelectorAll('#modal-details [data-status]').forEach(b => {
   });
 });
 
+// Delete only the clicked day
 document.getElementById('session-delete').addEventListener('click', async () => {
   if (!currentSession) return;
   if (!confirm('Delete this task? The deletion is recorded in history.')) return;
@@ -982,6 +993,33 @@ document.getElementById('session-delete').addEventListener('click', async () => 
   });
   if (res.ok) { closeModal(); refreshScheduleViews(); }
   else alert('Delete failed');
+});
+
+// Delete the clicked day AND every following weekly occurrence of the
+// same series (same task, person, time, weekday) from this date onward.
+// Weeks before this date are never touched.
+document.getElementById('session-delete-series').addEventListener('click', async () => {
+  if (!currentSession) return;
+  if (!confirm('Delete this task AND every following weekly occurrence from this date onward?\n\n' +
+    'Earlier weeks are kept. Already completed sessions are also kept ' +
+    '(they count toward points). The deletion is recorded in history.')) return;
+  try {
+    const res = await api('/api/admin/schedule/delete', {
+      method: 'POST',
+      body: JSON.stringify({ sessionId: currentSession.session_id, deleteFollowing: true }),
+    });
+    if (res.ok) {
+      const data = await res.json().catch(() => null);
+      closeModal();
+      refreshScheduleViews();
+      const n = data?.deletedCount ?? 1;
+      if (n > 1) alert(`Deleted ${n} sessions from this date onward.`);
+    } else {
+      alert('Delete failed: ' + (await res.text()));
+    }
+  } catch (err) {
+    alert('Network error: ' + err.message);
+  }
 });
 
 // ---- Task types modal wiring (create / delete programs) ----

@@ -82,8 +82,12 @@
         <p class="hint">Drag a person from the top onto a task to give it a person.
           Points are added up automatically. Click a task for options.
           One day is shown at a time — use the arrows (or ← → keys) to see another day.
-          When adding a task you can tick "Repeat every week" to apply it to all subsequent weeks.
-          Use "Manage tasks" to create new tasks or delete them.</p>
+          When adding a task you can tick "Repeat every week" to apply it to all
+          subsequent weeks — leave the weeks box empty for a fixed weekly schedule.
+          Repeated tasks are stored per week, so they show up automatically when you
+          browse to those weeks. "Delete this day" removes one occurrence;
+          "Delete + following weeks" also removes every later occurrence of the series.
+          Use "Manage tasks" to create new tasks or delete them from the list.</p>
         <div class="week-nav">
           <button id="plan-prev" class="btn ghost small">← Previous day</button>
           <button id="plan-today" class="btn small">Today</button>
@@ -151,8 +155,10 @@
         <label class="check-row"><input type="checkbox" id="assign-repeat"> Repeat every week (same weekday &amp; time)</label>
         <div id="assign-repeat-row" style="display:none;">
           <label for="assign-repeat-weeks">Repeat for (weeks, including this one)</label>
-          <input type="number" id="assign-repeat-weeks" min="1" max="53" step="1" value="4">
-          <p class="assign-repeat-note">Applies the task to all subsequent weeks — capped at 53 weeks (one year).</p>
+          <input type="number" id="assign-repeat-weeks" min="1" max="53" step="1" placeholder="empty = fixed schedule">
+          <p class="assign-repeat-note">Type a number of weeks (max 53) — or leave the box empty for a
+            fixed weekly schedule: the task is then created in every subsequent week
+            for one year (53 weeks).</p>
         </div>
         <label for="assign-notes">Notes</label>
         <input type="text" id="assign-notes" placeholder="optional">
@@ -165,7 +171,8 @@
           <button class="btn small" data-status="completed">✓ Complete</button>
           <button class="btn small ghost" data-status="scheduled">↺ Reopen</button>
           <button class="btn small ghost" data-status="cancelled">✕ Cancel</button>
-          <button id="session-delete" class="btn small danger">Delete</button>
+          <button id="session-delete" class="btn small danger">Delete this day</button>
+          <button id="session-delete-series" class="btn small danger">Delete + following weeks</button>
         </div>
       </div>
 

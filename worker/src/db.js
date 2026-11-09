@@ -218,8 +218,9 @@ export async function getActiveEmployees(db) {
 }
 
 // LEFT JOIN so sessions without a person yet still appear (Plan board)
+// program_id is selected so series matching can key off it
 const SESSION_SELECT = `
-  SELECT s.session_id, s.session_date, s.start_time, s.end_time, s.status,
+  SELECT s.session_id, s.program_id, s.session_date, s.start_time, s.end_time, s.status,
          s.points, s.is_sudden, s.notes, s.employee_id,
          p.code AS program_code, p.name AS program_name, p.category,
          e.first_name, e.last_name, e.email AS employee_email
@@ -254,6 +255,33 @@ export async function createSession(db, s) {
   ).bind(s.sessionDate, s.programId, s.employeeId, s.startTime || null,
          s.endTime || null, s.points, s.isSudden ? 1 : 0, s.notes || null,
          s.createdBy || null).run();
+}
+
+// Every occurrence of the same weekly series from a given date on:
+// same task, same person, same start/end time, same weekday.
+// Weeks before that date are excluded; completed sessions are kept
+// (history/points), except the session that started the deletion itself.
+export async function findSeriesSessionsFrom(db, source) {
+  const { results } = await db.prepare(`
+    SELECT s.session_id, s.session_date
+    FROM schedule_sessions s
+    WHERE s.program_id = ?
+      AND s.session_date >= ?
+      AND strftime('%w', s.session_date) = strftime('%w', ?)
+      AND IFNULL(s.employee_id, -1) = IFNULL(?, -1)
+      AND IFNULL(s.start_time, '') = IFNULL(?, '')
+      AND IFNULL(s.end_time, '') = IFNULL(?, '')
+      AND (s.status != 'completed' OR s.session_id = ?)
+    ORDER BY s.session_date ASC
+  `).bind(
+    source.program_id,
+    source.session_date, source.session_date,
+    source.employee_id ?? null,
+    source.start_time ?? null,
+    source.end_time ?? null,
+    source.session_id
+  ).all();
+  return results;
 }
 
 export async function reassignSession(db, sessionId, employeeId) {
