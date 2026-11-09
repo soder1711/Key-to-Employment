@@ -332,9 +332,11 @@ export async function handleAdminGetSchedule(env, session, url) {
  * @apiBody {String} [endTime] End time in HH:MM format.
  * @apiBody {Number} [points] Credited points; calculated from the program when omitted.
  * @apiBody {Boolean} [isSudden=false] Whether this is a sudden session (doubles points).
+ * @apiBody {Number} [repeatWeeks=1] Repeat for this many weeks, same weekday and time (max 53).
  * @apiBody {String} [notes] Optional notes.
  * @apiSuccess {Boolean} success Always true when created.
- * @apiSuccess {Object} session Created session.
+ * @apiSuccess {Object} session The first created session.
+ * @apiSuccess {Number} repeatedWeeks Number of weeks the task was added to.
  * @apiError 400 Invalid assignment payload.
  * @apiError 403 Admin access required.
  */
@@ -345,6 +347,7 @@ export async function handleAdminAssignSession(env, session, body) {
   const {
     employeeId: requestedEmployeeId,
     date, programId, startTime, endTime, points, isSudden, notes,
+    repeatWeeks: requestedRepeatWeeks,
   } = body;
   const employeeId = requestedEmployeeId == null || requestedEmployeeId === ''
     ? null
@@ -382,24 +385,44 @@ export async function handleAdminAssignSession(env, session, body) {
     return new Response('Invalid points', { status: 400 });
   }
 
-  const result = await createSession(env.DB, {
-    sessionDate, programId: parsedProgramId, employeeId,
-    startTime, endTime, points: pts,
-    isSudden: !!isSudden, notes, createdBy: session.employeeId,
-  });
+  // 1 = only this day; >1 = also all subsequent weeks (same weekday, same time).
+  // Clamped server-side too, so a crafted request cannot exceed 53 weeks.
+  const repeatWeeks = Math.min(53, Math.max(1,
+    Math.floor(Number(requestedRepeatWeeks) || 1)));
 
-  const sessionId = result.meta.last_row_id;
-  const created = await getSessionById(env.DB, sessionId);
+  // One real session row per week: every view (Plan board, admin grid,
+  // worker schedule, My tasks) reads by date range, so the copies show up
+  // in those weeks automatically.
+  const baseDate = new Date(sessionDate + 'T00:00:00Z');
+  const sessionIds = [];
+  for (let i = 0; i < repeatWeeks; i++) {
+    const d = new Date(baseDate);
+    d.setUTCDate(d.getUTCDate() + i * 7);
+    const result = await createSession(env.DB, {
+      sessionDate: d.toISOString().slice(0, 10),
+      programId: parsedProgramId,
+      employeeId,
+      startTime, endTime,
+      points: pts,
+      isSudden: !!isSudden,
+      notes,
+      createdBy: session.employeeId,
+    });
+    sessionIds.push(result.meta.last_row_id);
+  }
+
+  const created = await getSessionById(env.DB, sessionIds[0]);
   const who = created?.first_name
     ? `${created.first_name} ${created.last_name}`
     : 'no person yet';
   await logScheduleHistory(
-    env.DB, session.email, 'create', 'session', sessionId,
+    env.DB, session.email, 'create', 'session', sessionIds[0],
     `Added "${created?.program_name ?? parsedProgramId}" on ${sessionDate}` +
     ` (${startTime || '—'}–${endTime || '—'}) for ${pts} points` +
-    `${isSudden ? ' [sudden]' : ''} — ${who}`
+    `${isSudden ? ' [sudden]' : ''} — ${who}` +
+    (repeatWeeks > 1 ? ` — repeated for ${repeatWeeks} weeks (same weekday)` : '')
   );
-  return Response.json({ success: true, session: created });
+  return Response.json({ success: true, session: created, repeatedWeeks });
 }
 
 /**
