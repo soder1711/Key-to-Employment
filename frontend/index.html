@@ -14,13 +14,15 @@
         <span>Task Portal</span>
       </div>
       <nav class="view-nav">
-        <button id="nav-tasks" class="nav-btn active">Tasks</button>
-        <button id="nav-schedule" class="nav-btn">Schedule</button>
-        <button id="nav-plan" class="nav-btn" style="display:none;">Plan</button>
+        <button id="nav-tasks" class="nav-btn active" data-i18n="nav.tasks">Tasks</button>
+        <button id="nav-schedule" class="nav-btn" data-i18n="nav.schedule">Schedule</button>
+        <button id="nav-plan" class="nav-btn" style="display:none;" data-i18n="nav.plan">Plan</button>
       </nav>
       <div class="user-area">
         <span id="user" class="user-chip"></span>
-        <button id="logout-btn" class="btn ghost" style="display:none;">Log out</button>
+        <img id="user-avatar" class="user-avatar" style="display:none;" alt="">
+        <button id="lang-btn" class="btn ghost small" title="Tiếng Việt">VI</button>
+        <button id="logout-btn" class="btn ghost" style="display:none;" data-i18n="user.logout">Log out</button>
       </div>
     </header>
 
@@ -28,18 +30,22 @@
       <!-- ===== My tasks (table view) ===== -->
       <section id="my-tasks-section" class="card" style="display:none;">
         <div class="card-head">
-          <h2>My tasks</h2>
+          <h2 data-i18n="tasks.title">My tasks</h2>
           <span id="my-tasks-week" class="week-label"></span>
         </div>
         <div class="table-scroll">
           <table class="data-table">
             <thead><tr>
-              <th>Task</th><th>Priority / category</th><th>Status</th><th>Date / time</th><th>Progress / points</th>
+              <th data-i18n="th.task">Task</th>
+              <th data-i18n="th.priority">Priority / category</th>
+              <th data-i18n="th.status">Status</th>
+              <th data-i18n="th.date">Date / time</th>
+              <th data-i18n="th.progress">Progress / points</th>
             </tr></thead>
             <tbody id="my-tasks"></tbody>
           </table>
         </div>
-        <div id="my-tasks-empty" class="empty" style="display:none;">No tasks or Plan assignments yet.</div>
+        <div id="my-tasks-empty" class="empty" style="display:none;" data-i18n="tasks.empty">No tasks or Plan assignments yet.</div>
         <div id="project-tasks-error" class="error" style="display:none;"></div>
         <div id="planned-tasks-error" class="error" style="display:none;"></div>
       </section>
@@ -47,27 +53,32 @@
       <!-- ===== Personal weekly schedule ===== -->
       <section id="schedule-section" class="card" style="display:none;">
         <div class="card-head">
-          <h2>Schedule</h2>
+          <h2 data-i18n="schedule.title">Schedule</h2>
         </div>
         <div class="week-nav">
-          <button id="schedule-prev" class="btn ghost small">← Prev week</button>
-          <button id="schedule-today" class="btn small">Today</button>
-          <button id="schedule-next" class="btn ghost small">Next week →</button>
+          <button id="schedule-prev" class="btn ghost small" data-i18n="schedule.prev">← Prev week</button>
+          <button id="schedule-today" class="btn small" data-i18n="schedule.today">Today</button>
+          <button id="schedule-next" class="btn ghost small" data-i18n="schedule.next">Next week →</button>
           <span id="schedule-week-label" class="week-label"></span>
         </div>
-        <p id="admin-schedule-hint" class="hint" style="display:none;">Click an empty cell to assign a session · click a chip to complete, cancel or delete it · Pts = completed points this week · tasks without a person are listed in the Unassigned row.</p>
+        <p id="admin-schedule-hint" class="hint" style="display:none;" data-i18n="schedule.adminHint">Click an empty cell to assign a session · click a chip to complete, cancel or delete it · Pts = completed points this week.</p>
         <div id="admin-schedule-wrap" class="grid-scroll" style="display:none;">
           <table class="sched-grid" id="admin-schedule-grid"></table>
         </div>
         <div id="worker-schedule-wrap" class="table-scroll">
           <table class="sched-table">
             <thead><tr>
-              <th>Date</th><th>Program</th><th>Category</th><th>Time</th><th>Points</th><th>Status</th>
+              <th data-i18n="sth.date">Date</th>
+              <th data-i18n="sth.program">Program</th>
+              <th data-i18n="sth.category">Category</th>
+              <th data-i18n="sth.time">Time</th>
+              <th data-i18n="sth.points">Points</th>
+              <th data-i18n="sth.status">Status</th>
             </tr></thead>
             <tbody id="my-schedule-body"></tbody>
           </table>
         </div>
-        <div id="my-schedule-empty" class="empty" style="display:none;">No sessions scheduled for you this week.</div>
+        <div id="my-schedule-empty" class="empty" style="display:none;" data-i18n="schedule.empty">No sessions scheduled for you this week.</div>
         <div id="my-week-totals" class="week-totals" style="display:none;"></div>
         <div id="schedule-error" class="error" style="display:none;"></div>
       </section>
@@ -75,11 +86,11 @@
       <!-- ===== Admin: weekly plan board (one day at a time) ===== -->
       <section id="plan-section" class="card" style="display:none;">
         <div class="card-head">
-          <h2>Weekly plan</h2>
-          <span class="admin-tag">admin</span>
-          <button id="manage-tasks-btn" class="btn ghost small" style="margin-left:auto;">Manage tasks</button>
+          <h2 data-i18n="plan.title">Weekly plan</h2>
+          <span class="admin-tag" data-i18n="plan.adminTag">admin</span>
+          <button id="manage-tasks-btn" class="btn ghost small" style="margin-left:auto;" data-i18n="plan.manage">Manage tasks</button>
         </div>
-        <p class="hint">Drag a person from the top onto a task to give it a person.
+        <p class="hint" data-i18n="plan.hint">Drag a person from the top onto a task to give it a person.
           If the same task (same time) exists on this weekday in following weeks,
           a popup asks whether to apply the person to this day only or to all
           following weeks — with an option to override weeks that already have
@@ -89,13 +100,13 @@
           same task, same time and same weekday; anything else is kept.
           Use "Manage tasks" to create new tasks or delete them from the list.</p>
         <div class="week-nav">
-          <button id="plan-prev" class="btn ghost small">← Previous day</button>
-          <button id="plan-today" class="btn small">Today</button>
-          <button id="plan-next" class="btn ghost small">Next day →</button>
+          <button id="plan-prev" class="btn ghost small" data-i18n="plan.prev">← Previous day</button>
+          <button id="plan-today" class="btn small" data-i18n="plan.today">Today</button>
+          <button id="plan-next" class="btn ghost small" data-i18n="plan.next">Next day →</button>
           <span id="plan-day-label" class="week-label"></span>
         </div>
         <div class="people-pool">
-          <span class="pool-label">People</span>
+          <span class="pool-label" data-i18n="plan.people">People</span>
           <div id="pool-chips" class="pool-chips"></div>
         </div>
         <div id="plan-days"></div>
@@ -109,19 +120,22 @@
     <div class="login-card">
       <div class="card-accent"></div>
       <div class="login-body">
+        <div class="login-lang-row">
+          <button id="lang-btn-login" class="btn ghost small" title="Tiếng Việt">VI</button>
+        </div>
         <h1 class="login-title">Task Portal</h1>
-        <p class="login-sub">Sign in with your work account to view and update your tasks.</p>
+        <p class="login-sub" data-i18n="login.sub">Sign in with your work account to view and update your tasks.</p>
         <div class="signin-panel">
           <a id="signin-link" class="google-btn">
             <svg width="20" height="20" viewBox="0 0 48 48" aria-hidden="true">
-              <path fill="#FFC107" d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.652-.389-3.917z"/>
+              <path fill="#FFC107" d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z"/>
               <path fill="#FF3D00" d="M6.306 14.691l6.571 2.024C14.427 12.086 18.844 9 24 9c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 16.318 4 9.656 8.337 6.306 14.691z"/>
               <path fill="#4CAF50" d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238C29.211 35.091 26.715 36 24 36c-5.202 0-9.619-3.317-11.283-7.946l-6.522 2.316C9.503 36.726 16.227 44 24 44z"/>
-              <path fill="#1976D2" d="M43.611 20.083H42V20H24v8h11.303c-.792 2.237-2.231 4.166-4.087 5.571l.003-.002 6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.652-.389-3.917z"/>
+              <path fill="#1976D2" d="M43.611 20.083H42V20H24v8h11.303c-.792 2.237-2.231 4.166-4.087 5.571l.003-.002 6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.65-.389-3.917z"/>
             </svg>
-            <span>Sign in with Google</span>
+            <span data-i18n="login.google">Sign in with Google</span>
           </a>
-          <p class="signin-hint">Your access level is determined by your account.</p>
+          <p class="signin-hint" data-i18n="login.hint">Your access level is determined by your account.</p>
         </div>
       </div>
     </div>
@@ -137,43 +151,43 @@
 
       <div id="modal-assign-form">
         <p id="assign-context" class="modal-context"></p>
-        <label for="assign-program">Task</label>
+        <label for="assign-program" data-i18n="modal.task">Task</label>
         <select id="assign-program"></select>
         <div class="modal-row">
           <div>
-            <label for="assign-start">Start</label>
+            <label for="assign-start" data-i18n="modal.start">Start</label>
             <input type="time" id="assign-start">
           </div>
           <div>
-            <label for="assign-end">End</label>
+            <label for="assign-end" data-i18n="modal.end">End</label>
             <input type="time" id="assign-end">
           </div>
         </div>
         <p id="assign-period-hint" class="assign-repeat-note"></p>
-        <label for="assign-points">Points (calculated automatically)</label>
+        <label for="assign-points" data-i18n="modal.points">Points (calculated automatically)</label>
         <input type="number" id="assign-points" min="0" max="100" step="0.5" readonly>
-        <label class="check-row"><input type="checkbox" id="assign-sudden"> Sudden session (doubles the points)</label>
-        <label class="check-row"><input type="checkbox" id="assign-repeat"> Repeat every week (same weekday &amp; time)</label>
+        <label class="check-row"><input type="checkbox" id="assign-sudden"><span data-i18n="modal.sudden"> Sudden session (doubles the points)</span></label>
+        <label class="check-row"><input type="checkbox" id="assign-repeat"><span data-i18n="modal.repeat"> Repeat every week (same weekday &amp; time)</span></label>
         <div id="assign-repeat-row" style="display:none;">
-          <label for="assign-repeat-weeks">Repeat for (weeks, including this one)</label>
+          <label for="assign-repeat-weeks" data-i18n="modal.repeatWeeks">Repeat for (weeks, including this one)</label>
           <input type="number" id="assign-repeat-weeks" min="1" max="53" step="1" placeholder="empty = fixed schedule">
-          <p class="assign-repeat-note">Type a number of weeks (max 53) — or leave the box empty for a
+          <p class="assign-repeat-note" data-i18n="modal.repeatNote">Type a number of weeks (max 53) — or leave the box empty for a
             fixed weekly schedule: the task is then created in every subsequent week
             for one year (53 weeks).</p>
         </div>
-        <label for="assign-notes">Notes</label>
-        <input type="text" id="assign-notes" placeholder="optional">
-        <button id="assign-submit" class="btn modal-submit">Add task</button>
+        <label for="assign-notes" data-i18n="modal.notes">Notes</label>
+        <input type="text" id="assign-notes" data-i18n-placeholder="modal.notesPlaceholder" placeholder="optional">
+        <button id="assign-submit" class="btn modal-submit" data-i18n="modal.add">Add task</button>
       </div>
 
       <div id="modal-details" style="display:none;">
         <div id="detail-info" class="modal-context"></div>
         <div class="modal-actions">
-          <button class="btn small" data-status="completed">✓ Complete</button>
-          <button class="btn small ghost" data-status="scheduled">↺ Reopen</button>
-          <button class="btn small ghost" data-status="cancelled">✕ Cancel</button>
-          <button id="session-delete" class="btn small danger">Delete this day</button>
-          <button id="session-delete-series" class="btn small danger">Delete + following weeks</button>
+          <button class="btn small" data-status="completed" data-i18n="action.complete">✓ Complete</button>
+          <button class="btn small ghost" data-status="scheduled" data-i18n="action.reopen">↺ Reopen</button>
+          <button class="btn small ghost" data-status="cancelled" data-i18n="action.cancel">✕ Cancel</button>
+          <button id="session-delete" class="btn small danger" data-i18n="action.deleteDay">Delete this day</button>
+          <button id="session-delete-series" class="btn small danger" data-i18n="action.deleteSeries">Delete + following weeks</button>
         </div>
       </div>
 
@@ -184,17 +198,17 @@
   <div id="apply-modal" class="modal-overlay" style="display:none;">
     <div class="modal">
       <div class="modal-head">
-        <h3 id="apply-title">Apply person to following weeks?</h3>
+        <h3 id="apply-title" data-i18n="apply.title">Apply person to following weeks?</h3>
         <button id="apply-close" class="modal-x" aria-label="Close">✕</button>
       </div>
       <p id="apply-context" class="modal-context"></p>
-      <label class="check-row"><input type="checkbox" id="apply-override"> Override weeks that already have a person</label>
-      <p class="assign-repeat-note">Unchecked: only weeks without a person get this person;
+      <label class="check-row"><input type="checkbox" id="apply-override"><span data-i18n="apply.override"> Override weeks that already have a person</span></label>
+      <p class="assign-repeat-note" data-i18n="apply.note">Unchecked: only weeks without a person get this person;
         weeks that already have someone keep theirs. Checked: every following week
         gets this person, replacing existing ones.</p>
       <div class="modal-actions">
-        <button id="apply-one" class="btn small ghost">This day only</button>
-        <button id="apply-all" class="btn small">Apply to all following weeks</button>
+        <button id="apply-one" class="btn small ghost" data-i18n="apply.one">This day only</button>
+        <button id="apply-all" class="btn small" data-i18n="apply.all">Apply to all following weeks</button>
       </div>
     </div>
   </div>
@@ -202,51 +216,56 @@
   <div id="program-modal" class="modal-overlay" style="display:none;">
     <div class="modal">
       <div class="modal-head">
-        <h3>Tasks</h3>
+        <h3 data-i18n="programs.title">Tasks</h3>
         <button id="program-modal-close" class="modal-x" aria-label="Close">✕</button>
       </div>
 
-      <p class="modal-context">Create new tasks or delete them from the list.
+      <p class="modal-context" data-i18n="programs.context">Create new tasks or delete them from the list.
         Deleting a task that already has scheduled sessions only hides it (the sessions are kept);
         a task with no sessions is removed from the database.</p>
 
       <div class="program-list-wrap">
         <table class="program-table">
           <thead><tr>
-            <th>Code</th><th>Task</th><th>Category</th><th>Default pts</th><th>Default time</th><th></th>
+            <th data-i18n="pth.code">Code</th>
+            <th data-i18n="pth.task">Task</th>
+            <th data-i18n="pth.category">Category</th>
+            <th data-i18n="pth.pts">Default pts</th>
+            <th data-i18n="pth.time">Default time</th>
+            <th></th>
           </tr></thead>
           <tbody id="program-list"></tbody>
         </table>
       </div>
 
-      <h4 class="pm-subhead">New task</h4>
+      <h4 class="pm-subhead" data-i18n="programs.new">New task</h4>
       <div class="modal-row">
         <div>
-          <label for="program-code">Code</label>
+          <label for="program-code" data-i18n="plabel.code">Code</label>
           <input type="text" id="program-code" maxlength="16" placeholder="e.g. NEWS">
         </div>
         <div>
-          <label for="program-category">Category</label>
+          <label for="program-category" data-i18n="plabel.category">Category</label>
           <input type="text" id="program-category" maxlength="32" placeholder="e.g. news">
         </div>
       </div>
-      <label for="program-name">Name</label>
+      <label for="program-name" data-i18n="plabel.name">Name</label>
       <input type="text" id="program-name" maxlength="120" placeholder="e.g. Morning news review">
       <div class="modal-row">
         <div>
-          <label for="program-points">Default points</label>
+          <label for="program-points" data-i18n="plabel.points">Default points</label>
           <input type="number" id="program-points" min="0" max="100" step="0.5" value="1">
         </div>
         <div>
-          <label for="program-start">Default start</label>
+          <label for="program-start" data-i18n="plabel.start">Default start</label>
           <input type="time" id="program-start">
         </div>
         <div>
-          <label for="program-end">Default end</label>
+          <label for="program-end" data-i18n="plabel.end">Default end</label>
           <input type="time" id="program-end">
         </div>
       </div>
-      <button id="program-submit" class="btn modal-submit">Create task</button>
+      <button id="program-submit" class="btn modal-submit" data-i18n="programs.create">Create task</button>
       <p id="program-error" class="error" style="display:none;"></p>
     </div>
   </div>

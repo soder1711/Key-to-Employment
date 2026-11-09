@@ -25,9 +25,6 @@ async function sha256Base64Url(input) {
  * @apiDescription Starts the OAuth 2.0 Authorization Code flow with PKCE and redirects to Google.
  * @apiSuccess (Redirect) {String} Location Google authorization URL.
  * @apiSuccess (Cookie) {String} oauth_state Short-lived signed OAuth state cookie.
- * @apiSuccessExample {http} Success:
- *     HTTP/1.1 302 Found
- *     Location: https://accounts.google.com/o/oauth2/v2/auth
  */
 // Step 1: Redirect to Google
 export async function handleLogin(request, env) {
@@ -117,6 +114,7 @@ export async function handleCallback(request, env) {
   const user = await userRes.json();
   const email = user.email;
   const sub = user.sub; // stable Google ID
+  const picture = user.picture || null; // Google profile picture
 
   if (!email) {
     return new Response('No email returned from Google', { status: 400 });
@@ -124,7 +122,7 @@ export async function handleCallback(request, env) {
 
   // Look up employee in D1 by email (or cf_sub for stability)
   let employee = await env.DB.prepare(
-    `SELECT employee_id, cf_sub, is_active, is_admin
+    `SELECT employee_id, cf_sub, is_active, is_admin, picture_url
     FROM employees WHERE cf_sub = ? OR email = ? LIMIT 1`
   ).bind(sub, email).first();
 
@@ -132,16 +130,19 @@ export async function handleCallback(request, env) {
     return new Response('Access denied: not in employee directory', { status: 403 });
   }
 
-  // Backfill cf_sub if missing (first login)
-  if (!employee.cf_sub) {
+  // Backfill cf_sub if missing (first login) and refresh the Google profile
+  // picture whenever it changes, so the avatar next to the name stays current
+  if (!employee.cf_sub || picture !== (employee.picture_url ?? null)) {
     await env.DB.prepare(
-      `UPDATE employees SET cf_sub = ? WHERE employee_id = ?`
-    ).bind(sub, employee.employee_id).run();
+      `UPDATE employees
+       SET cf_sub = COALESCE(?, cf_sub), picture_url = ?
+       WHERE employee_id = ?`
+    ).bind(sub, picture, employee.employee_id).run();
   }
 
   // Create session cookie
   const session = await createSession(
-    { employeeId: employee.employee_id, 
+    { employeeId: employee.employee_id,
       email,
       isAdmin: employee.is_admin === 1,
      },

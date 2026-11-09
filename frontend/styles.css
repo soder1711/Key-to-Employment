@@ -75,7 +75,7 @@ button { font-family: inherit; }
   font-size: 0.8rem;
 }
 
-.user-area { display: flex; align-items: center; gap: 0.75rem; }
+.user-area { display: flex; align-items: center; gap: 0.6rem; }
 .user-chip {
   background: var(--blue-50);
   color: var(--blue-700);
@@ -84,6 +84,16 @@ button { font-family: inherit; }
   border-radius: 999px;
   font-size: 0.85rem;
   font-weight: 600;
+}
+
+/* Google profile picture, right of the email */
+.user-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--blue-100);
+  background: var(--blue-50);
 }
 
 .container { max-width: 960px; margin: 0 auto; padding: 1.5rem 1rem 3rem; }
@@ -213,6 +223,11 @@ button { font-family: inherit; }
 }
 .card-accent { height: 8px; background: linear-gradient(90deg, var(--blue-700), #60a5fa); }
 .login-body { padding: 2.25rem 2.25rem 2.5rem; text-align: center; }
+.login-lang-row {
+  display: flex;
+  justify-content: flex-end;
+  margin: -0.75rem -0.9rem 0.9rem 0;
+}
 .login-title { margin: 0; font-size: 1.6rem; font-weight: 800; }
 .login-sub {
   color: var(--muted);
@@ -350,6 +365,7 @@ button { font-family: inherit; }
   min-width: 140px; text-align: left; padding: 0.5rem; font-weight: 600;
 }
 .sched-grid thead .sticky-col { background: #f8fafc; z-index: 3; }
+.sched-grid .sticky-col.unassigned { color: var(--muted); font-style: italic; }
 
 .grid-cell { vertical-align: top; padding: 4px; min-width: 96px; height: 100%; cursor: pointer; }
 .grid-cell:hover { background: var(--blue-50); }

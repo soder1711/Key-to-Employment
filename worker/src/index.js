@@ -59,9 +59,10 @@ export default {
       const isAdminRoute = url.pathname.startsWith('/api/admin/');
       const isMeRoute = url.pathname === '/api/me' && request.method === 'GET';
       const currentSession = { ...session };
+      let employee = null;
 
       if (isAdminRoute || isMeRoute) {
-        const employee = await getEmployeeAuth(env.DB, session.employeeId);
+        employee = await getEmployeeAuth(env.DB, session.employeeId);
 
         if (!employee || !employee.is_active) {
           return new Response(JSON.stringify({ error: 'Unauthorized' }), {
@@ -88,6 +89,7 @@ export default {
        * @apiSuccess {String} email Signed-in employee email.
        * @apiSuccess {Number} employeeId Employee identifier.
        * @apiSuccess {Boolean} isAdmin Whether the employee is an administrator.
+       * @apiSuccess {String} [picture] Google profile picture URL.
        * @apiError 401 Unauthorized or inactive employee.
        */
       // ---- User endpoints (self only) ----
@@ -96,6 +98,7 @@ export default {
           email: currentSession.email,
           employeeId: currentSession.employeeId,
           isAdmin: currentSession.isAdmin,
+          picture: employee?.picture_url ?? null,
         });
       }
       else if (url.pathname === '/api/me/tasks' && request.method === 'GET') {
