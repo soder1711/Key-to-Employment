@@ -156,6 +156,53 @@ export async function getPrograms(db) {
   return results;
 }
 
+// ---------- Task types (programs) — create / list / delete ----------
+
+export async function getAllPrograms(db) {
+  const { results } = await db.prepare(
+    `SELECT program_id, code, name, category, default_points, default_start, default_end, is_active
+     FROM programs ORDER BY is_active DESC, category, name`
+  ).all();
+  return results;
+}
+
+export async function getProgramById(db, programId) {
+  return await db.prepare(
+    `SELECT program_id, code, name, category, default_points, default_start, default_end, is_active
+     FROM programs WHERE program_id = ? LIMIT 1`
+  ).bind(programId).first();
+}
+
+export async function createProgram(db, p) {
+  return await db.prepare(
+    `INSERT INTO programs
+       (code, name, category, default_points, default_start, default_end, is_active)
+     VALUES (?, ?, ?, ?, ?, ?, 1)`
+  ).bind(p.code, p.name, p.category, p.defaultPoints,
+         p.defaultStart || null, p.defaultEnd || null).run();
+}
+
+// Soft delete: hides the task from pickers but keeps existing sessions intact
+export async function deactivateProgram(db, programId) {
+  return await db.prepare(
+    `UPDATE programs SET is_active = 0 WHERE program_id = ?`
+  ).bind(programId).run();
+}
+
+// Hard delete: only used when no session references the task
+export async function hardDeleteProgram(db, programId) {
+  return await db.prepare(
+    `DELETE FROM programs WHERE program_id = ?`
+  ).bind(programId).run();
+}
+
+export async function countProgramSessions(db, programId) {
+  const row = await db.prepare(
+    `SELECT COUNT(*) AS n FROM schedule_sessions WHERE program_id = ?`
+  ).bind(programId).first();
+  return row?.n ?? 0;
+}
+
 export async function getActiveEmployees(db) {
   const { results } = await db.prepare(
     `SELECT employee_id, first_name, last_name, email, department

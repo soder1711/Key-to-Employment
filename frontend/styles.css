@@ -526,6 +526,28 @@ button { font-family: inherit; }
   padding: 0.55rem 0.7rem; font-size: 0.85rem; color: var(--blue-700); margin: 0;
 }
 
+/* ---------- Repeat weekly (assign modal) ---------- */
+#assign-repeat-row { margin-top: 0.25rem; }
+.assign-repeat-note { color: var(--muted); font-size: 0.78rem; margin: 0.25rem 0 0; }
+
+/* ---------- Task types modal (create / delete programs) ---------- */
+.pm-subhead { margin: 1.1rem 0 0.2rem; font-size: 0.95rem; }
+.program-list-wrap {
+  max-height: 240px; overflow-y: auto;
+  border: 1px solid var(--line); border-radius: 8px; margin: 0.9rem 0 0.25rem;
+}
+.program-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+.program-table th {
+  position: sticky; top: 0; z-index: 1; background: #f8fafc;
+  text-align: left; font-size: 0.7rem; text-transform: uppercase;
+  letter-spacing: 0.04em; color: var(--muted);
+  padding: 0.45rem 0.6rem; border-bottom: 2px solid var(--line);
+}
+.program-table td { padding: 0.45rem 0.6rem; border-bottom: 1px solid var(--line); vertical-align: middle; }
+.pm-code { font-weight: 700; white-space: nowrap; }
+.pm-action { text-align: right; white-space: nowrap; }
+.pm-deleted-tag { background: #e2e8f0; color: #64748b; }
+
 @media (max-width: 640px) {
   .view-nav { order: 3; width: 100%; justify-content: center; }
   .topbar { flex-wrap: wrap; }

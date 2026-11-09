@@ -77,10 +77,13 @@
         <div class="card-head">
           <h2>Weekly plan</h2>
           <span class="admin-tag">admin</span>
+          <button id="manage-tasks-btn" class="btn ghost small" style="margin-left:auto;">Manage tasks</button>
         </div>
         <p class="hint">Drag a person from the top onto a task to give it a person.
           Points are added up automatically. Click a task for options.
-          One day is shown at a time — use the arrows (or ← → keys) to see another day.</p>
+          One day is shown at a time — use the arrows (or ← → keys) to see another day.
+          When adding a task you can tick "Repeat every week" to apply it to all subsequent weeks.
+          Use "Manage tasks" to create new tasks or delete them.</p>
         <div class="week-nav">
           <button id="plan-prev" class="btn ghost small">← Previous day</button>
           <button id="plan-today" class="btn small">Today</button>
@@ -145,6 +148,12 @@
         <label for="assign-points">Points (calculated automatically)</label>
         <input type="number" id="assign-points" min="0" max="100" step="0.5" readonly>
         <label class="check-row"><input type="checkbox" id="assign-sudden"> Sudden session (doubles the points)</label>
+        <label class="check-row"><input type="checkbox" id="assign-repeat"> Repeat every week (same weekday &amp; time)</label>
+        <div id="assign-repeat-row" style="display:none;">
+          <label for="assign-repeat-weeks">Repeat for (weeks, including this one)</label>
+          <input type="number" id="assign-repeat-weeks" min="1" max="53" step="1" value="4">
+          <p class="assign-repeat-note">Applies the task to all subsequent weeks — capped at 53 weeks (one year).</p>
+        </div>
         <label for="assign-notes">Notes</label>
         <input type="text" id="assign-notes" placeholder="optional">
         <button id="assign-submit" class="btn modal-submit">Add task</button>
@@ -161,6 +170,58 @@
       </div>
 
       <p id="modal-error" class="error" style="display:none;"></p>
+    </div>
+  </div>
+
+  <div id="program-modal" class="modal-overlay" style="display:none;">
+    <div class="modal">
+      <div class="modal-head">
+        <h3>Tasks</h3>
+        <button id="program-modal-close" class="modal-x" aria-label="Close">✕</button>
+      </div>
+
+      <p class="modal-context">Create new tasks or delete them from the list.
+        Deleting a task that already has scheduled sessions only hides it (the sessions are kept);
+        a task with no sessions is removed from the database.</p>
+
+      <div class="program-list-wrap">
+        <table class="program-table">
+          <thead><tr>
+            <th>Code</th><th>Task</th><th>Category</th><th>Default pts</th><th>Default time</th><th></th>
+          </tr></thead>
+          <tbody id="program-list"></tbody>
+        </table>
+      </div>
+
+      <h4 class="pm-subhead">New task</h4>
+      <div class="modal-row">
+        <div>
+          <label for="program-code">Code</label>
+          <input type="text" id="program-code" maxlength="16" placeholder="e.g. NEWS">
+        </div>
+        <div>
+          <label for="program-category">Category</label>
+          <input type="text" id="program-category" maxlength="32" placeholder="e.g. news">
+        </div>
+      </div>
+      <label for="program-name">Name</label>
+      <input type="text" id="program-name" maxlength="120" placeholder="e.g. Morning news review">
+      <div class="modal-row">
+        <div>
+          <label for="program-points">Default points</label>
+          <input type="number" id="program-points" min="0" max="100" step="0.5" value="1">
+        </div>
+        <div>
+          <label for="program-start">Default start</label>
+          <input type="time" id="program-start">
+        </div>
+        <div>
+          <label for="program-end">Default end</label>
+          <input type="time" id="program-end">
+        </div>
+      </div>
+      <button id="program-submit" class="btn modal-submit">Create task</button>
+      <p id="program-error" class="error" style="display:none;"></p>
     </div>
   </div>
 

@@ -683,6 +683,7 @@ function openPlanAddModal(date, period) {
   populatePrograms();
   document.getElementById('assign-sudden').checked = false;
   document.getElementById('assign-notes').value = '';
+  resetAssignRepeat();
   refreshAssignDefaults();
   openModal('assign');
 }
@@ -690,6 +691,7 @@ function openPlanAddModal(date, period) {
 // ================= Modal =================
 
 const modal = document.getElementById('session-modal');
+const programModal = document.getElementById('program-modal');
 
 function openModal(which) {
   document.getElementById('modal-assign-form').style.display = which === 'assign' ? 'block' : 'none';
@@ -709,15 +711,20 @@ function showModalError(msg) {
   el.style.display = 'block';
 }
 
+// "＋ Create new task…" entry in the task picker
+const NEW_PROGRAM_OPTION = '<option value="__new__">＋ Create new task…</option>';
+
 function populatePrograms() {
   const sel = document.getElementById('assign-program');
   sel.innerHTML = adminPrograms.map(p =>
     `<option value="${p.program_id}">${escapeHtml(p.code)} — ${escapeHtml(p.name)} ` +
-    `(${escapeHtml(p.category)}, ${Number(p.default_points).toFixed(1)} pts)</option>`).join('');
+    `(${escapeHtml(p.category)}, ${Number(p.default_points).toFixed(1)} pts)</option>`).join('') +
+    NEW_PROGRAM_OPTION;
 }
 
 function refreshAssignDefaults() {
   const sel = document.getElementById('assign-program');
+  if (sel.value === '__new__') return;
   const p = adminPrograms.find(x => x.program_id === Number(sel.value));
   if (!p) return;
 
@@ -740,6 +747,12 @@ function refreshAssignDefaults() {
   ptsInput.readOnly = true;
 }
 
+function resetAssignRepeat() {
+  document.getElementById('assign-repeat').checked = false;
+  document.getElementById('assign-repeat-weeks').value = 4;
+  document.getElementById('assign-repeat-row').style.display = 'none';
+}
+
 function openAssignModal(employeeId, date) {
   planPeriod = null;
   modalEmployeeId = employeeId;
@@ -751,6 +764,7 @@ function openAssignModal(employeeId, date) {
   populatePrograms();
   document.getElementById('assign-sudden').checked = false;
   document.getElementById('assign-notes').value = '';
+  resetAssignRepeat();
   refreshAssignDefaults();
   openModal('assign');
 }
@@ -771,6 +785,67 @@ function openDetailsModal(sessionId) {
     <span class="status-pill ${s.status}">${s.status}</span>
     ${s.notes ? `<br>Notes: ${escapeHtml(s.notes)}` : ''}`;
   openModal('details');
+}
+
+// ================= Task types (create / delete programs) =================
+
+let allPrograms = [];
+
+// Fetches all task types (active + deleted) and refreshes the assign picker
+async function refreshAdminPrograms(preferredId) {
+  const res = await api('/api/admin/programs');
+  if (!res.ok) return null;
+  const data = await res.json();
+  allPrograms = data.programs || [];
+  adminPrograms = allPrograms.filter(p => p.is_active === 1);
+
+  const sel = document.getElementById('assign-program');
+  const keep = preferredId != null ? String(preferredId) : sel.value;
+  populatePrograms();
+  if ([...sel.options].some(o => o.value === keep)) sel.value = keep;
+  else sel.selectedIndex = 0;
+  if (sel.value !== '__new__') refreshAssignDefaults();
+  return allPrograms;
+}
+
+function renderProgramList() {
+  const tbody = document.getElementById('program-list');
+  if (!allPrograms.length) {
+    tbody.innerHTML = '<tr><td colspan="6" class="no-tasks">No tasks in the database yet.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = allPrograms.map(p => {
+    const time = (p.default_start || p.default_end)
+      ? `${fmtTime(p.default_start)}–${fmtTime(p.default_end)}` : '—';
+    const action = p.is_active
+      ? `<button type="button" class="btn small danger pm-del" data-program-id="${p.program_id}">Delete</button>`
+      : '<span class="mini-tag pm-deleted-tag">deleted</span>';
+    return `<tr${p.is_active ? '' : ' class="cancelled-row"'}>
+      <td class="pm-code">${escapeHtml(p.code)}</td>
+      <td>${escapeHtml(p.name)}</td>
+      <td><span class="cat-tag ${escapeHtml(p.category)}">${escapeHtml(p.category)}</span></td>
+      <td class="pts">${Number(p.default_points || 0).toFixed(1)}</td>
+      <td>${time}</td>
+      <td class="pm-action">${action}</td>
+    </tr>`;
+  }).join('');
+}
+
+function showProgramError(msg) {
+  const el = document.getElementById('program-error');
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+
+async function openProgramModal() {
+  document.getElementById('program-error').style.display = 'none';
+  programModal.style.display = 'flex';
+  await refreshAdminPrograms();
+  renderProgramList();
+}
+
+function closeProgramModal() {
+  programModal.style.display = 'none';
 }
 
 // ================= Event wiring =================
@@ -812,7 +887,7 @@ document.getElementById('plan-today').addEventListener('click', () => goToPlanDa
 document.addEventListener('keydown', (e) => {
   if (!planLoaded) return;
   if (document.getElementById('plan-section').style.display !== 'block') return;
-  if (modal.style.display === 'flex') return;
+  if (modal.style.display === 'flex' || programModal.style.display === 'flex') return;
   const tag = ((document.activeElement && document.activeElement.tagName) || '').toUpperCase();
   if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
   if (e.key === 'ArrowLeft') { e.preventDefault(); shiftPlanDay(-1); }
@@ -832,13 +907,29 @@ document.getElementById('plan-days').addEventListener('click', (e) => {
 // ---- Modal wiring ----
 document.getElementById('modal-close').addEventListener('click', closeModal);
 modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
-document.getElementById('assign-program').addEventListener('change', refreshAssignDefaults);
+
+// "＋ Create new task…" opens the task types modal; otherwise recalc defaults
+document.getElementById('assign-program').addEventListener('change', (e) => {
+  if (e.target.value === '__new__') { openProgramModal(); return; }
+  refreshAssignDefaults();
+});
 document.getElementById('assign-sudden').addEventListener('change', refreshAssignDefaults);
+
+document.getElementById('assign-repeat').addEventListener('change', (e) => {
+  document.getElementById('assign-repeat-row').style.display = e.target.checked ? 'block' : 'none';
+});
 
 document.getElementById('assign-submit').addEventListener('click', async (e) => {
   const btn = e.target;
   btn.disabled = true;
   try {
+    // 1 = only this day; checked = also all subsequent weeks (same weekday)
+    const repeatOn = document.getElementById('assign-repeat').checked;
+    const repeatWeeks = repeatOn
+      ? Math.min(53, Math.max(1,
+          parseInt(document.getElementById('assign-repeat-weeks').value, 10) || 1))
+      : 1;
+
     const res = await api('/api/admin/schedule/assign', {
       method: 'POST',
       body: JSON.stringify({
@@ -850,13 +941,18 @@ document.getElementById('assign-submit').addEventListener('click', async (e) => 
         points: Number(document.getElementById('assign-points').value),
         isSudden: document.getElementById('assign-sudden').checked,
         notes: document.getElementById('assign-notes').value || null,
+        repeatWeeks,
       }),
     });
     if (!res.ok) {
       showModalError('Save failed: ' + (await res.text()));
     } else {
+      const data = await res.json().catch(() => null);
       closeModal();
       refreshScheduleViews();
+      if (data?.repeatedWeeks > 1) {
+        alert(`Task added to ${data.repeatedWeeks} weeks (same weekday, same time).`);
+      }
     }
   } catch (err) {
     showModalError('Network error: ' + err.message);
@@ -886,6 +982,76 @@ document.getElementById('session-delete').addEventListener('click', async () => 
   });
   if (res.ok) { closeModal(); refreshScheduleViews(); }
   else alert('Delete failed');
+});
+
+// ---- Task types modal wiring (create / delete programs) ----
+document.getElementById('manage-tasks-btn').addEventListener('click', openProgramModal);
+document.getElementById('program-modal-close').addEventListener('click', closeProgramModal);
+programModal.addEventListener('click', (e) => { if (e.target === programModal) closeProgramModal(); });
+
+document.getElementById('program-submit').addEventListener('click', async (e) => {
+  const btn = e.target;
+  const code = document.getElementById('program-code').value.trim();
+  const name = document.getElementById('program-name').value.trim();
+  const category = document.getElementById('program-category').value.trim() || 'general';
+  const defaultPoints = Number(document.getElementById('program-points').value);
+  const defaultStart = document.getElementById('program-start').value || null;
+  const defaultEnd = document.getElementById('program-end').value || null;
+
+  document.getElementById('program-error').style.display = 'none';
+  if (!code || !name) { showProgramError('Code and name are required.'); return; }
+  if (!Number.isFinite(defaultPoints) || defaultPoints < 0) {
+    showProgramError('Default points must be a number of at least 0.');
+    return;
+  }
+
+  btn.disabled = true;
+  try {
+    const res = await api('/api/admin/programs', {
+      method: 'POST',
+      body: JSON.stringify({ code, name, category, defaultPoints, defaultStart, defaultEnd }),
+    });
+    if (!res.ok) {
+      showProgramError('Save failed: ' + (await res.text()));
+    } else {
+      const data = await res.json();
+      ['program-code', 'program-name', 'program-category'].forEach(
+        id => document.getElementById(id).value = '');
+      document.getElementById('program-points').value = 1;
+      document.getElementById('program-start').value = '';
+      document.getElementById('program-end').value = '';
+      // Refresh the picker too; selects the new task if the assign form is open
+      await refreshAdminPrograms(data.program?.program_id);
+      renderProgramList();
+    }
+  } catch (err) {
+    showProgramError('Network error: ' + err.message);
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+document.getElementById('program-list').addEventListener('click', async (e) => {
+  const btn = e.target.closest('.pm-del');
+  if (!btn) return;
+  if (!confirm('Delete this task? If it has scheduled sessions they are kept ' +
+    'and the task is only hidden from the lists; otherwise it is removed from the database.')) return;
+  document.getElementById('program-error').style.display = 'none';
+  try {
+    const res = await api('/api/admin/programs/delete', {
+      method: 'POST',
+      body: JSON.stringify({ programId: Number(btn.dataset.programId) }),
+    });
+    if (!res.ok) {
+      showProgramError('Delete failed: ' + (await res.text()));
+    } else {
+      await refreshAdminPrograms();
+      renderProgramList();
+      if (planLoaded) loadPlanBoard(); // refresh the add-task pickers on the board
+    }
+  } catch (err) {
+    showProgramError('Network error: ' + err.message);
+  }
 });
 
 // ================= Boot =================

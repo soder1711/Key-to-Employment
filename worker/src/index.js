@@ -8,6 +8,7 @@ import {
   handleAdminSessionStatus, handleAdminDeleteSession,
   handleAdminMonthlySummary, handleAdminSetTarget,
   handleAdminReassignSession,
+  handleAdminListPrograms, handleAdminCreateProgram, handleAdminDeleteProgram,
 } from './api.js';
 
 // CORS: allow only your GitHub Pages origin
@@ -120,6 +121,19 @@ export default {
       else if (url.pathname === '/api/admin/progress' && request.method === 'POST') {
         const body = await request.json();
         response = await handleAdminUpdateProgress(env, currentSession, body);
+      }
+
+      // ---- Task types (programs) endpoints ----
+      else if (url.pathname === '/api/admin/programs' && request.method === 'GET') {
+        response = await handleAdminListPrograms(env, currentSession);
+      }
+      else if (url.pathname === '/api/admin/programs' && request.method === 'POST') {
+        const body = await request.json();
+        response = await handleAdminCreateProgram(env, currentSession, body);
+      }
+      else if (url.pathname === '/api/admin/programs/delete' && request.method === 'POST') {
+        const body = await request.json();
+        response = await handleAdminDeleteProgram(env, currentSession, body);
       }
 
       // ---- Schedule endpoints ----
