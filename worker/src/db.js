@@ -217,8 +217,8 @@ export async function getActiveEmployees(db) {
   return results;
 }
 
-// LEFT JOIN so sessions without a person yet still appear (Plan board)
-// program_id is selected so series matching can key off it
+// LEFT JOIN so sessions without a person yet still appear (Plan board).
+// program_id is selected so series matching can key off it.
 const SESSION_SELECT = `
   SELECT s.session_id, s.program_id, s.session_date, s.start_time, s.end_time, s.status,
          s.points, s.is_sudden, s.notes, s.employee_id,
@@ -257,10 +257,13 @@ export async function createSession(db, s) {
          s.createdBy || null).run();
 }
 
-// Every occurrence of the same weekly series from a given date on:
-// same task, same person, same start/end time, same weekday.
-// Weeks before that date are excluded; completed sessions are kept
-// (history/points), except the session that started the deletion itself.
+// Every later occurrence of the same task on the same weekday, from the
+// clicked session's date onward. Matching deliberately ignores the assigned
+// person and the exact start/end times, so a weekly series still deletes
+// cleanly when individual weeks were re-assigned by drag & drop or re-added
+// at different times. Weeks before that date are excluded; completed sessions
+// are kept (history/points), except the session that started the deletion
+// itself.
 export async function findSeriesSessionsFrom(db, source) {
   const { results } = await db.prepare(`
     SELECT s.session_id, s.session_date
@@ -268,17 +271,11 @@ export async function findSeriesSessionsFrom(db, source) {
     WHERE s.program_id = ?
       AND s.session_date >= ?
       AND strftime('%w', s.session_date) = strftime('%w', ?)
-      AND IFNULL(s.employee_id, -1) = IFNULL(?, -1)
-      AND IFNULL(s.start_time, '') = IFNULL(?, '')
-      AND IFNULL(s.end_time, '') = IFNULL(?, '')
       AND (s.status != 'completed' OR s.session_id = ?)
     ORDER BY s.session_date ASC
   `).bind(
     source.program_id,
     source.session_date, source.session_date,
-    source.employee_id ?? null,
-    source.start_time ?? null,
-    source.end_time ?? null,
     source.session_id
   ).all();
   return results;

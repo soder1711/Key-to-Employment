@@ -313,7 +313,9 @@ export async function handleGetMySchedule(env, session, url) {
  * @apiQuery {String} [start] Any date in the requested week; normalized to Monday.
  * @apiSuccess {String} weekStart Monday for the requested week.
  * @apiSuccess {String[]} dates Seven dates in the week.
- * @apiSuccess {Object[]} sessions All sessions in the week.
+ * @apiSuccess {Object[]} sessions All sessions in the week, including ones
+ *   without a person yet (employee_id null) so the frontend can show them
+ *   in an Unassigned row.
  * @apiSuccess {Object[]} employees Active employees.
  * @apiSuccess {Object[]} programs Available programs.
  * @apiError 403 Admin access required.
@@ -416,7 +418,8 @@ export async function handleAdminAssignSession(env, session, body) {
   }
 
   // Create one session per week: this week + repeat-1 subsequent weeks.
-  // Every week is a real row, so the task is visible when browsing later weeks.
+  // Every week is a real row, so the task is visible when browsing later
+  // weeks in both the plan board and the schedule table.
   const createdIds = [];
   for (let i = 0; i < repeat; i++) {
     const repeatDate = addDaysISO(sessionDate, i * 7);
@@ -531,13 +534,16 @@ export async function handleAdminSessionStatus(env, session, body) {
  * @apiGroup AdminSchedule
  * @apiHeader {String} Cookie Encrypted admin session cookie.
  * @apiBody {Number} sessionId Session identifier.
- * @apiBody {Boolean} [deleteFollowing=false] Also delete every subsequent
- *   occurrence of the same weekly series (same task, person, start/end time
- *   and weekday) from this date onward. Weeks before this date are never
- *   touched; completed later sessions are kept so points/history survive.
+ * @apiBody {Boolean} [deleteFollowing=false] Also delete every later
+ *   occurrence of the same task on the same weekday from this date onward —
+ *   regardless of the assigned person or the exact times, so a weekly series
+ *   still deletes cleanly even if individual weeks were re-assigned by
+ *   drag & drop or re-added at different times. Weeks before this date are
+ *   never touched; completed later sessions are kept so points and history
+ *   survive.
  * @apiSuccess {Boolean} success Always true when deleted.
  * @apiSuccess {Number} deletedCount How many sessions were removed.
- * @apiSuccess {Boolean} deletedFollowing Whether the whole series tail was removed.
+ * @apiSuccess {Boolean} deletedFollowing Whether the series tail was removed.
  * @apiError 400 Invalid session ID.
  * @apiError 403 Admin access required.
  * @apiError 404 Session not found.
@@ -555,10 +561,10 @@ export async function handleAdminDeleteSession(env, session, body) {
   if (!before) return new Response('Session not found', { status: 404 });
 
   if (deleteFollowing === true) {
-    // Delete this session AND all later occurrences of the same weekly series
-    // (same task, person, start/end time, weekday) from this date onward.
-    // Earlier weeks are untouched. Completed sessions are kept (points/history),
-    // except the session that started the deletion itself.
+    // Delete this session AND all later occurrences of the same task on this
+    // weekday, from this date onward — any person, any time. Earlier weeks are
+    // untouched. Completed sessions are kept (points/history), except the
+    // session that started the deletion itself.
     const following = await findSeriesSessionsFrom(env.DB, before);
     for (const row of following) {
       await deleteSession(env.DB, row.session_id);
@@ -567,8 +573,8 @@ export async function handleAdminDeleteSession(env, session, body) {
       env.DB, session.email, 'delete', 'session', sessionId,
       `Deleted "${before.program_name}" ${before.session_date} ` +
       `(${before.first_name} ${before.last_name}, was ${before.status}) ` +
-      `plus ${Math.max(0, following.length - 1)} subsequent weekly occurrence(s) ` +
-      `from this date onward`
+      `plus ${Math.max(0, following.length - 1)} later occurrence(s) of this weekday ` +
+      `(any person/time) from this date onward`
     );
     return Response.json({
       success: true,

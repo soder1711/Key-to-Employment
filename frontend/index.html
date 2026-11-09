@@ -55,7 +55,7 @@
           <button id="schedule-next" class="btn ghost small">Next week →</button>
           <span id="schedule-week-label" class="week-label"></span>
         </div>
-        <p id="admin-schedule-hint" class="hint" style="display:none;">Click an empty cell to assign a session · click a chip to complete, cancel or delete it · Pts = completed points this week.</p>
+        <p id="admin-schedule-hint" class="hint" style="display:none;">Click an empty cell to assign a session · click a chip to complete, cancel or delete it · Pts = completed points this week · tasks without a person are listed in the Unassigned row.</p>
         <div id="admin-schedule-wrap" class="grid-scroll" style="display:none;">
           <table class="sched-grid" id="admin-schedule-grid"></table>
         </div>
@@ -82,12 +82,14 @@
         <p class="hint">Drag a person from the top onto a task to give it a person.
           Points are added up automatically. Click a task for options.
           One day is shown at a time — use the arrows (or ← → keys) to see another day.
-          When adding a task you can tick "Repeat every week" to apply it to all
-          subsequent weeks — leave the weeks box empty for a fixed weekly schedule.
-          Repeated tasks are stored per week, so they show up automatically when you
-          browse to those weeks. "Delete this day" removes one occurrence;
-          "Delete + following weeks" also removes every later occurrence of the series.
-          Use "Manage tasks" to create new tasks or delete them from the list.</p>
+          Tasks are placed in Morning or Afternoon and evening automatically based on
+          their start time; the Add buttons only prefill times.
+          Tick "Repeat every week" to apply a task to all subsequent weeks — leave the
+          weeks box empty for a fixed weekly schedule (one year).
+          "Delete + following weeks" removes every later occurrence of the task on that
+          weekday, whatever person or time; earlier weeks are kept.
+          The Schedule view follows the planned week, and tasks without a person appear
+          in its Unassigned row. Use "Manage tasks" to create new tasks or delete them.</p>
         <div class="week-nav">
           <button id="plan-prev" class="btn ghost small">← Previous day</button>
           <button id="plan-today" class="btn small">Today</button>
@@ -149,6 +151,7 @@
             <input type="time" id="assign-end">
           </div>
         </div>
+        <p id="assign-period-hint" class="assign-repeat-note"></p>
         <label for="assign-points">Points (calculated automatically)</label>
         <input type="number" id="assign-points" min="0" max="100" step="0.5" readonly>
         <label class="check-row"><input type="checkbox" id="assign-sudden"> Sudden session (doubles the points)</label>

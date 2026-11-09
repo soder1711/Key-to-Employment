@@ -310,6 +310,15 @@ function renderMonthProgress(summary, label) {
 
 // ---------- Admin week grid ----------
 
+function slotChipHtml(s) {
+  return `
+    <span class="slot-chip ${escapeHtml(s.status)}${s.is_sudden ? ' sudden' : ''}"
+          data-session-id="${s.session_id}"
+          title="${escapeHtml(s.program_name)} · ${fmtTime(s.start_time)} · ${Number(s.points).toFixed(1)} pts · ${escapeHtml(s.status)}">
+      ${escapeHtml(s.program_code)}${s.start_time ? ' ' + fmtTime(s.start_time) : ''}
+    </span>`;
+}
+
 async function loadAdminSchedule() {
   const error = document.getElementById('schedule-error');
   try {
@@ -326,8 +335,14 @@ async function loadAdminSchedule() {
     error.style.display = 'none';
 
     const byEmp = {};
+    const unassigned = {};
     for (const s of data.sessions) {
-      if (s.employee_id == null) continue;
+      if (s.employee_id == null) {
+        // Repeated tasks without a person yet: kept separately so they stay
+        // visible in the schedule grid (Unassigned row) instead of vanishing.
+        (unassigned[s.session_date] ??= []).push(s);
+        continue;
+      }
       (byEmp[s.employee_id] ??= {});
       (byEmp[s.employee_id][s.session_date] ??= []).push(s);
     }
@@ -349,17 +364,24 @@ async function loadAdminSchedule() {
         const list = (byEmp[emp.employee_id] || {})[d] || [];
         weekPts += list.filter(s => s.status === 'completed')
                        .reduce((a, s) => a + Number(s.points), 0);
-        const chips = list.map(s => `
-          <span class="slot-chip ${escapeHtml(s.status)}${s.is_sudden ? ' sudden' : ''}"
-                data-session-id="${s.session_id}"
-                title="${escapeHtml(s.program_name)} · ${fmtTime(s.start_time)} · ${Number(s.points).toFixed(1)} pts · ${escapeHtml(s.status)}">
-            ${escapeHtml(s.program_code)}${s.start_time ? ' ' + fmtTime(s.start_time) : ''}
-          </span>`).join('');
         html += `<td class="grid-cell${list.length ? ' has' : ''}${d === today ? ' today' : ''}"
-                    data-employee-id="${emp.employee_id}" data-date="${d}">${chips}</td>`;
+                    data-employee-id="${emp.employee_id}" data-date="${d}">
+                   ${list.map(slotChipHtml).join('')}</td>`;
       }
       html += `<td class="pts-cell">${weekPts ? weekPts.toFixed(1) : ''}</td></tr>`;
     }
+
+    // Unassigned row: repeated tasks that have no person yet still show up here
+    if (Object.keys(unassigned).length) {
+      html += `<tr><td class="sticky-col unassigned">Unassigned</td>`;
+      for (const d of data.dates) {
+        const list = unassigned[d] || [];
+        html += `<td class="grid-cell${list.length ? ' has' : ''}${d === today ? ' today' : ''}"
+                    data-date="${d}">${list.map(slotChipHtml).join('')}</td>`;
+      }
+      html += `<td class="pts-cell"></td></tr>`;
+    }
+
     document.getElementById('admin-schedule-grid').innerHTML = html + '</tbody>';
   } catch (err) {
     error.textContent = `Failed to load schedule: ${err.message}`;
@@ -483,6 +505,8 @@ function planCells(s) {
 function renderDayTable(date) {
   const daySessions = planSessions
     .filter(s => s.session_date === date && s.status !== 'cancelled');
+  // Automatic allocation: a task belongs to Morning or Afternoon and evening
+  // purely based on its start time (< 12:00 = morning). No stored period.
   const morning = daySessions.filter(s => (s.start_time || '09:00') < '12:00');
   const afternoon = daySessions.filter(s => (s.start_time || '09:00') >= '12:00');
   const total = list =>
@@ -667,8 +691,15 @@ function initPlan() {
 }
 
 function refreshScheduleViews() {
+  // After plan-board changes the Schedule view follows the planned week,
+  // so repeated tasks are visible there straight away.
+  const planVisible =
+    document.getElementById('plan-section').style.display === 'block';
+  if (planVisible && planLoaded) scheduleWeekStart = planWeekStart;
+
   if (planLoaded) loadPlanBoard();
-  if (scheduleLoaded) loadSchedule();
+  scheduleLoaded = true; // schedule table always refreshes afterwards
+  loadSchedule();
   loadMyTasks();
 }
 
@@ -722,19 +753,32 @@ function populatePrograms() {
     NEW_PROGRAM_OPTION;
 }
 
+// Automatic allocation: tells (live) which column the task will appear in,
+// decided purely by the start time.
+function updateAssignPeriodHint() {
+  const el = document.getElementById('assign-period-hint');
+  if (!el) return;
+  const start = document.getElementById('assign-start').value;
+  el.textContent = start
+    ? `Appears in: ${start < '12:00' ? 'Morning' : 'Afternoon and evening'} — allocated automatically from the start time`
+    : '';
+}
+
 function refreshAssignDefaults() {
   const sel = document.getElementById('assign-program');
-  if (sel.value === '__new__') return;
+  if (sel.value === '__new__') { updateAssignPeriodHint(); return; }
   const p = adminPrograms.find(x => x.program_id === Number(sel.value));
-  if (!p) return;
+  if (!p) { updateAssignPeriodHint(); return; }
 
+  // No period forcing any more: the program's default times are used as-is.
+  // The "+ Add task…" buttons only prefill fallback times when the program
+  // has no defaults; placement is always decided by the start time.
   let start = p.default_start || '';
   let end = p.default_end || '';
-  if (planPeriod) {
+  if (!start && planPeriod) {
     const fallback = planPeriod === 'morning' ? ['09:00', '10:00'] : ['14:00', '15:00'];
-    const wrongPeriod = start && ((planPeriod === 'morning' && start >= '12:00') ||
-                                  (planPeriod === 'afternoon' && start < '12:00'));
-    if (!start || wrongPeriod) { start = fallback[0]; end = fallback[1]; }
+    start = fallback[0];
+    end = fallback[1];
   }
   document.getElementById('assign-start').value = start;
   document.getElementById('assign-end').value = end;
@@ -745,6 +789,8 @@ function refreshAssignDefaults() {
   const ptsInput = document.getElementById('assign-points');
   ptsInput.value = pts;
   ptsInput.readOnly = true;
+
+  updateAssignPeriodHint();
 }
 
 function resetAssignRepeat() {
@@ -755,12 +801,16 @@ function resetAssignRepeat() {
 
 function openAssignModal(employeeId, date) {
   planPeriod = null;
-  modalEmployeeId = employeeId;
+  modalEmployeeId = employeeId == null ? null : Number(employeeId); // null = unassigned task
   modalDate = date;
-  const emp = adminEmployees.find(e => e.employee_id === employeeId);
+  const emp = modalEmployeeId == null
+    ? null
+    : adminEmployees.find(e => e.employee_id === modalEmployeeId);
+  const who = modalEmployeeId == null
+    ? 'Unassigned'
+    : (emp ? `${emp.first_name} ${emp.last_name}` : `Employee #${modalEmployeeId}`);
   document.getElementById('modal-title').textContent = 'Assign session';
-  document.getElementById('assign-context').textContent =
-    `${emp ? `${emp.first_name} ${emp.last_name}` : `Employee #${employeeId}`} — ${fmtCellDate(date)}`;
+  document.getElementById('assign-context').textContent = `${who} — ${fmtCellDate(date)}`;
   populatePrograms();
   document.getElementById('assign-sudden').checked = false;
   document.getElementById('assign-notes').value = '';
@@ -875,7 +925,12 @@ document.getElementById('admin-schedule-grid').addEventListener('click', (e) => 
     return;
   }
   const cell = e.target.closest('.grid-cell');
-  if (cell) openAssignModal(Number(cell.dataset.employeeId), cell.dataset.date);
+  if (cell) {
+    // Unassigned-row cells have no data-employee-id -> null = unassigned task
+    const raw = cell.dataset.employeeId;
+    const employeeId = raw === undefined || raw === '' ? null : Number(raw);
+    openAssignModal(employeeId, cell.dataset.date);
+  }
 });
 
 // ---- Plan board navigation (one day at a time) ----
@@ -914,6 +969,9 @@ document.getElementById('assign-program').addEventListener('change', (e) => {
   refreshAssignDefaults();
 });
 document.getElementById('assign-sudden').addEventListener('change', refreshAssignDefaults);
+
+// Live allocation hint while the start time is edited
+document.getElementById('assign-start').addEventListener('input', updateAssignPeriodHint);
 
 document.getElementById('assign-repeat').addEventListener('change', (e) => {
   document.getElementById('assign-repeat-row').style.display = e.target.checked ? 'block' : 'none';
@@ -995,13 +1053,15 @@ document.getElementById('session-delete').addEventListener('click', async () => 
   else alert('Delete failed');
 });
 
-// Delete the clicked day AND every following weekly occurrence of the
-// same series (same task, person, time, weekday) from this date onward.
-// Weeks before this date are never touched.
+// Delete the clicked day AND every later occurrence of the same task on that
+// weekday from this date onward — whatever person or time those weeks have.
+// Weeks before this date are never touched; completed later sessions are kept
+// so points and history survive.
 document.getElementById('session-delete-series').addEventListener('click', async () => {
   if (!currentSession) return;
-  if (!confirm('Delete this task AND every following weekly occurrence from this date onward?\n\n' +
-    'Earlier weeks are kept. Already completed sessions are also kept ' +
+  if (!confirm('Delete this task AND every later occurrence of this task on this weekday,\n' +
+    'from this date onward (whatever person or time those weeks have)?\n\n' +
+    'Earlier weeks are kept. Already completed sessions are kept ' +
     '(they count toward points). The deletion is recorded in history.')) return;
   try {
     const res = await api('/api/admin/schedule/delete', {
