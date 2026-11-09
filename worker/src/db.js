@@ -173,6 +173,12 @@ export async function getProgramById(db, programId) {
   ).bind(programId).first();
 }
 
+export async function getProgramByCode(db, code) {
+  return await db.prepare(
+    `SELECT program_id FROM programs WHERE code = ? LIMIT 1`
+  ).bind(code).first();
+}
+
 export async function createProgram(db, p) {
   return await db.prepare(
     `INSERT INTO programs

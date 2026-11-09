@@ -4,7 +4,8 @@ import {
   weekStartFrom, weekDates, getPrograms, getActiveEmployees,
   getSessionsBetween, getSessionById, createSession, setSessionStatus,
   deleteSession, logScheduleHistory, getMonthlySummary, setMonthlyTarget,
-  reassignSession,
+  reassignSession, getAllPrograms, getProgramById, getProgramByCode,
+  createProgram, deactivateProgram, hardDeleteProgram, countProgramSessions,
 } from './db.js';
 
 /**
@@ -115,6 +116,108 @@ export async function handleAdminGetTask(env, session, taskId) {
   const task = await getAnyTaskDetail(env.DB, taskId);
   if (!task) return new Response('Not found', { status: 404 });
   return Response.json({ task });
+}
+
+/**
+ * @api {get} /api/admin/programs List all task types
+ * @apiName AdminListPrograms
+ * @apiGroup AdminTasks
+ * @apiHeader {String} Cookie Encrypted admin session cookie.
+ * @apiSuccess {Object[]} programs All task types, including deleted ones.
+ * @apiError 403 Admin access required.
+ */
+export async function handleAdminListPrograms(env, session) {
+  const denied = requireAdmin(session);
+  if (denied) return denied;
+
+  const programs = await getAllPrograms(env.DB);
+  return Response.json({ programs });
+}
+
+/**
+ * @api {post} /api/admin/programs Create a task type
+ * @apiName AdminCreateProgram
+ * @apiGroup AdminTasks
+ * @apiHeader {String} Cookie Encrypted admin session cookie.
+ * @apiBody {String} code Unique task code, up to 16 characters.
+ * @apiBody {String} name Task name, up to 120 characters.
+ * @apiBody {String} [category=general] Category, up to 32 characters.
+ * @apiBody {Number} [defaultPoints=1] Default points from 0 to 100.
+ * @apiBody {String} [defaultStart] Default start time in HH:MM format.
+ * @apiBody {String} [defaultEnd] Default end time in HH:MM format.
+ * @apiSuccess {Object} program Created task type.
+ * @apiError 400 Invalid task type.
+ * @apiError 403 Admin access required.
+ * @apiError 409 Task code already exists.
+ */
+export async function handleAdminCreateProgram(env, session, body) {
+  const denied = requireAdmin(session);
+  if (denied) return denied;
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return new Response('Invalid task type', { status: 400 });
+  }
+
+  const code = typeof body.code === 'string' ? body.code.trim() : '';
+  const name = typeof body.name === 'string' ? body.name.trim() : '';
+  const category = typeof body.category === 'string' && body.category.trim()
+    ? body.category.trim()
+    : 'general';
+  const defaultPoints = Number(body.defaultPoints ?? 1);
+  const defaultStart = body.defaultStart || null;
+  const defaultEnd = body.defaultEnd || null;
+  const validTime = value => value === null ||
+    (typeof value === 'string' && /^\d{2}:\d{2}$/.test(value) &&
+      Number(value.slice(0, 2)) <= 23 && Number(value.slice(3, 5)) <= 59);
+
+  if (!code || code.length > 16 || !name || name.length > 120 ||
+      category.length > 32 || !Number.isFinite(defaultPoints) ||
+      defaultPoints < 0 || defaultPoints > 100 ||
+      !validTime(defaultStart) || !validTime(defaultEnd)) {
+    return new Response('Invalid task type', { status: 400 });
+  }
+  if (await getProgramByCode(env.DB, code)) {
+    return new Response('Task code already exists', { status: 409 });
+  }
+
+  const result = await createProgram(env.DB, {
+    code, name, category, defaultPoints, defaultStart, defaultEnd,
+  });
+  const program = await getProgramById(env.DB, result.meta.last_row_id);
+  return Response.json({ program }, { status: 201 });
+}
+
+/**
+ * @api {post} /api/admin/programs/delete Delete a task type
+ * @apiName AdminDeleteProgram
+ * @apiGroup AdminTasks
+ * @apiHeader {String} Cookie Encrypted admin session cookie.
+ * @apiBody {Number} programId Task type identifier.
+ * @apiSuccess {Boolean} success Whether the task type was deleted or hidden.
+ * @apiError 400 Invalid task type identifier.
+ * @apiError 403 Admin access required.
+ * @apiError 404 Task type not found.
+ */
+export async function handleAdminDeleteProgram(env, session, body) {
+  const denied = requireAdmin(session);
+  if (denied) return denied;
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return new Response('Invalid task type identifier', { status: 400 });
+  }
+
+  const programId = Number(body.programId);
+  if (!Number.isSafeInteger(programId) || programId < 1) {
+    return new Response('Invalid task type identifier', { status: 400 });
+  }
+  if (!await getProgramById(env.DB, programId)) {
+    return new Response('Task type not found', { status: 404 });
+  }
+
+  if (await countProgramSessions(env.DB, programId)) {
+    await deactivateProgram(env.DB, programId);
+  } else {
+    await hardDeleteProgram(env.DB, programId);
+  }
+  return Response.json({ success: true });
 }
 
 /**
