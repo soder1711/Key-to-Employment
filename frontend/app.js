@@ -429,9 +429,10 @@ function shiftMonth(delta) {
   loadMonthView();
 }
 
-// ================= Plan board (drag & drop, one table per day) =================
+// ================= Plan board (drag & drop, ONE day at a time) =================
 
-let planWeekStart = null;
+let planWeekStart = null;   // Monday of the week currently loaded from the API
+let planDayCursor = null;   // the single day currently displayed
 let planLoaded = false;
 let planDates = [];
 let planSessions = [];
@@ -545,11 +546,50 @@ function renderDayTable(date) {
     </div>`;
 }
 
+// Shows which single day is on screen, e.g. "Mon 2 November 2026"
+function updatePlanDayLabel() {
+  const el = document.getElementById('plan-day-label');
+  if (!el || !planDayCursor) return;
+  const d = new Date(planDayCursor + 'T00:00:00Z');
+  el.textContent =
+    `${DAY_NAMES[d.getUTCDay()]} ${d.getUTCDate()} ` +
+    `${MONTH_NAMES[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+}
+
+// Renders ONLY the day under planDayCursor (one table at a time)
 function renderPlanBoard() {
   renderPool();
-  document.getElementById('plan-days').innerHTML =
-    planDates.map(renderDayTable).join('');
+  let day = planDates.includes(planDayCursor) ? planDayCursor
+    : (planDates.includes(todayISO()) ? todayISO() : planDates[0]);
+  if (!day) return;
+  planDayCursor = day;
+  document.getElementById('plan-days').innerHTML = renderDayTable(day);
+  updatePlanDayLabel();
   initPlanSortables();
+}
+
+// Jump to any day; loads that day's week when it crosses a week boundary
+async function goToPlanDay(date) {
+  if (!date) return;
+  planDayCursor = date;
+  const weekOfDate = mondayOf(date);
+  try {
+    if (weekOfDate !== planWeekStart) {
+      planWeekStart = weekOfDate;
+      await loadPlanBoard(); // renders after the new week is fetched
+    } else {
+      renderPlanBoard(); // same week, no network needed
+    }
+  } catch (err) {
+    const errEl = document.getElementById('plan-error');
+    errEl.textContent = `Failed to load plan: ${err.message}`;
+    errEl.style.display = 'block';
+  }
+}
+
+function shiftPlanDay(delta) {
+  if (!planDayCursor) return;
+  goToPlanDay(shiftISO(planDayCursor, delta));
 }
 
 function destroyPlanSortables() {
@@ -616,14 +656,13 @@ async function loadPlanBoard() {
   adminEmployees = data.employees;
   adminPrograms = data.programs;
   sessionById = new Map(data.sessions.map(s => [s.session_id, s]));
-  document.getElementById('plan-week-label').textContent =
-    `${fmtShort(data.dates[0])} – ${fmtShort(data.dates[6])}`;
-  renderPlanBoard();
+  renderPlanBoard(); // renders only planDayCursor's table + day label
 }
 
 function initPlan() {
   planLoaded = true;
   planWeekStart = mondayOf();
+  planDayCursor = todayISO(); // start on today
   loadPlanBoard();
 }
 
@@ -764,15 +803,20 @@ document.getElementById('admin-schedule-grid').addEventListener('click', (e) => 
   if (cell) openAssignModal(Number(cell.dataset.employeeId), cell.dataset.date);
 });
 
-// ---- Plan board navigation ----
-document.getElementById('plan-prev').addEventListener('click', () => {
-  planWeekStart = shiftISO(planWeekStart, -7); loadPlanBoard();
-});
-document.getElementById('plan-next').addEventListener('click', () => {
-  planWeekStart = shiftISO(planWeekStart, 7); loadPlanBoard();
-});
-document.getElementById('plan-today').addEventListener('click', () => {
-  planWeekStart = mondayOf(); loadPlanBoard();
+// ---- Plan board navigation (one day at a time) ----
+document.getElementById('plan-prev').addEventListener('click', () => shiftPlanDay(-1));
+document.getElementById('plan-next').addEventListener('click', () => shiftPlanDay(1));
+document.getElementById('plan-today').addEventListener('click', () => goToPlanDay(todayISO()));
+
+// Arrow keys browse days while the plan view is open
+document.addEventListener('keydown', (e) => {
+  if (!planLoaded) return;
+  if (document.getElementById('plan-section').style.display !== 'block') return;
+  if (modal.style.display === 'flex') return;
+  const tag = ((document.activeElement && document.activeElement.tagName) || '').toUpperCase();
+  if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
+  if (e.key === 'ArrowLeft') { e.preventDefault(); shiftPlanDay(-1); }
+  else if (e.key === 'ArrowRight') { e.preventDefault(); shiftPlanDay(1); }
 });
 
 // ---- Plan board clicks ----
