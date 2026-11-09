@@ -257,26 +257,62 @@ export async function createSession(db, s) {
          s.createdBy || null).run();
 }
 
-// Every later occurrence of the same task on the same weekday, from the
-// clicked session's date onward. Matching deliberately ignores the assigned
-// person and the exact start/end times, so a weekly series still deletes
-// cleanly when individual weeks were re-assigned by drag & drop or re-added
-// at different times. Weeks before that date are excluded; completed sessions
-// are kept (history/points), except the session that started the deletion
-// itself.
+// ---------- Weekly series matching ----------
+// A "series" occurrence means: same task (program), same weekday AND the
+// SAME START AND END TIME. Times are compared on HH:MM (substr 1-5) so
+// '14:00' matches '14:00:00'. NULL times only match NULL times. The
+// assigned person is deliberately NOT part of the match, so drag & drop
+// reassignments never break a series.
+
+// "Delete + following weeks": every occurrence of the series from the
+// clicked date ONWARD (>= source date). Completed sessions are kept
+// (points/history), except the session that started the deletion itself.
 export async function findSeriesSessionsFrom(db, source) {
   const { results } = await db.prepare(`
     SELECT s.session_id, s.session_date
     FROM schedule_sessions s
     WHERE s.program_id = ?
-      AND s.session_date >= ?
       AND strftime('%w', s.session_date) = strftime('%w', ?)
+      AND IFNULL(substr(s.start_time, 1, 5), '') = IFNULL(substr(?, 1, 5), '')
+      AND IFNULL(substr(s.end_time, 1, 5), '') = IFNULL(substr(?, 1, 5), '')
+      AND s.session_date >= ?
       AND (s.status != 'completed' OR s.session_id = ?)
     ORDER BY s.session_date ASC
   `).bind(
     source.program_id,
-    source.session_date, source.session_date,
+    source.session_date,
+    source.start_time ?? null,
+    source.end_time ?? null,
+    source.session_date,
     source.session_id
+  ).all();
+  return results;
+}
+
+// "Apply person to following weeks" (drag & drop): every occurrence of the
+// series strictly AFTER the source date. employee_id is returned so the
+// caller can skip weeks that already have a person when override is off.
+export async function findFollowingSeries(db, source) {
+  const { results } = await db.prepare(`
+    SELECT s.session_id, s.session_date, s.employee_id,
+           p.name AS program_name,
+           e.first_name, e.last_name
+    FROM schedule_sessions s
+    JOIN programs p ON p.program_id = s.program_id
+    LEFT JOIN employees e ON e.employee_id = s.employee_id
+    WHERE s.program_id = ?
+      AND strftime('%w', s.session_date) = strftime('%w', ?)
+      AND IFNULL(substr(s.start_time, 1, 5), '') = IFNULL(substr(?, 1, 5), '')
+      AND IFNULL(substr(s.end_time, 1, 5), '') = IFNULL(substr(?, 1, 5), '')
+      AND s.session_date > ?
+      AND s.status != 'completed'
+    ORDER BY s.session_date ASC
+  `).bind(
+    source.program_id,
+    source.session_date,
+    source.start_time ?? null,
+    source.end_time ?? null,
+    source.session_date
   ).all();
   return results;
 }

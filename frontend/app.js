@@ -660,8 +660,28 @@ async function onPersonDropped(evt) {
   } catch (err) {
     alert('Network error: ' + err.message);
   }
+
   await loadPlanBoard(); // always re-render from saved data
   await loadMyTasks();
+
+  // Ask about applying the same person to the following weeks
+  try {
+    const res = await api(`/api/admin/schedule/following?sessionId=${sessionId}`);
+    if (!res.ok) return;
+    const { following } = await res.json();
+    if (!following || !following.length) return;
+    const name = planEmployeeName(employeeId);
+    pendingApply = { sessionId, employeeId };
+    const withPerson = following.filter(s => s.employee_id != null).length;
+    document.getElementById('apply-context').innerHTML =
+      `You put <strong>${escapeHtml(name)}</strong> on this week's task. ` +
+      `There ${following.length === 1 ? 'is <strong>1</strong> similar task' : `are <strong>${following.length}</strong> similar tasks`} ` +
+      `in following weeks (same task, same time, same weekday)` +
+      `${withPerson ? `, ${withPerson} of which already ${withPerson === 1 ? 'has a person' : 'have a person'}` : ''}. ` +
+      `Apply ${escapeHtml(name)} there too?`;
+    document.getElementById('apply-override').checked = false;
+    applyModal.style.display = 'flex';
+  } catch { /* ignore — the single reassign already succeeded */ }
 }
 
 async function loadPlanBoard() {
@@ -723,6 +743,10 @@ function openPlanAddModal(date, period) {
 
 const modal = document.getElementById('session-modal');
 const programModal = document.getElementById('program-modal');
+const applyModal = document.getElementById('apply-modal');
+
+// Drag & drop "apply to all following weeks?" state
+let pendingApply = null;
 
 function openModal(which) {
   document.getElementById('modal-assign-form').style.display = which === 'assign' ? 'block' : 'none';
@@ -898,6 +922,13 @@ function closeProgramModal() {
   programModal.style.display = 'none';
 }
 
+// ---- Apply-to-following-weeks modal ----
+
+function closeApplyModal() {
+  applyModal.style.display = 'none';
+  pendingApply = null;
+}
+
 // ================= Event wiring =================
 
 // ---- Navigation & view switching ----
@@ -942,7 +973,8 @@ document.getElementById('plan-today').addEventListener('click', () => goToPlanDa
 document.addEventListener('keydown', (e) => {
   if (!planLoaded) return;
   if (document.getElementById('plan-section').style.display !== 'block') return;
-  if (modal.style.display === 'flex' || programModal.style.display === 'flex') return;
+  if (modal.style.display === 'flex' || programModal.style.display === 'flex' ||
+      applyModal.style.display === 'flex') return;
   const tag = ((document.activeElement && document.activeElement.tagName) || '').toUpperCase();
   if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
   if (e.key === 'ArrowLeft') { e.preventDefault(); shiftPlanDay(-1); }
@@ -1053,14 +1085,16 @@ document.getElementById('session-delete').addEventListener('click', async () => 
   else alert('Delete failed');
 });
 
-// Delete the clicked day AND every later occurrence of the same task on that
-// weekday from this date onward — whatever person or time those weeks have.
-// Weeks before this date are never touched; completed later sessions are kept
-// so points and history survive.
+// Delete the clicked day AND every later occurrence of the same task on this
+// weekday from this date onward — but ONLY the ones with the SAME start and
+// end time. Same task with a different time, or on a different weekday,
+// is never touched. Weeks before this date are never touched; completed
+// later sessions are kept so points and history survive.
 document.getElementById('session-delete-series').addEventListener('click', async () => {
   if (!currentSession) return;
-  if (!confirm('Delete this task AND every later occurrence of this task on this weekday,\n' +
-    'from this date onward (whatever person or time those weeks have)?\n\n' +
+  if (!confirm('Delete this task AND every later occurrence of this task with the SAME time\n' +
+    'on this weekday, from this date onward?\n\n' +
+    'Same task but a different time, or on a different weekday, is kept.\n' +
     'Earlier weeks are kept. Already completed sessions are kept ' +
     '(they count toward points). The deletion is recorded in history.')) return;
   try {
@@ -1080,6 +1114,38 @@ document.getElementById('session-delete-series').addEventListener('click', async
   } catch (err) {
     alert('Network error: ' + err.message);
   }
+});
+
+// ---- Apply-to-following-weeks modal wiring (drag & drop) ----
+document.getElementById('apply-close').addEventListener('click', closeApplyModal);
+applyModal.addEventListener('click', (e) => { if (e.target === applyModal) closeApplyModal(); });
+
+// "This day only": the drop already happened, nothing more to do
+document.getElementById('apply-one').addEventListener('click', closeApplyModal);
+
+document.getElementById('apply-all').addEventListener('click', async () => {
+  if (!pendingApply) return closeApplyModal();
+  const { sessionId, employeeId } = pendingApply;
+  const override = document.getElementById('apply-override').checked;
+  try {
+    const res = await api('/api/admin/schedule/reassign', {
+      method: 'POST',
+      body: JSON.stringify({ sessionId, employeeId, applyFollowing: true, override }),
+    });
+    if (!res.ok) {
+      alert('Could not apply to following weeks: ' + (await res.text()));
+    } else {
+      const data = await res.json().catch(() => null);
+      if (data?.skipped > 0) {
+        alert(`Applied to ${data.applied} following week(s); skipped ${data.skipped} ` +
+              `that already ${data.skipped === 1 ? 'had a person' : 'had people'}.`);
+      }
+      refreshScheduleViews();
+    }
+  } catch (err) {
+    alert('Network error: ' + err.message);
+  }
+  closeApplyModal();
 });
 
 // ---- Task types modal wiring (create / delete programs) ----

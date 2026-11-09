@@ -6,7 +6,7 @@ import {
   deleteSession, logScheduleHistory, getMonthlySummary, setMonthlyTarget,
   reassignSession, getAllPrograms, getProgramById, getProgramByCode,
   createProgram, deactivateProgram, hardDeleteProgram, countProgramSessions,
-  findSeriesSessionsFrom,
+  findSeriesSessionsFrom, findFollowingSeries,
 } from './db.js';
 
 /**
@@ -335,6 +335,36 @@ export async function handleAdminGetSchedule(env, session, url) {
 }
 
 /**
+ * @api {get} /api/admin/schedule/following List following similar sessions
+ * @apiName AdminFollowingSessions
+ * @apiGroup AdminSchedule
+ * @apiDescription Returns every session AFTER the given one that is the same
+ *   task (program), same start/end time and same weekday — the "apply to
+ *   following weeks" candidates after a drag & drop.
+ * @apiHeader {String} Cookie Encrypted admin session cookie.
+ * @apiQuery {Number} sessionId Source session identifier.
+ * @apiSuccess {Object[]} following Matching later sessions with their dates
+ *   and current person (employee_id), so the frontend can count skips.
+ * @apiError 400 Invalid session identifier.
+ * @apiError 403 Admin access required.
+ * @apiError 404 Session not found.
+ */
+export async function handleAdminFollowingSessions(env, session, url) {
+  const denied = requireAdmin(session);
+  if (denied) return denied;
+
+  const sessionId = Number(url.searchParams.get('sessionId'));
+  if (!Number.isSafeInteger(sessionId) || sessionId < 1) {
+    return new Response('Invalid session id', { status: 400 });
+  }
+  const source = await getSessionById(env.DB, sessionId);
+  if (!source) return new Response('Session not found', { status: 404 });
+
+  const following = await findFollowingSeries(env.DB, source);
+  return Response.json({ following });
+}
+
+/**
  * @api {post} /api/admin/schedule/assign Assign schedule session
  * @apiName AdminAssignSession
  * @apiGroup AdminSchedule
@@ -455,10 +485,20 @@ export async function handleAdminAssignSession(env, session, body) {
  * @api {post} /api/admin/schedule/reassign Change the person of a session
  * @apiName AdminReassignSession
  * @apiGroup AdminSchedule
+ * @apiDescription Reassigns the given session. With applyFollowing=true it
+ *   also applies the same person to every LATER session of the same series
+ *   (same task, same start/end time, same weekday): without override only
+ *   weeks that have no person yet, with override every following week.
  * @apiHeader {String} Cookie Encrypted admin session cookie.
  * @apiBody {Number} sessionId Session identifier.
  * @apiBody {Number} employeeId New employee identifier.
+ * @apiBody {Boolean} [applyFollowing=false] Also apply to all following weeks.
+ * @apiBody {Boolean} [override=false] Also replace people already assigned
+ *   in following weeks; otherwise those weeks are skipped.
  * @apiSuccess {Boolean} success Always true when updated.
+ * @apiSuccess {Number} [applied] How many following weeks were updated.
+ * @apiSuccess {Number} [skipped] How many following weeks were skipped
+ *   because they already had a person and override was unchecked.
  * @apiError 400 Invalid payload or unknown employee.
  * @apiError 403 Admin access required.
  * @apiError 404 Session not found.
@@ -467,7 +507,7 @@ export async function handleAdminReassignSession(env, session, body) {
   const denied = requireAdmin(session);
   if (denied) return denied;
 
-  const { sessionId, employeeId } = body;
+  const { sessionId, employeeId, applyFollowing, override } = body;
   if (!Number.isInteger(sessionId) || !Number.isInteger(employeeId)) {
     return new Response('Invalid reassign payload', { status: 400 });
   }
@@ -481,14 +521,43 @@ export async function handleAdminReassignSession(env, session, body) {
   const before = await getSessionById(env.DB, sessionId);
   if (!before) return new Response('Session not found', { status: 404 });
 
+  // The clicked session itself is always reassigned
   const result = await reassignSession(env.DB, sessionId, employeeId);
   if (result.meta.changes === 0) return new Response('Session not found', { status: 404 });
+
+  const person = `${employee.first_name} ${employee.last_name}`;
+
+  // "Apply to all following weeks": same task, same start/end time, same
+  // weekday, strictly after this date. Completed ones are never touched.
+  // Without override, weeks that already have a person are skipped.
+  if (applyFollowing === true) {
+    const following = await findFollowingSeries(env.DB, before);
+    let applied = 0;
+    let skipped = 0;
+    for (const row of following) {
+      if (override !== true && row.employee_id != null) {
+        skipped++;
+        continue;
+      }
+      await reassignSession(env.DB, row.session_id, employeeId);
+      applied++;
+    }
+    await logScheduleHistory(
+      env.DB, session.email, 'reassign', 'session', sessionId,
+      `"${before.program_name}" ${before.session_date}: ` +
+      `${before.first_name ? before.first_name + ' ' + before.last_name : 'unassigned'}` +
+      ` -> ${person}` +
+      ` — applied to ${applied} following week(s)` +
+      (override !== true ? `, skipped ${skipped} that already had a person` : ', override on')
+    );
+    return Response.json({ success: true, applied, skipped });
+  }
 
   await logScheduleHistory(
     env.DB, session.email, 'reassign', 'session', sessionId,
     `"${before.program_name}" ${before.session_date}: ` +
     `${before.first_name ? before.first_name + ' ' + before.last_name : 'unassigned'}` +
-    ` -> ${employee.first_name} ${employee.last_name}`
+    ` -> ${person}`
   );
   return Response.json({ success: true });
 }
@@ -532,15 +601,16 @@ export async function handleAdminSessionStatus(env, session, body) {
  * @api {post} /api/admin/schedule/delete Delete schedule session
  * @apiName AdminDeleteSession
  * @apiGroup AdminSchedule
+ * @apiDescription With deleteFollowing=true it also deletes every LATER
+ *   occurrence of the same series: same task, same start time, same end
+ *   time, same weekday, from this date onward. A same-task session with a
+ *   different time or on a different weekday is never deleted. Weeks
+ *   before this date are never touched; completed later sessions are kept
+ *   so points and history survive.
  * @apiHeader {String} Cookie Encrypted admin session cookie.
  * @apiBody {Number} sessionId Session identifier.
  * @apiBody {Boolean} [deleteFollowing=false] Also delete every later
- *   occurrence of the same task on the same weekday from this date onward —
- *   regardless of the assigned person or the exact times, so a weekly series
- *   still deletes cleanly even if individual weeks were re-assigned by
- *   drag & drop or re-added at different times. Weeks before this date are
- *   never touched; completed later sessions are kept so points and history
- *   survive.
+ *   occurrence of the same series (same task, same time, same weekday).
  * @apiSuccess {Boolean} success Always true when deleted.
  * @apiSuccess {Number} deletedCount How many sessions were removed.
  * @apiSuccess {Boolean} deletedFollowing Whether the series tail was removed.
@@ -561,10 +631,11 @@ export async function handleAdminDeleteSession(env, session, body) {
   if (!before) return new Response('Session not found', { status: 404 });
 
   if (deleteFollowing === true) {
-    // Delete this session AND all later occurrences of the same task on this
-    // weekday, from this date onward — any person, any time. Earlier weeks are
-    // untouched. Completed sessions are kept (points/history), except the
-    // session that started the deletion itself.
+    // Delete this session AND all later occurrences of the same series:
+    // same task, SAME START AND END TIME, same weekday, from this date on.
+    // Same task at a different time, or on a different weekday, is kept.
+    // Earlier weeks are untouched. Completed sessions are kept
+    // (points/history), except the session that started the deletion.
     const following = await findSeriesSessionsFrom(env.DB, before);
     for (const row of following) {
       await deleteSession(env.DB, row.session_id);
@@ -573,8 +644,8 @@ export async function handleAdminDeleteSession(env, session, body) {
       env.DB, session.email, 'delete', 'session', sessionId,
       `Deleted "${before.program_name}" ${before.session_date} ` +
       `(${before.first_name} ${before.last_name}, was ${before.status}) ` +
-      `plus ${Math.max(0, following.length - 1)} later occurrence(s) of this weekday ` +
-      `(any person/time) from this date onward`
+      `plus ${Math.max(0, following.length - 1)} later occurrence(s) ` +
+      `with the same time on this weekday from this date onward`
     );
     return Response.json({
       success: true,

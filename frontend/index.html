@@ -80,16 +80,14 @@
           <button id="manage-tasks-btn" class="btn ghost small" style="margin-left:auto;">Manage tasks</button>
         </div>
         <p class="hint">Drag a person from the top onto a task to give it a person.
-          Points are added up automatically. Click a task for options.
+          If the same task (same time) exists on this weekday in following weeks,
+          a popup asks whether to apply the person to this day only or to all
+          following weeks — with an option to override weeks that already have
+          a person. Points are added up automatically. Click a task for options.
           One day is shown at a time — use the arrows (or ← → keys) to see another day.
-          Tasks are placed in Morning or Afternoon and evening automatically based on
-          their start time; the Add buttons only prefill times.
-          Tick "Repeat every week" to apply a task to all subsequent weeks — leave the
-          weeks box empty for a fixed weekly schedule (one year).
-          "Delete + following weeks" removes every later occurrence of the task on that
-          weekday, whatever person or time; earlier weeks are kept.
-          The Schedule view follows the planned week, and tasks without a person appear
-          in its Unassigned row. Use "Manage tasks" to create new tasks or delete them.</p>
+          "Delete + following weeks" removes every later occurrence with the
+          same task, same time and same weekday; anything else is kept.
+          Use "Manage tasks" to create new tasks or delete them from the list.</p>
         <div class="week-nav">
           <button id="plan-prev" class="btn ghost small">← Previous day</button>
           <button id="plan-today" class="btn small">Today</button>
@@ -180,6 +178,24 @@
       </div>
 
       <p id="modal-error" class="error" style="display:none;"></p>
+    </div>
+  </div>
+
+  <div id="apply-modal" class="modal-overlay" style="display:none;">
+    <div class="modal">
+      <div class="modal-head">
+        <h3 id="apply-title">Apply person to following weeks?</h3>
+        <button id="apply-close" class="modal-x" aria-label="Close">✕</button>
+      </div>
+      <p id="apply-context" class="modal-context"></p>
+      <label class="check-row"><input type="checkbox" id="apply-override"> Override weeks that already have a person</label>
+      <p class="assign-repeat-note">Unchecked: only weeks without a person get this person;
+        weeks that already have someone keep theirs. Checked: every following week
+        gets this person, replacing existing ones.</p>
+      <div class="modal-actions">
+        <button id="apply-one" class="btn small ghost">This day only</button>
+        <button id="apply-all" class="btn small">Apply to all following weeks</button>
+      </div>
     </div>
   </div>
 
