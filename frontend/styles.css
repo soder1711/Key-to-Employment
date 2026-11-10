@@ -520,6 +520,7 @@ button { font-family: inherit; }
   padding: 1.4rem; box-shadow: 0 24px 60px rgba(15, 23, 42, 0.25);
   max-height: 90vh; overflow-y: auto;
 }
+.program-modal { max-width: 760px; }
 .modal-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.9rem; }
 .modal-head h3 { margin: 0; font-size: 1.05rem; }
 .modal-x { border: none; background: transparent; font-size: 1.05rem; cursor: pointer; color: var(--muted); }
@@ -549,10 +550,10 @@ button { font-family: inherit; }
 /* ---------- Task types modal (create / delete programs) ---------- */
 .pm-subhead { margin: 1.1rem 0 0.2rem; font-size: 0.95rem; }
 .program-list-wrap {
-  max-height: 240px; overflow-y: auto;
+  max-height: 240px; overflow: auto;
   border: 1px solid var(--line); border-radius: 8px; margin: 0.9rem 0 0.25rem;
 }
-.program-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+.program-table { width: 100%; min-width: 620px; border-collapse: collapse; font-size: 0.88rem; }
 .program-table th {
   position: sticky; top: 0; z-index: 1; background: #f8fafc;
   text-align: left; font-size: 0.7rem; text-transform: uppercase;
