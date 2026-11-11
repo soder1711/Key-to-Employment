@@ -2,7 +2,18 @@
 
 ## Structure
 
-The frontend is a small static site consisting of `index.html`, `app.js`, and `styles.css`. It is published as-is to GitHub Pages; there is no npm project, bundler, or frontend test harness.
+The frontend is a small static site consisting of `index.html`, feature-focused JavaScript files, and `styles.css`. The JavaScript files are classic browser scripts loaded in order from `index.html`; they share top-level state and do not require a bundler. It is published as-is to GitHub Pages; there is no npm project or frontend test harness.
+
+JavaScript responsibilities:
+
+- `shared.js`: configuration, translations, and shared helpers
+- `my-tasks.js`: signed-in task list and authentication bootstrap
+- `schedule.js`: weekly schedules and shared schedule state
+- `monthly-summary.js`: admin monthly summary and goal editing
+- `plan.js`: admin planning board and drag-and-drop assignments
+- `session-modals.js`: schedule assignment and detail dialogs
+- `task-management.js`: task type management dialog
+- `app.js`: event wiring and application startup
 
 ## Implementation conventions
 
