@@ -241,7 +241,29 @@ Response: `{ "success": true }`.
 GET /api/admin/schedule/monthly?year=2026&month=10
 ```
 
-`year` and `month` default to the current UTC year and month. Response: `{ "year": 2026, "month": 10, "rows": [ ... ] }`.
+`year` and `month` default to the current UTC year and month. The admin-only response is `{ "year": 2026, "month": 10, "rows": [ ... ] }`. Each row retains the monthly totals and includes points and completed-session counts for days 1–10, 11–20, and 21–month-end, plus target status and goal variance:
+
+```json
+{
+  "employee_id": 2,
+  "first_name": "Example",
+  "last_name": "Employee",
+  "completed_points": 28,
+  "completed_sessions": 12,
+  "target_points": 24,
+  "target_set": true,
+  "days_1_10_points": 12.5,
+  "days_1_10_completed_sessions": 5,
+  "days_11_20_points": 9.5,
+  "days_11_20_completed_sessions": 4,
+  "days_21_end_points": 6,
+  "days_21_end_completed_sessions": 3,
+  "goal_variance": 4,
+  "points_above_goal": 4
+}
+```
+
+`goal_variance` and `points_above_goal` are `null` when the employee has no target for that month.
 
 ### Set an employee's monthly target
 

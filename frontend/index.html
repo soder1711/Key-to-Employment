@@ -17,6 +17,7 @@
         <button id="nav-tasks" class="nav-btn active" data-i18n="nav.tasks">Tasks</button>
         <button id="nav-schedule" class="nav-btn" data-i18n="nav.schedule">Schedule</button>
         <button id="nav-plan" class="nav-btn" style="display:none;" data-i18n="nav.plan">Plan</button>
+        <button id="nav-monthly" class="nav-btn" style="display:none;" data-i18n="nav.monthly">Monthly summary</button>
       </nav>
       <div class="user-area">
         <span id="user" class="user-chip"></span>
@@ -81,6 +82,25 @@
         <div id="my-schedule-empty" class="empty" style="display:none;" data-i18n="schedule.empty">No sessions scheduled for you this week.</div>
         <div id="my-week-totals" class="week-totals" style="display:none;"></div>
         <div id="schedule-error" class="error" style="display:none;"></div>
+      </section>
+
+      <!-- ===== Admin: monthly summary ===== -->
+      <section id="monthly-summary-section" class="card" style="display:none;">
+        <div class="card-head">
+          <h2 data-i18n="summary.title">Monthly summary</h2>
+          <span class="admin-tag" data-i18n="plan.adminTag">admin</span>
+        </div>
+        <div class="week-nav">
+          <button id="monthly-summary-prev" class="btn ghost small" data-i18n="summary.prev">← Previous month</button>
+          <button id="monthly-summary-current" class="btn small" data-i18n="summary.current">This month</button>
+          <button id="monthly-summary-next" class="btn ghost small" data-i18n="summary.next">Next month →</button>
+          <span id="monthly-summary-label" class="week-label" aria-live="polite"></span>
+        </div>
+        <p id="monthly-summary-demo" class="hint" style="display:none;" data-i18n="summary.demoNotice">Demo preview: sample data only; no sign-in or live data is used.</p>
+        <p id="monthly-summary-loading" class="empty" style="display:none;" role="status" data-i18n="summary.loading">Loading monthly summary…</p>
+        <div id="monthly-summary-wrap" class="table-scroll" style="display:none;"></div>
+        <div id="monthly-summary-empty" class="empty" style="display:none;" data-i18n="summary.empty">No active employees.</div>
+        <div id="monthly-summary-error" class="error" style="display:none;" role="alert"></div>
       </section>
 
       <!-- ===== Admin: weekly plan board (one day at a time) ===== -->

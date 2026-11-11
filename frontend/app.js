@@ -1,6 +1,8 @@
 // ================= Configuration & shared helpers =================
 
 const WORKER = 'https://task-portal.soder1234.workers.dev';
+const LOCAL_DEMO = new URLSearchParams(window.location.search).get('demo') === '1' &&
+  ['localhost', '127.0.0.1', '[::1]'].includes(window.location.hostname);
 
 let currentUser = null;
 
@@ -17,6 +19,19 @@ let lang = (() => {
 const I18N = {
   en: {
     'nav.tasks': 'Tasks', 'nav.schedule': 'Schedule', 'nav.plan': 'Plan',
+    'nav.monthly': 'Monthly summary',
+    'summary.title': 'Monthly summary', 'summary.prev': '← Previous month',
+    'summary.current': 'This month', 'summary.next': 'Next month →',
+    'summary.daysOneToTen': 'Days 1–10', 'summary.daysElevenToTwenty': 'Days 11–20',
+    'summary.daysTwentyOneToEnd': 'Days 21–end', 'summary.employee': 'Employee',
+    'summary.points': 'Completed points', 'summary.goal': 'Monthly goal',
+    'summary.notSet': 'Not set', 'summary.variance': 'Goal variance',
+    'summary.aboveGoal': 'Points above goal', 'summary.completedTasks': 'Completed tasks',
+    'summary.tasksCount': '{count} tasks', 'summary.loading': 'Loading monthly summary…',
+    'summary.error': 'Could not load monthly summary ({status}).',
+    'summary.empty': 'No active employees.',
+    'summary.demoNotice': 'Demo preview: sample data only; no sign-in or live data is used.',
+    'summary.demoUser': 'Demo preview',
     'user.logout': 'Log out',
     'tasks.title': 'My tasks',
     'tasks.empty': 'No tasks or Plan assignments yet.',
@@ -134,6 +149,19 @@ const I18N = {
   },
   vi: {
     'nav.tasks': 'Nhiệm vụ', 'nav.schedule': 'Lịch', 'nav.plan': 'Kế hoạch',
+    'nav.monthly': 'Tổng kết tháng',
+    'summary.title': 'Tổng kết tháng', 'summary.prev': '← Tháng trước',
+    'summary.current': 'Tháng này', 'summary.next': 'Tháng sau →',
+    'summary.daysOneToTen': 'Ngày 1–10', 'summary.daysElevenToTwenty': 'Ngày 11–20',
+    'summary.daysTwentyOneToEnd': 'Ngày 21–cuối tháng', 'summary.employee': 'Nhân viên',
+    'summary.points': 'Điểm hoàn thành', 'summary.goal': 'Mục tiêu tháng',
+    'summary.notSet': 'Chưa đặt', 'summary.variance': 'Chênh lệch mục tiêu',
+    'summary.aboveGoal': 'Điểm vượt mục tiêu', 'summary.completedTasks': 'Nhiệm vụ hoàn thành',
+    'summary.tasksCount': '{count} nhiệm vụ', 'summary.loading': 'Đang tải tổng kết tháng…',
+    'summary.error': 'Không tải được tổng kết tháng ({status}).',
+    'summary.empty': 'Không có nhân sự đang hoạt động.',
+    'summary.demoNotice': 'Bản xem trước: chỉ dùng dữ liệu mẫu; không cần đăng nhập và không dùng dữ liệu trực tiếp.',
+    'summary.demoUser': 'Bản xem trước',
     'user.logout': 'Đăng xuất',
     'tasks.title': 'Nhiệm vụ của tôi',
     'tasks.empty': 'Chưa có nhiệm vụ hay phân công Kế hoạch nào.',
@@ -287,9 +315,14 @@ function setLang(newLang) {
   refreshLangButtons();
   // Re-render the dynamic views in the new language
   if (currentUser) {
-    loadMyTasks();
-    if (scheduleLoaded) loadSchedule();
-    if (planLoaded) loadPlanBoard();
+    if (LOCAL_DEMO) {
+      document.getElementById('user').textContent = t('summary.demoUser');
+    } else {
+      loadMyTasks();
+      if (scheduleLoaded) loadSchedule();
+      if (planLoaded) loadPlanBoard();
+    }
+    if (monthlySummaryLoaded) loadMonthlySummary();
   }
 }
 
@@ -405,6 +438,20 @@ async function loadMyTasks() {
 // ================= Sign-in / bootstrap =================
 
 async function load() {
+  if (LOCAL_DEMO) {
+    currentUser = { email: t('summary.demoUser'), isAdmin: true };
+    document.getElementById('signin-section').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    document.getElementById('user').textContent = t('summary.demoUser');
+    document.getElementById('nav-tasks').style.display = 'none';
+    document.getElementById('nav-schedule').style.display = 'none';
+    document.getElementById('nav-plan').style.display = 'none';
+    document.getElementById('nav-monthly').style.display = 'inline-block';
+    document.getElementById('monthly-summary-demo').style.display = 'block';
+    switchView('monthly-summary');
+    return;
+  }
+
   const me = await api('/api/me');
 
   if (me.status === 401) {
@@ -439,6 +486,7 @@ async function load() {
 
   if (user.isAdmin) {
     document.getElementById('nav-plan').style.display = 'inline-block';
+    document.getElementById('nav-monthly').style.display = 'inline-block';
   }
 }
 
@@ -448,6 +496,7 @@ let scheduleWeekStart = null;
 let scheduleLoaded = false;
 let schedMode = 'week';
 let monthCursor = { year: new Date().getUTCFullYear(), month: new Date().getUTCMonth() + 1 };
+let monthlySummaryLoaded = false;
 let adminPrograms = [];
 let adminEmployees = [];
 let sessionById = new Map();
@@ -495,17 +544,25 @@ function switchView(view) {
   const showTasks = view === 'tasks';
   const showSchedule = view === 'schedule';
   const showPlan = view === 'plan';
+  const showMonthlySummary = view === 'monthly-summary' && currentUser?.isAdmin;
 
   document.getElementById('nav-tasks').classList.toggle('active', showTasks);
   document.getElementById('nav-schedule').classList.toggle('active', showSchedule);
   document.getElementById('nav-plan').classList.toggle('active', showPlan);
+  document.getElementById('nav-monthly').classList.toggle('active', showMonthlySummary);
 
   document.getElementById('my-tasks-section').style.display = showTasks ? 'block' : 'none';
   document.getElementById('schedule-section').style.display = showSchedule ? 'block' : 'none';
   document.getElementById('plan-section').style.display =
     showPlan && currentUser?.isAdmin ? 'block' : 'none';
+  document.getElementById('monthly-summary-section').style.display =
+    showMonthlySummary ? 'block' : 'none';
 
   if (showPlan && !planLoaded) initPlan();
+  if (showMonthlySummary) {
+    monthlySummaryLoaded = true;
+    loadMonthlySummary();
+  }
   if (showTasks) loadMyTasks();
   if (showSchedule) {
     if (!scheduleLoaded) {
@@ -745,6 +802,137 @@ function shiftMonth(delta) {
   if (m > 12) { m = 1; y++; }
   monthCursor = { year: y, month: m };
   loadMonthView();
+}
+
+const DEMO_MONTHLY_ROWS = [
+  {
+    employee_id: 1, first_name: 'Linh', last_name: 'Nguyen',
+    days_1_10_points: 12.5, days_1_10_completed_sessions: 5,
+    days_11_20_points: 9.5, days_11_20_completed_sessions: 4,
+    days_21_end_points: 6, days_21_end_completed_sessions: 3,
+    completed_points: 28, completed_sessions: 12, target_points: 24,
+    target_set: 1, goal_variance: 4, points_above_goal: 4,
+  },
+  {
+    employee_id: 2, first_name: 'Minh', last_name: 'Tran',
+    days_1_10_points: 5, days_1_10_completed_sessions: 2,
+    days_11_20_points: 8, days_11_20_completed_sessions: 4,
+    days_21_end_points: 3, days_21_end_completed_sessions: 2,
+    completed_points: 16, completed_sessions: 8, target_points: 20,
+    target_set: 1, goal_variance: -4, points_above_goal: 0,
+  },
+  {
+    employee_id: 3, first_name: 'Alex', last_name: 'Morgan',
+    days_1_10_points: 0, days_1_10_completed_sessions: 0,
+    days_11_20_points: 0, days_11_20_completed_sessions: 0,
+    days_21_end_points: 0, days_21_end_completed_sessions: 0,
+    completed_points: 0, completed_sessions: 0, target_points: 0,
+    target_set: 0, goal_variance: null, points_above_goal: null,
+  },
+];
+
+function summaryPoints(value) {
+  const points = Number(value);
+  return Number.isFinite(points) ? points.toFixed(1) : '0.0';
+}
+
+function renderMonthlySummary(rows) {
+  const periods = [
+    ['days_1_10_points', 'days_1_10_completed_sessions', 'summary.daysOneToTen'],
+    ['days_11_20_points', 'days_11_20_completed_sessions', 'summary.daysElevenToTwenty'],
+    ['days_21_end_points', 'days_21_end_completed_sessions', 'summary.daysTwentyOneToEnd'],
+  ];
+  const periodHeaders = periods.map(([, , label]) => `<th>${t(label)}</th>`).join('');
+  const body = rows.map(row => {
+    const earned = Number(row.completed_points) || 0;
+    const target = Number(row.target_points) || 0;
+    const targetSet = row.target_set === undefined
+      ? target > 0
+      : Number(row.target_set) === 1;
+    const varianceValue = Number(row.goal_variance);
+    const variance = targetSet
+      ? (Number.isFinite(varianceValue) ? varianceValue : earned - target)
+      : null;
+    const varianceClass = variance > 0 ? 'summary-positive' : variance < 0 ? 'summary-negative' : '';
+    const varianceText = targetSet
+      ? `${variance > 0 ? '+' : ''}${summaryPoints(variance)}`
+      : '—';
+    const aboveValue = Number(row.points_above_goal);
+    const aboveGoal = targetSet
+      ? summaryPoints(Number.isFinite(aboveValue) ? aboveValue : Math.max(variance, 0))
+      : '—';
+    const periodCells = periods.map(([pointsKey, countKey]) => {
+      const count = Math.max(0, Number(row[countKey]) || 0);
+      return `<td>${summaryPoints(row[pointsKey])} ${t('unit.pts')}` +
+        `<span class="summary-cell-sub">${t('summary.tasksCount', { count })}</span></td>`;
+    }).join('');
+    return `<tr>
+      <td class="summary-person">${escapeHtml(row.first_name)} ${escapeHtml(row.last_name)}</td>
+      ${periodCells}
+      <td class="pts">${summaryPoints(row.completed_points)} ${t('unit.pts')}</td>
+      <td>${targetSet ? `${summaryPoints(row.target_points)} ${t('unit.pts')}` : t('summary.notSet')}</td>
+      <td class="${varianceClass}">${varianceText} ${targetSet ? t('unit.pts') : ''}</td>
+      <td>${aboveGoal}${targetSet ? ` ${t('unit.pts')}` : ''}</td>
+      <td>${Math.max(0, Number(row.completed_sessions) || 0)}</td>
+    </tr>`;
+  }).join('');
+
+  return `<table class="monthly-summary-table">
+    <thead><tr><th>${t('summary.employee')}</th>${periodHeaders}
+      <th>${t('summary.points')}</th><th>${t('summary.goal')}</th>
+      <th>${t('summary.variance')}</th><th>${t('summary.aboveGoal')}</th>
+      <th>${t('summary.completedTasks')}</th>
+    </tr></thead><tbody>${body}</tbody>
+  </table>`;
+}
+
+async function loadMonthlySummary() {
+  const { year, month } = monthCursor;
+  const label = document.getElementById('monthly-summary-label');
+  const loading = document.getElementById('monthly-summary-loading');
+  const wrap = document.getElementById('monthly-summary-wrap');
+  const empty = document.getElementById('monthly-summary-empty');
+  const error = document.getElementById('monthly-summary-error');
+  label.textContent = `${monthName(month - 1)} ${year}`;
+  loading.style.display = 'block';
+  wrap.style.display = 'none';
+  wrap.textContent = '';
+  empty.style.display = 'none';
+  error.style.display = 'none';
+
+  try {
+    let rows;
+    if (LOCAL_DEMO) {
+      rows = DEMO_MONTHLY_ROWS.map(row => ({ ...row }));
+    } else {
+      const res = await api(`/api/admin/schedule/monthly?year=${year}&month=${month}`);
+      if (!res.ok) throw new Error(String(res.status));
+      const data = await res.json();
+      rows = data.rows;
+    }
+
+    loading.style.display = 'none';
+    if (!Array.isArray(rows)) throw new Error('Invalid response');
+    if (!rows.length) {
+      empty.style.display = 'block';
+      return;
+    }
+    wrap.innerHTML = renderMonthlySummary(rows);
+    wrap.style.display = 'block';
+  } catch (err) {
+    loading.style.display = 'none';
+    error.textContent = t('summary.error', { status: err.message || 'network error' });
+    error.style.display = 'block';
+  }
+}
+
+function shiftSummaryMonth(delta) {
+  let month = monthCursor.month + delta;
+  let year = monthCursor.year;
+  if (month < 1) { month = 12; year--; }
+  if (month > 12) { month = 1; year++; }
+  monthCursor = { year, month };
+  loadMonthlySummary();
 }
 
 // ================= Plan board (drag & drop, ONE day at a time) =================
@@ -1243,6 +1431,14 @@ document.getElementById('lang-btn-login').addEventListener('click', () =>
 document.getElementById('nav-tasks').addEventListener('click', () => switchView('tasks'));
 document.getElementById('nav-schedule').addEventListener('click', () => switchView('schedule'));
 document.getElementById('nav-plan').addEventListener('click', () => switchView('plan'));
+document.getElementById('nav-monthly').addEventListener('click', () => switchView('monthly-summary'));
+document.getElementById('monthly-summary-prev').addEventListener('click', () => shiftSummaryMonth(-1));
+document.getElementById('monthly-summary-next').addEventListener('click', () => shiftSummaryMonth(1));
+document.getElementById('monthly-summary-current').addEventListener('click', () => {
+  const now = new Date();
+  monthCursor = { year: now.getUTCFullYear(), month: now.getUTCMonth() + 1 };
+  loadMonthlySummary();
+});
 
 document.getElementById('schedule-prev').addEventListener('click', () => {
   scheduleWeekStart = shiftISO(scheduleWeekStart, -7);

@@ -1,3 +1,5 @@
+import { aggregateMonthlyRows, monthlyDateRange } from './monthly-summary.js';
+
 // All queries use parameter binding — never string concatenation
 export async function getEmployeeAuth(db, employeeId) {
   return await db.prepare(`
@@ -343,30 +345,24 @@ export async function logScheduleHistory(db, actorEmail, action, entity, entityI
 }
 
 export async function getMonthlySummary(db, year, month, employeeId = null) {
-  const mm = String(month).padStart(2, '0');
-  const start = `${year}-${mm}-01`;
-  const end = `${year}-${mm}-31`; // safe upper bound for SQLite date strings
+  const { start, end } = monthlyDateRange(year, month);
   const sql = `
     SELECT e.employee_id, e.first_name, e.last_name, e.email,
-           COUNT(s.session_id) AS total_sessions,
-           COALESCE(SUM(CASE WHEN s.status = 'completed' THEN 1 ELSE 0 END), 0) AS completed_sessions,
-           COALESCE(SUM(CASE WHEN s.status = 'scheduled' THEN 1 ELSE 0 END), 0) AS scheduled_sessions,
-           COALESCE(SUM(CASE WHEN s.status = 'completed' THEN s.points ELSE 0 END), 0) AS completed_points,
-           COALESCE(SUM(CASE WHEN s.status != 'cancelled' THEN s.points ELSE 0 END), 0) AS potential_points,
-           COALESCE(mt.target_points, 0) AS target_points
+           COALESCE(mt.target_points, 0) AS target_points,
+           CASE WHEN mt.employee_id IS NULL THEN 0 ELSE 1 END AS target_set,
+           s.session_id, s.session_date, s.status, s.points
     FROM employees e
     LEFT JOIN schedule_sessions s
       ON s.employee_id = e.employee_id AND s.session_date >= ? AND s.session_date <= ?
     LEFT JOIN monthly_targets mt
       ON mt.employee_id = e.employee_id AND mt.year = ? AND mt.month = ?
     WHERE e.is_active = 1 ${employeeId ? 'AND e.employee_id = ?' : ''}
-    GROUP BY e.employee_id
-    ORDER BY e.first_name, e.last_name`;
+    ORDER BY e.first_name, e.last_name, s.session_date`;
   const params = employeeId
     ? [start, end, year, month, employeeId]
     : [start, end, year, month];
   const { results } = await db.prepare(sql).bind(...params).all();
-  return results;
+  return aggregateMonthlyRows(results);
 }
 
 export async function setMonthlyTarget(db, employeeId, year, month, targetPoints) {

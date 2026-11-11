@@ -291,7 +291,8 @@ export async function handleGetMySchedule(env, session, url) {
   // Explicit ?year=&month= wins; otherwise use the month of the week's Thursday
   let year = parseInt(url.searchParams.get('year'), 10);
   let month = parseInt(url.searchParams.get('month'), 10);
-  if (!Number.isInteger(year) || !Number.isInteger(month) || month < 1 || month > 12) {
+  if (!Number.isInteger(year) || year < 1 || year > 9999 ||
+      !Number.isInteger(month) || month < 1 || month > 12) {
     const mid = new Date(dates[3] + 'T00:00:00Z');
     year = mid.getUTCFullYear();
     month = mid.getUTCMonth() + 1;
@@ -672,8 +673,9 @@ export async function handleAdminDeleteSession(env, session, body) {
  * @apiQuery {Number} [month] Summary month from 1 to 12; defaults to the current month.
  * @apiSuccess {Number} year Summary year.
  * @apiSuccess {Number} month Summary month.
- * @apiSuccess {Object[]} rows Employee summary rows.
- * @apiError 400 Invalid month.
+ * @apiSuccess {Object[]} rows Employee summary rows with completed points and task counts
+ *   for days 1–10, 11–20, and 21–month-end, monthly totals, target, variance, and points above goal.
+ * @apiError 400 Invalid year or month.
  * @apiError 403 Admin access required.
  */
 export async function handleAdminMonthlySummary(env, session, url) {
@@ -683,7 +685,9 @@ export async function handleAdminMonthlySummary(env, session, url) {
   const now = new Date();
   const year = parseInt(url.searchParams.get('year'), 10) || now.getUTCFullYear();
   const month = parseInt(url.searchParams.get('month'), 10) || now.getUTCMonth() + 1;
-  if (month < 1 || month > 12) return new Response('Invalid month', { status: 400 });
+  if (!Number.isInteger(year) || year < 1 || year > 9999 || month < 1 || month > 12) {
+    return new Response('Invalid year or month', { status: 400 });
+  }
   const rows = await getMonthlySummary(env.DB, year, month);
   return Response.json({ year, month, rows });
 }

@@ -282,7 +282,7 @@ button { font-family: inherit; }
 
 /* ---------- View navigation (dashboard toggle) ---------- */
 .view-nav {
-  display: flex; gap: 0.35rem;
+  display: flex; flex-wrap: wrap; gap: 0.35rem;
   background: var(--blue-50); border: 1px solid var(--blue-100);
   padding: 4px; border-radius: 10px;
 }
@@ -391,6 +391,18 @@ button { font-family: inherit; }
   padding: 0.5rem 0.6rem; border-bottom: 2px solid var(--line);
 }
 .month-table td { padding: 0.5rem 0.6rem; border-bottom: 1px solid var(--line); }
+.monthly-summary-table { width: 100%; min-width: 1040px; border-collapse: collapse; font-size: 0.88rem; }
+.monthly-summary-table th {
+  text-align: left; font-size: 0.72rem; text-transform: uppercase;
+  letter-spacing: 0.04em; color: var(--muted); padding: 0.55rem 0.6rem;
+  border-bottom: 2px solid var(--line); white-space: nowrap;
+}
+.monthly-summary-table td { padding: 0.6rem; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.monthly-summary-table tr:hover td { background: var(--blue-50); }
+.summary-person { font-weight: 700; }
+.summary-cell-sub { display: block; color: var(--muted); font-size: 0.76rem; margin-top: 2px; }
+.summary-positive { color: #15803d; font-weight: 700; }
+.summary-negative { color: #b91c1c; font-weight: 700; }
 .target-input {
   width: 80px; padding: 0.3rem 0.45rem; border: 1px solid var(--line);
   border-radius: 6px; font: inherit; font-size: 0.85rem;

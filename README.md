@@ -56,6 +56,16 @@ For a database that already has the schedule tables, apply
 created before assigning a person. Do not use `--remote` unless you intend to
 modify production data.
 
+### Preview the monthly summary without OAuth
+
+From the repository root, run:
+
+```sh
+node frontend/dev-server.mjs
+```
+
+Open `http://127.0.0.1:4173/?demo=1` to view sample monthly summary data. The demo is limited to localhost and does not call the Worker or use live data. Without `?demo=1`, the frontend follows the normal authentication flow.
+
 ## Deployment
 
 - Changes under `frontend/` on `main` deploy automatically to GitHub Pages through `deploy.yml`.
@@ -66,9 +76,10 @@ For a manual Worker deployment, run `wrangler deploy --config wrangler.toml` fro
 
 ## Validation
 
-There is no package manifest, build step, linter, or automated test suite. Before submitting changes:
+There is no package manifest, build step, or linter. The monthly-summary aggregation tests use Node's built-in test runner. Before submitting changes:
 
-- Run `node --check src/index.js` (and repeat for changed Worker JavaScript files) from `worker/`.
+- Run `node --experimental-default-type=module --test worker/tests/monthly-summary.test.mjs`.
+- Run `node --check` on changed JavaScript files.
 - Review API routes and database bindings manually.
-- Smoke-test sign-in, task loading, schedule views, and logout in a browser when those areas change.
+- Smoke-test the localhost demo and, when available, authenticated behavior in a browser.
 - Inspect `git diff` and ensure local Wrangler state and credentials are not included.
