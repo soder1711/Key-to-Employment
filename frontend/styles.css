@@ -403,6 +403,15 @@ button { font-family: inherit; }
 .summary-cell-sub { display: block; color: var(--muted); font-size: 0.76rem; margin-top: 2px; }
 .summary-positive { color: #15803d; font-weight: 700; }
 .summary-negative { color: #b91c1c; font-weight: 700; }
+.goal-editor { display: grid; justify-items: start; gap: 0.3rem; min-width: 175px; }
+.monthly-goal-input {
+  width: 100px; padding: 0.35rem 0.45rem; border: 1px solid var(--line);
+  border-radius: 6px; font: inherit; font-size: 0.85rem;
+}
+.goal-actions { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+.goal-actions button:disabled { cursor: default; opacity: 0.55; }
+.summary-status { margin: 0 0 0.75rem; font-size: 0.9rem; }
+.summary-status-success { color: #15803d; }
 .target-input {
   width: 80px; padding: 0.3rem 0.45rem; border: 1px solid var(--line);
   border-radius: 6px; font: inherit; font-size: 0.85rem;

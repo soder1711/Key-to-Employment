@@ -11,7 +11,7 @@ Add an admin-facing monthly summary that compares each active employee's complet
 - Show one row per active employee with:
   - Completed points for days 1–10, 11–20, and 21–month-end.
   - Total completed points for the month.
-  - Monthly goal.
+  - The shared 170-point monthly goal by default, with per-person, per-month overrides that admins can save or reset.
   - Points above goal and signed goal variance, so both exceeded and unmet goals are clear.
   - Number of completed tasks/sessions.
 - Include loading, error, empty-state, and narrow-screen behavior.
@@ -21,7 +21,7 @@ Add an admin-facing monthly summary that compares each active employee's complet
 
 The Worker already exposes the admin-protected `GET /api/admin/schedule/monthly` route. Its response includes employee identity, completed points, completed sessions, and monthly targets.
 
-Extend this endpoint to provide per-interval completed points and completed-task counts. Use the session date and `status = 'completed'` for the breakdown. Preserve the admin authorization check, parameterized database queries, and existing response fields. Do not count scheduled or cancelled sessions as completed work.
+Extend this endpoint to provide per-interval completed points and completed-task counts. Use the session date and `status = 'completed'` for the breakdown. Use 170 points as the shared goal when no employee-month override exists; allow admins to save or reset an override with the existing target endpoint. Preserve the admin authorization check, parameterized database queries, and existing response fields. Do not count scheduled or cancelled sessions as completed work.
 
 ## Frontend implementation
 

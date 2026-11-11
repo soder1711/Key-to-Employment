@@ -348,8 +348,8 @@ export async function getMonthlySummary(db, year, month, employeeId = null) {
   const { start, end } = monthlyDateRange(year, month);
   const sql = `
     SELECT e.employee_id, e.first_name, e.last_name, e.email,
-           COALESCE(mt.target_points, 0) AS target_points,
-           CASE WHEN mt.employee_id IS NULL THEN 0 ELSE 1 END AS target_set,
+           mt.target_points AS target_points,
+           CASE WHEN mt.employee_id IS NULL THEN 0 ELSE 1 END AS target_is_override,
            s.session_id, s.session_date, s.status, s.points
     FROM employees e
     LEFT JOIN schedule_sessions s
@@ -372,4 +372,10 @@ export async function setMonthlyTarget(db, employeeId, year, month, targetPoints
      ON CONFLICT (employee_id, year, month)
      DO UPDATE SET target_points = excluded.target_points`
   ).bind(employeeId, year, month, targetPoints).run();
+}
+export async function clearMonthlyTarget(db, employeeId, year, month) {
+  return await db.prepare(
+    `DELETE FROM monthly_targets
+     WHERE employee_id = ? AND year = ? AND month = ?`
+  ).bind(employeeId, year, month).run();
 }

@@ -241,7 +241,7 @@ Response: `{ "success": true }`.
 GET /api/admin/schedule/monthly?year=2026&month=10
 ```
 
-`year` and `month` default to the current UTC year and month. The admin-only response is `{ "year": 2026, "month": 10, "rows": [ ... ] }`. Each row retains the monthly totals and includes points and completed-session counts for days 1–10, 11–20, and 21–month-end, plus target status and goal variance:
+`year` and `month` default to the current UTC year and month. The admin-only response is `{ "year": 2026, "month": 10, "rows": [ ... ] }`. Each row retains the monthly totals and includes points and completed-session counts for days 1–10, 11–20, and 21–month-end, plus target status and goal variance. The shared default goal is 170 points; `target_is_override` indicates whether that employee has a month-specific override:
 
 ```json
 {
@@ -252,6 +252,7 @@ GET /api/admin/schedule/monthly?year=2026&month=10
   "completed_sessions": 12,
   "target_points": 24,
   "target_set": true,
+  "target_is_override": true,
   "days_1_10_points": 12.5,
   "days_1_10_completed_sessions": 5,
   "days_11_20_points": 9.5,
@@ -263,7 +264,7 @@ GET /api/admin/schedule/monthly?year=2026&month=10
 }
 ```
 
-`goal_variance` and `points_above_goal` are `null` when the employee has no target for that month.
+Without an override, rows use the shared 170-point goal and set `target_is_override` to `false`. `goal_variance` is completed points minus the effective goal; `points_above_goal` is zero when below goal.
 
 ### Set an employee's monthly target
 
@@ -283,7 +284,7 @@ Request:
 }
 ```
 
-Target points must be between `0` and `10000`. Response: `{ "success": true }`.
+Target points must be between `0` and `10000`. The override applies to that employee and month. To clear an override and use the shared 170-point goal, send `{ "employeeId": 2, "year": 2026, "month": 10, "useDefault": true }`. Response: `{ "success": true, "usingDefault": false }` when saving a value or `true` when resetting.
 
 ## Error responses
 

@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { getMonthlySummary } from '../src/db.js';
-import { aggregateMonthlyRows, monthlyDateRange } from '../src/monthly-summary.js';
+import { handleAdminSetTarget } from '../src/api.js';
+import { clearMonthlyTarget, getMonthlySummary } from '../src/db.js';
+import {
+  aggregateMonthlyRows, DEFAULT_MONTHLY_TARGET_POINTS, monthlyDateRange,
+} from '../src/monthly-summary.js';
 
 function session(sessionId, sessionDate, status, points) {
   return {
@@ -10,7 +13,7 @@ function session(sessionId, sessionDate, status, points) {
     last_name: 'Employee',
     email: 'test@example.com',
     target_points: 20,
-    target_set: 1,
+    target_is_override: 1,
     session_id: sessionId,
     session_date: sessionDate,
     status,
@@ -52,25 +55,29 @@ test('aggregateMonthlyRows assigns completed points and counts to 10-day interva
   assert.equal(summary.points_above_goal, 1);
 });
 
-test('aggregateMonthlyRows handles employees with no sessions and no goal', () => {
+test('aggregateMonthlyRows applies the shared default when there is no override', () => {
   const [summary] = aggregateMonthlyRows([{
     employee_id: 9,
     first_name: 'No',
     last_name: 'Tasks',
     email: 'no-tasks@example.com',
-    target_points: 0,
-    target_set: 0,
+    target_points: null,
+    target_is_override: 0,
     session_id: null,
     session_date: null,
     status: null,
     points: null,
   }]);
 
+  assert.equal(DEFAULT_MONTHLY_TARGET_POINTS, 170);
   assert.equal(summary.total_sessions, 0);
   assert.equal(summary.completed_points, 0);
   assert.equal(summary.completed_sessions, 0);
-  assert.equal(summary.goal_variance, null);
-  assert.equal(summary.points_above_goal, null);
+  assert.equal(summary.target_points, 170);
+  assert.equal(summary.target_set, true);
+  assert.equal(summary.target_is_override, false);
+  assert.equal(summary.goal_variance, -170);
+  assert.equal(summary.points_above_goal, 0);
 });
 
 test('aggregateMonthlyRows reports negative variance and zero excess below goal', () => {
@@ -81,6 +88,64 @@ test('aggregateMonthlyRows reports negative variance and zero excess below goal'
   assert.equal(summary.completed_points, 5);
   assert.equal(summary.goal_variance, -5);
   assert.equal(summary.points_above_goal, 0);
+});
+
+test('admin can reset a monthly override to the shared default', async () => {
+  const statements = [];
+  const env = {
+    DB: {
+      prepare(sql) {
+        return {
+          bind(...values) {
+            statements.push({ sql, values });
+            return { run: async () => ({ success: true }) };
+          },
+        };
+      },
+    },
+  };
+  const response = await handleAdminSetTarget(
+    env,
+    { isAdmin: true, email: 'admin@example.com' },
+    { employeeId: 7, year: 2026, month: 11, useDefault: true },
+  );
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { success: true, usingDefault: true });
+  assert.match(statements[0].sql, /DELETE FROM monthly_targets/);
+  assert.deepEqual(statements[0].values, [7, 2026, 11]);
+});
+
+test('monthly goal changes remain admin-only', async () => {
+  let queryCount = 0;
+  const response = await handleAdminSetTarget(
+    { DB: { prepare() { queryCount++; } } },
+    { isAdmin: false, email: 'employee@example.com' },
+    { employeeId: 7, year: 2026, month: 11, useDefault: true },
+  );
+
+  assert.equal(response.status, 403);
+  assert.equal(queryCount, 0);
+});
+
+test('clearMonthlyTarget deletes only the selected employee month override', async () => {
+  let sql;
+  let bindings;
+  const db = {
+    prepare(statement) {
+      sql = statement;
+      return {
+        bind(...values) {
+          bindings = values;
+          return { run: async () => ({ success: true }) };
+        },
+      };
+    },
+  };
+
+  await clearMonthlyTarget(db, 7, 2026, 11);
+  assert.match(sql, /WHERE employee_id = \? AND year = \? AND month = \?/);
+  assert.deepEqual(bindings, [7, 2026, 11]);
 });
 
 test('getMonthlySummary binds exact dates and employee scope', async () => {

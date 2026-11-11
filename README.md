@@ -64,7 +64,7 @@ From the repository root, run:
 node frontend/dev-server.mjs
 ```
 
-Open `http://127.0.0.1:4173/?demo=1` to view sample monthly summary data. The demo is limited to localhost and does not call the Worker or use live data. Without `?demo=1`, the frontend follows the normal authentication flow.
+Open `http://127.0.0.1:4173/?demo=1` to view sample monthly summary data. The demo is limited to localhost and does not call the Worker or use live data; goal edits only affect in-memory sample data. The shared monthly goal is 170 points, with admin overrides scoped to an employee and month. Without `?demo=1`, the frontend follows the normal authentication flow.
 
 ## Deployment
 

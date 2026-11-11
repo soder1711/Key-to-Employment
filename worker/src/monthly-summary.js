@@ -1,3 +1,5 @@
+export const DEFAULT_MONTHLY_TARGET_POINTS = 170;
+
 const INTERVALS = [
   { points: 'days_1_10_points', count: 'days_1_10_completed_sessions', start: 1, end: 10 },
   { points: 'days_11_20_points', count: 'days_11_20_completed_sessions', start: 11, end: 20 },
@@ -32,8 +34,11 @@ export function aggregateMonthlyRows(rows) {
         scheduled_sessions: 0,
         completed_points: 0,
         potential_points: 0,
-        target_points: Number(row.target_points) || 0,
-        target_set: Number(row.target_set) === 1,
+        target_points: Number(row.target_is_override) === 1
+          ? Number(row.target_points) || 0
+          : DEFAULT_MONTHLY_TARGET_POINTS,
+        target_set: true,
+        target_is_override: Number(row.target_is_override) === 1,
       };
       for (const interval of INTERVALS) {
         summary[interval.points] = 0;
@@ -61,13 +66,11 @@ export function aggregateMonthlyRows(rows) {
   }
 
   return [...employees.values()].map(summary => {
-    const goalVariance = summary.target_set
-      ? summary.completed_points - summary.target_points
-      : null;
+    const goalVariance = summary.completed_points - summary.target_points;
     return {
       ...summary,
       goal_variance: goalVariance,
-      points_above_goal: goalVariance === null ? null : Math.max(0, goalVariance),
+      points_above_goal: Math.max(0, goalVariance),
     };
   });
 }

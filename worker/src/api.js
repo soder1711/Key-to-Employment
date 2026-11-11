@@ -3,7 +3,7 @@ import {
   getAllTasks, getAnyTaskDetail, updateAssignmentProgressAsAdmin,
   weekStartFrom, weekDates, getPrograms, getActiveEmployees,
   getSessionsBetween, getSessionById, createSession, setSessionStatus,
-  deleteSession, logScheduleHistory, getMonthlySummary, setMonthlyTarget,
+  deleteSession, logScheduleHistory, getMonthlySummary, setMonthlyTarget, clearMonthlyTarget,
   reassignSession, getAllPrograms, getProgramById, getProgramByCode,
   createProgram, deactivateProgram, hardDeleteProgram, countProgramSessions,
   findSeriesSessionsFrom, findFollowingSeries,
@@ -674,7 +674,8 @@ export async function handleAdminDeleteSession(env, session, body) {
  * @apiSuccess {Number} year Summary year.
  * @apiSuccess {Number} month Summary month.
  * @apiSuccess {Object[]} rows Employee summary rows with completed points and task counts
- *   for days 1–10, 11–20, and 21–month-end, monthly totals, target, variance, and points above goal.
+ *   for days 1–10, 11–20, and 21–month-end, monthly totals, shared default/override target,
+ *   target_is_override, variance, and points above goal.
  * @apiError 400 Invalid year or month.
  * @apiError 403 Admin access required.
  */
@@ -700,7 +701,8 @@ export async function handleAdminMonthlySummary(env, session, url) {
  * @apiBody {Number} employeeId Employee identifier.
  * @apiBody {Number} year Target year.
  * @apiBody {Number} month Target month from 1 to 12.
- * @apiBody {Number} targetPoints Target points from 0 to 10000.
+ * @apiBody {Number} [targetPoints] Override points from 0 to 10000.
+ * @apiBody {Boolean} [useDefault=false] Remove the person's monthly override and use the shared goal.
  * @apiSuccess {Boolean} success Always true when saved.
  * @apiError 400 Invalid target payload or points.
  * @apiError 403 Admin access required.
@@ -709,20 +711,25 @@ export async function handleAdminSetTarget(env, session, body) {
   const denied = requireAdmin(session);
   if (denied) return denied;
 
-  const { employeeId, year, month, targetPoints } = body;
-  if (!Number.isInteger(employeeId) || !Number.isInteger(year) ||
-      !Number.isInteger(month) || month < 1 || month > 12) {
+  const { employeeId, year, month, targetPoints, useDefault = false } = body;
+  if (!Number.isInteger(employeeId) || !Number.isInteger(year) || year < 1 || year > 9999 ||
+      !Number.isInteger(month) || month < 1 || month > 12 || typeof useDefault !== 'boolean') {
     return new Response('Invalid target payload', { status: 400 });
   }
-  const pts = Number(targetPoints);
-  if (!Number.isFinite(pts) || pts < 0 || pts > 10000) {
-    return new Response('Invalid target points', { status: 400 });
+
+  let details;
+  if (useDefault) {
+    await clearMonthlyTarget(env.DB, employeeId, year, month);
+    details = `Monthly target for ${year}-${String(month).padStart(2, '0')} reset to shared default`;
+  } else {
+    const pts = Number(targetPoints);
+    if (!Number.isFinite(pts) || pts < 0 || pts > 10000) {
+      return new Response('Invalid target points', { status: 400 });
+    }
+    await setMonthlyTarget(env.DB, employeeId, year, month, pts);
+    details = `Monthly target for ${year}-${String(month).padStart(2, '0')} set to ${pts} points`;
   }
 
-  await setMonthlyTarget(env.DB, employeeId, year, month, pts);
-  await logScheduleHistory(
-    env.DB, session.email, 'target', 'employee', employeeId,
-    `Monthly target for ${year}-${String(month).padStart(2, '0')} set to ${pts} points`
-  );
-  return Response.json({ success: true });
+  await logScheduleHistory(env.DB, session.email, 'target', 'employee', employeeId, details);
+  return Response.json({ success: true, usingDefault: useDefault });
 }
