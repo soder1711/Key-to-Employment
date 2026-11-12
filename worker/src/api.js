@@ -2,7 +2,7 @@ import {
   getEmployeeTasks, getTaskDetail, updateAssignmentProgress,
   getAllTasks, getAnyTaskDetail, updateAssignmentProgressAsAdmin,
   weekStartFrom, weekDates, getPrograms, getActiveEmployees,
-  getSessionsBetween, getSessionById, createSession, setSessionStatus,
+  getSessionsBetween, getSessionById, createSession, updateSession, setSessionStatus,
   deleteSession, logScheduleHistory, getMonthlySummary, setMonthlyTarget, clearMonthlyTarget,
   reassignSession, getAllPrograms, getProgramById, getProgramByCode,
   createProgram, deactivateProgram, hardDeleteProgram, countProgramSessions,
@@ -259,6 +259,12 @@ export async function handleAdminUpdateProgress(env, session, body) {
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const TIME_RE = /^\d{2}:\d{2}$/;
 
+function isValidISODate(value) {
+  if (!DATE_RE.test(value)) return false;
+  const date = new Date(`${value}T00:00:00Z`);
+  return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value;
+}
+
 // Repeat caps: one year of weekly repeats, max.
 const MAX_REPEAT_WEEKS = 53;
 // Empty weeks box in the UI = fixed weekly schedule -> materialized for one year.
@@ -480,6 +486,118 @@ export async function handleAdminAssignSession(env, session, body) {
     repeatedWeeks: repeat,
     repeatFixed: repeatFixed === true,
   });
+}
+
+/**
+ * @api {post} /api/admin/schedule/update Update one scheduled session
+ * @apiName AdminUpdateSession
+ * @apiGroup AdminSchedule
+ * @apiHeader {String} Cookie Encrypted admin session cookie.
+ * @apiBody {Number} sessionId Session identifier.
+ * @apiBody {Number} programId Task type identifier.
+ * @apiBody {String} sessionDate Date in YYYY-MM-DD format.
+ * @apiBody {String} [startTime] Start time in HH:MM format.
+ * @apiBody {String} [endTime] End time in HH:MM format.
+ * @apiBody {Number} points Credited points from 0 to 100.
+ * @apiBody {Boolean} isSudden Whether this is a sudden session.
+ * @apiBody {String} [notes] Optional notes.
+ * @apiSuccess {Boolean} success Always true when updated.
+ * @apiError 400 Invalid update payload.
+ * @apiError 403 Admin access required.
+ * @apiError 404 Session or task type not found.
+ */
+export async function handleAdminUpdateSession(env, session, body) {
+  const denied = requireAdmin(session);
+  if (denied) return denied;
+
+  const sessionId = Number(body?.sessionId);
+  const programId = Number(body?.programId);
+  const sessionDate = body?.sessionDate;
+  const startTime = body?.startTime || null;
+  const endTime = body?.endTime || null;
+  const points = Number(body?.points);
+  const isSudden = body?.isSudden;
+  const notes = body?.notes == null ? null : String(body.notes);
+  if (!Number.isSafeInteger(sessionId) || sessionId < 1 ||
+      !Number.isSafeInteger(programId) || programId < 1 ||
+      typeof sessionDate !== 'string' || !isValidISODate(sessionDate) ||
+      (startTime !== null && (typeof startTime !== 'string' || !TIME_RE.test(startTime))) ||
+      (endTime !== null && (typeof endTime !== 'string' || !TIME_RE.test(endTime))) ||
+      !Number.isFinite(points) || points < 0 || points > 100 ||
+      typeof isSudden !== 'boolean') {
+    return new Response('Invalid update payload', { status: 400 });
+  }
+
+  const [before, program] = await Promise.all([
+    getSessionById(env.DB, sessionId),
+    getProgramById(env.DB, programId),
+  ]);
+  if (!before) return new Response('Session not found', { status: 404 });
+  if (!program) return new Response('Task type not found', { status: 404 });
+
+  await updateSession(env.DB, sessionId, {
+    sessionDate, programId, startTime, endTime, points, isSudden, notes,
+  });
+  const updated = await getSessionById(env.DB, sessionId);
+  await logScheduleHistory(
+    env.DB, session.email, 'update', 'session', sessionId,
+    `Updated "${before.program_name}" ${before.session_date} to ` +
+    `"${updated.program_name}" ${sessionDate} (${startTime || '—'}–${endTime || '—'})`
+  );
+  return Response.json({ success: true, session: updated });
+}
+
+/**
+ * @api {post} /api/admin/schedule/clone Clone a session to other weekdays
+ * @apiName AdminCloneSession
+ * @apiGroup AdminSchedule
+ * @apiHeader {String} Cookie Encrypted admin session cookie.
+ * @apiBody {Number} sessionId Source session identifier.
+ * @apiBody {String[]} dates One or more other dates in the same Monday-Sunday week.
+ * @apiSuccess {Boolean} success Always true when cloned.
+ * @apiSuccess {Number} clonedCount Number of new sessions.
+ * @apiError 400 Invalid dates or source session.
+ * @apiError 403 Admin access required.
+ * @apiError 404 Session not found.
+ */
+export async function handleAdminCloneSession(env, session, body) {
+  const denied = requireAdmin(session);
+  if (denied) return denied;
+
+  const sessionId = Number(body?.sessionId);
+  const dates = body?.dates;
+  if (!Number.isSafeInteger(sessionId) || sessionId < 1 || !Array.isArray(dates) ||
+      dates.length < 1 || dates.length > 6 || dates.some(date => !isValidISODate(date))) {
+    return new Response('Invalid clone payload', { status: 400 });
+  }
+  const source = await getSessionById(env.DB, sessionId);
+  if (!source) return new Response('Session not found', { status: 404 });
+  if (new Set(dates).size !== dates.length || dates.some(date =>
+      date === source.session_date || weekStartFrom(date) !== weekStartFrom(source.session_date))) {
+    return new Response('Clone dates must be unique other weekdays in the same week', { status: 400 });
+  }
+
+  const cloned = [];
+  for (const date of dates) {
+    const result = await createSession(env.DB, {
+      sessionDate: date,
+      programId: source.program_id,
+      employeeId: source.employee_id,
+      startTime: source.start_time,
+      endTime: source.end_time,
+      points: source.points,
+      isSudden: source.is_sudden === 1,
+      notes: source.notes,
+      createdBy: session.employeeId,
+    });
+    const created = await getSessionById(env.DB, result.meta.last_row_id);
+    cloned.push(created);
+    await logScheduleHistory(
+      env.DB, session.email, 'create', 'session', created.session_id,
+      `Cloned "${created.program_name}" from ${source.session_date} to ${date}`
+    );
+  }
+  return Response.json({ success: true, clonedCount: cloned.length, sessions: cloned });
 }
 
 /**

@@ -259,6 +259,16 @@ export async function createSession(db, s) {
          s.createdBy || null).run();
 }
 
+export async function updateSession(db, sessionId, s) {
+  return await db.prepare(
+    `UPDATE schedule_sessions
+     SET session_date = ?, program_id = ?, start_time = ?, end_time = ?,
+         points = ?, is_sudden = ?, notes = ?
+     WHERE session_id = ?`
+  ).bind(s.sessionDate, s.programId, s.startTime || null, s.endTime || null,
+         s.points, s.isSudden ? 1 : 0, s.notes || null, sessionId).run();
+}
+
 // ---------- Weekly series matching ----------
 // A "series" occurrence means: same task (program), same weekday AND the
 // SAME START AND END TIME. Times are compared on HH:MM (substr 1-5) so

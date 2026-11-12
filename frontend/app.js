@@ -113,20 +113,26 @@ document.getElementById('assign-submit').addEventListener('click', async (e) => 
       ? Math.min(53, Math.max(1, parseInt(weeksRaw, 10) || 1))
       : 1;
 
-    const res = await api('/api/admin/schedule/assign', {
+    const isEditing = editingSession && currentSession;
+    const payload = {
+      programId: Number(document.getElementById('assign-program').value),
+      startTime: document.getElementById('assign-start').value || null,
+      endTime: document.getElementById('assign-end').value || null,
+      points: Number(document.getElementById('assign-points').value),
+      isSudden: document.getElementById('assign-sudden').checked,
+      notes: document.getElementById('assign-notes').value || null,
+    };
+    const res = await api(isEditing ? '/api/admin/schedule/update' : '/api/admin/schedule/assign', {
       method: 'POST',
-      body: JSON.stringify({
-        employeeId: modalEmployeeId,
-        date: modalDate,
-        programId: Number(document.getElementById('assign-program').value),
-        startTime: document.getElementById('assign-start').value || null,
-        endTime: document.getElementById('assign-end').value || null,
-        points: Number(document.getElementById('assign-points').value),
-        isSudden: document.getElementById('assign-sudden').checked,
-        notes: document.getElementById('assign-notes').value || null,
-        repeatWeeks,
-        repeatFixed,
-      }),
+      body: JSON.stringify(isEditing
+        ? { ...payload, sessionId: currentSession.session_id, sessionDate: document.getElementById('assign-date').value }
+        : {
+            ...payload,
+            employeeId: modalEmployeeId,
+            date: modalDate,
+            repeatWeeks,
+            repeatFixed,
+          }),
     });
     if (!res.ok) {
       showModalError(t('err.saveFailed') + (await res.text()));
@@ -134,9 +140,9 @@ document.getElementById('assign-submit').addEventListener('click', async (e) => 
       const data = await res.json().catch(() => null);
       closeModal();
       refreshScheduleViews();
-      if (data?.repeatFixed) {
+      if (!isEditing && data?.repeatFixed) {
         alert(t('alert.assignFixed'));
-      } else if (data?.repeatedWeeks > 1) {
+      } else if (!isEditing && data?.repeatedWeeks > 1) {
         alert(t('alert.assignRepeat', { n: data.repeatedWeeks }));
       }
     }
@@ -144,6 +150,38 @@ document.getElementById('assign-submit').addEventListener('click', async (e) => 
     showModalError(t('err.network') + err.message);
   } finally {
     btn.disabled = false;
+  }
+});
+
+document.getElementById('session-edit').addEventListener('click', openSessionEdit);
+document.getElementById('session-clone').addEventListener('click', openSessionClone);
+document.getElementById('clone-back').addEventListener('click', () => {
+  if (currentSession) openDetailsModal(currentSession.session_id);
+});
+document.getElementById('clone-submit').addEventListener('click', async (e) => {
+  if (!currentSession) return;
+  const dates = [...document.querySelectorAll('#clone-date-options input:checked')].map(input => input.value);
+  if (!dates.length) {
+    showModalError(t('err.cloneDays'));
+    return;
+  }
+  const button = e.currentTarget;
+  button.disabled = true;
+  try {
+    const res = await api('/api/admin/schedule/clone', {
+      method: 'POST',
+      body: JSON.stringify({ sessionId: currentSession.session_id, dates }),
+    });
+    if (!res.ok) {
+      showModalError(t('err.cloneFailed') + (await res.text()));
+    } else {
+      closeModal();
+      refreshScheduleViews();
+    }
+  } catch (err) {
+    showModalError(t('err.network') + err.message);
+  } finally {
+    button.disabled = false;
   }
 });
 

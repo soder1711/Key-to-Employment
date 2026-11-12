@@ -7,9 +7,13 @@ const applyModal = document.getElementById('apply-modal');
 // Drag & drop "apply to all following weeks?" state
 let pendingApply = null;
 
+let editingSession = false;
+
 function openModal(which) {
-  document.getElementById('modal-assign-form').style.display = which === 'assign' ? 'block' : 'none';
+  document.getElementById('modal-assign-form').style.display =
+    which === 'assign' || which === 'edit' ? 'block' : 'none';
   document.getElementById('modal-details').style.display = which === 'details' ? 'block' : 'none';
+  document.getElementById('session-clone-form').style.display = which === 'clone' ? 'block' : 'none';
   document.getElementById('modal-error').style.display = 'none';
   modal.style.display = 'flex';
 }
@@ -17,6 +21,7 @@ function openModal(which) {
 function closeModal() {
   modal.style.display = 'none';
   currentSession = null;
+  editingSession = false;
 }
 
 function showModalError(msg) {
@@ -29,9 +34,19 @@ function showModalError(msg) {
 const newProgramOption = () =>
   `<option value="__new__">＋ ${t('programs.new')}…</option>`;
 
-function populatePrograms() {
+function populatePrograms(currentProgramId = null, currentSession = null) {
   const sel = document.getElementById('assign-program');
-  sel.innerHTML = adminPrograms.map(p =>
+  const programs = [...adminPrograms];
+  if (currentSession && !programs.some(p => p.program_id === currentProgramId)) {
+    programs.push({
+      program_id: currentProgramId,
+      code: currentSession.program_code,
+      name: currentSession.program_name,
+      category: currentSession.category,
+      default_points: currentSession.points,
+    });
+  }
+  sel.innerHTML = programs.map(p =>
     `<option value="${p.program_id}">${escapeHtml(p.code)} — ${escapeHtml(p.name)} ` +
     `(${escapeHtml(p.category)}, ${Number(p.default_points).toFixed(1)} ${t('unit.pts')})</option>`).join('') +
     newProgramOption();
@@ -72,7 +87,7 @@ function refreshAssignDefaults() {
     (document.getElementById('assign-sudden').checked ? 2 : 1);
   const ptsInput = document.getElementById('assign-points');
   ptsInput.value = pts;
-  ptsInput.readOnly = true;
+  ptsInput.readOnly = !editingSession;
 
   updateAssignPeriodHint();
 }
@@ -84,6 +99,13 @@ function resetAssignRepeat() {
 }
 
 function openAssignModal(employeeId, date) {
+  editingSession = false;
+  document.getElementById('assign-date-row').style.display = 'none';
+  document.getElementById('assign-repeat-option').style.display = 'block';
+  document.getElementById('assign-submit').textContent = t('modal.add');
+  document.querySelector('label[for="assign-points"]').textContent = t('modal.points');
+  document.getElementById('assign-points').readOnly = true;
+  document.getElementById('assign-date').value = date;
   planPeriod = null;
   modalEmployeeId = employeeId == null ? null : Number(employeeId); // null = unassigned task
   modalDate = date;
@@ -119,5 +141,45 @@ function openDetailsModal(sessionId) {
     <span class="status-pill ${escapeHtml(s.status)}">${escapeHtml(t('status.' + s.status))}</span>
     ${s.notes ? `<br>${escapeHtml(t('modal.notesPrefix'))}${escapeHtml(s.notes)}` : ''}`;
   openModal('details');
+}
+
+function openSessionEdit() {
+  if (!currentSession) return;
+  editingSession = true;
+  const s = currentSession;
+  document.getElementById('modal-title').textContent = t('modal.editTitle');
+  document.getElementById('assign-context').textContent =
+    `${s.program_name} · ${fmtCellDate(s.session_date)}`;
+  document.getElementById('assign-date-row').style.display = 'block';
+  document.getElementById('assign-repeat-option').style.display = 'none';
+  document.getElementById('assign-date').value = s.session_date;
+  populatePrograms(s.program_id, s);
+  document.getElementById('assign-program').value = String(s.program_id);
+  document.getElementById('assign-start').value = fmtTime(s.start_time) === '—' ? '' : fmtTime(s.start_time);
+  document.getElementById('assign-end').value = fmtTime(s.end_time) === '—' ? '' : fmtTime(s.end_time);
+  document.getElementById('assign-points').value = Number(s.points || 0);
+  document.querySelector('label[for="assign-points"]').textContent = t('modal.pointsEditable');
+  document.getElementById('assign-points').readOnly = false;
+  document.getElementById('assign-sudden').checked = !!s.is_sudden;
+  document.getElementById('assign-notes').value = s.notes || '';
+  document.getElementById('assign-submit').textContent = t('action.saveChanges');
+  updateAssignPeriodHint();
+  openModal('edit');
+}
+
+function openSessionClone() {
+  if (!currentSession) return;
+  const monday = mondayOf(currentSession.session_date);
+  const sourceDate = currentSession.session_date;
+  const options = [];
+  for (let offset = 0; offset < 7; offset++) {
+    const date = shiftISO(monday, offset);
+    if (date === sourceDate) continue;
+    options.push(`<label class="check-row"><input type="checkbox" value="${date}">` +
+      `<span>${escapeHtml(fmtCellDate(date))}</span></label>`);
+  }
+  document.getElementById('modal-title').textContent = t('modal.cloneTitle');
+  document.getElementById('clone-date-options').innerHTML = options.join('');
+  openModal('clone');
 }
 

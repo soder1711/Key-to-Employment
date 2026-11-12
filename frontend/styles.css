@@ -553,6 +553,7 @@ button { font-family: inherit; }
 .modal input[readonly] { background: var(--blue-50); color: var(--blue-700); font-weight: 700; }
 .modal-row { display: flex; gap: 0.7rem; }
 .modal-row > div { flex: 1; }
+.clone-date-options { display: grid; gap: 0.4rem; margin-top: 0.75rem; }
 .check-row { display: flex !important; align-items: center; gap: 0.5rem; font-size: 0.85rem !important; color: var(--ink) !important; }
 .check-row input { width: auto !important; }
 .modal-submit { margin-top: 1.1rem; width: 100%; }

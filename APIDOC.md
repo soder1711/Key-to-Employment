@@ -209,6 +209,29 @@ Response: `{ "success": true, "session": { ... } }`.
 
 `employeeId`, `programId`, and `date` are required. Times are optional. Points must be between `0` and `100`.
 
+### Edit a schedule session
+
+```http
+POST /api/admin/schedule/update
+Content-Type: application/json
+```
+
+Request fields: `sessionId`, `programId`, `sessionDate`, `points`, and `isSudden`; `startTime`, `endTime`, and `notes` are optional. This updates only the selected session and preserves its assignee and status.
+
+Response: `{ "success": true, "session": { ... } }`.
+
+### Clone a session to other weekdays
+
+```http
+POST /api/admin/schedule/clone
+Content-Type: application/json
+```
+
+Request: `{ "sessionId": 42, "dates": ["2026-10-22", "2026-10-23"] }`.
+Dates must be distinct weekdays in the same Monday-Sunday week as the source session, excluding its date. The clone copies the task settings and assignee and starts in `scheduled` status.
+
+Response: `{ "success": true, "clonedCount": 2, "sessions": [ ... ] }`.
+
 ### Change session status
 
 ```http

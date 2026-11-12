@@ -173,6 +173,10 @@
 
       <div id="modal-assign-form">
         <p id="assign-context" class="modal-context"></p>
+        <div id="assign-date-row" style="display:none;">
+          <label for="assign-date" data-i18n="modal.date">Date</label>
+          <input type="date" id="assign-date">
+        </div>
         <label for="assign-program" data-i18n="modal.task">Task</label>
         <select id="assign-program"></select>
         <div class="modal-row">
@@ -189,13 +193,15 @@
         <label for="assign-points" data-i18n="modal.points">Points (calculated automatically)</label>
         <input type="number" id="assign-points" min="0" max="100" step="0.5" readonly>
         <label class="check-row"><input type="checkbox" id="assign-sudden"><span data-i18n="modal.sudden"> Sudden session (doubles the points)</span></label>
-        <label class="check-row"><input type="checkbox" id="assign-repeat"><span data-i18n="modal.repeat"> Repeat every week (same weekday &amp; time)</span></label>
-        <div id="assign-repeat-row" style="display:none;">
-          <label for="assign-repeat-weeks" data-i18n="modal.repeatWeeks">Repeat for (weeks, including this one)</label>
-          <input type="number" id="assign-repeat-weeks" min="1" max="53" step="1" placeholder="empty = fixed schedule">
-          <p class="assign-repeat-note" data-i18n="modal.repeatNote">Type a number of weeks (max 53) — or leave the box empty for a
-            fixed weekly schedule: the task is then created in every subsequent week
-            for one year (53 weeks).</p>
+        <div id="assign-repeat-option">
+          <label class="check-row"><input type="checkbox" id="assign-repeat"><span data-i18n="modal.repeat"> Repeat every week (same weekday &amp; time)</span></label>
+          <div id="assign-repeat-row" style="display:none;">
+            <label for="assign-repeat-weeks" data-i18n="modal.repeatWeeks">Repeat for (weeks, including this one)</label>
+            <input type="number" id="assign-repeat-weeks" min="1" max="53" step="1" placeholder="empty = fixed schedule">
+            <p class="assign-repeat-note" data-i18n="modal.repeatNote">Type a number of weeks (max 53) — or leave the box empty for a
+              fixed weekly schedule: the task is then created in every subsequent week
+              for one year (53 weeks).</p>
+          </div>
         </div>
         <label for="assign-notes" data-i18n="modal.notes">Notes</label>
         <input type="text" id="assign-notes" data-i18n-placeholder="modal.notesPlaceholder" placeholder="optional">
@@ -205,11 +211,22 @@
       <div id="modal-details" style="display:none;">
         <div id="detail-info" class="modal-context"></div>
         <div class="modal-actions">
+          <button id="session-edit" class="btn small" data-i18n="action.edit">Edit</button>
+          <button id="session-clone" class="btn small ghost" data-i18n="action.cloneWeekdays">Clone to weekdays</button>
           <button class="btn small" data-status="completed" data-i18n="action.complete">✓ Complete</button>
           <button class="btn small ghost" data-status="scheduled" data-i18n="action.reopen">↺ Reopen</button>
           <button class="btn small ghost" data-status="cancelled" data-i18n="action.cancel">✕ Cancel</button>
           <button id="session-delete" class="btn small danger" data-i18n="action.deleteDay">Delete this day</button>
           <button id="session-delete-series" class="btn small danger" data-i18n="action.deleteSeries">Delete + following weeks</button>
+        </div>
+      </div>
+
+      <div id="session-clone-form" style="display:none;">
+        <p class="modal-context" data-i18n="clone.chooseDays">Choose other weekdays in this week:</p>
+        <div id="clone-date-options" class="clone-date-options"></div>
+        <div class="modal-actions">
+          <button id="clone-back" class="btn small ghost" data-i18n="action.back">Back</button>
+          <button id="clone-submit" class="btn small" data-i18n="action.clone">Clone</button>
         </div>
       </div>
 
