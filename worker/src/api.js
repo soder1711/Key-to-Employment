@@ -601,6 +601,85 @@ export async function handleAdminCloneSession(env, session, body) {
 }
 
 /**
+ * @api {post} /api/admin/schedule/copy-week Copy a week to the following week
+ * @apiName AdminCopyScheduleWeek
+ * @apiGroup AdminSchedule
+ * @apiHeader {String} Cookie Encrypted admin session cookie.
+ * @apiBody {String} weekStart Monday date in YYYY-MM-DD format.
+ * @apiSuccess {Boolean} success Always true when copied.
+ * @apiSuccess {String} targetWeekStart The following Monday.
+ * @apiSuccess {Number} createdCount Number of sessions created.
+ * @apiSuccess {Number} skippedCount Existing matching sessions not duplicated.
+ * @apiError 400 Invalid Monday date.
+ * @apiError 403 Admin access required.
+ */
+export async function handleAdminCopyScheduleWeek(env, session, body) {
+  const denied = requireAdmin(session);
+  if (denied) return denied;
+
+  const weekStart = body?.weekStart;
+  if (typeof weekStart !== 'string' || !isValidISODate(weekStart) ||
+      weekStartFrom(weekStart) !== weekStart) {
+    return new Response('weekStart must be a valid Monday date', { status: 400 });
+  }
+
+  const targetWeekStart = addDaysISO(weekStart, 7);
+  const [sourceSessions, targetSessions] = await Promise.all([
+    getSessionsBetween(env.DB, weekStart, addDaysISO(weekStart, 6)),
+    getSessionsBetween(env.DB, targetWeekStart, addDaysISO(targetWeekStart, 6)),
+  ]);
+  const eligible = sourceSessions.filter(s => s.status !== 'cancelled');
+  const sessionKey = (s, date) => JSON.stringify([
+    date, s.program_id, s.employee_id, s.start_time?.slice(0, 5) ?? null,
+    s.end_time?.slice(0, 5) ?? null, Number(s.points), !!s.is_sudden, s.notes ?? null,
+  ]);
+  const desired = new Map();
+  for (const source of eligible) {
+    const key = sessionKey(source, addDaysISO(source.session_date, 7));
+    const group = desired.get(key) || { source, count: 0 };
+    group.count++;
+    desired.set(key, group);
+  }
+  const existingCounts = new Map();
+  for (const target of targetSessions) {
+    if (target.status === 'cancelled') continue;
+    const key = sessionKey(target, target.session_date);
+    existingCounts.set(key, (existingCounts.get(key) || 0) + 1);
+  }
+
+  let createdCount = 0;
+  for (const [key, group] of desired) {
+    const needed = Math.max(0, group.count - (existingCounts.get(key) || 0));
+    for (let i = 0; i < needed; i++) {
+      const source = group.source;
+      await createSession(env.DB, {
+        sessionDate: addDaysISO(source.session_date, 7),
+        programId: source.program_id,
+        employeeId: source.employee_id,
+        startTime: source.start_time,
+        endTime: source.end_time,
+        points: source.points,
+        isSudden: !!source.is_sudden,
+        notes: source.notes,
+        createdBy: session.employeeId,
+      });
+      createdCount++;
+    }
+  }
+
+  const skippedCount = eligible.length - createdCount;
+  await logScheduleHistory(
+    env.DB, session.email, 'clone', 'week', null,
+    `Copied schedule week ${weekStart} to ${targetWeekStart}: ` +
+    `${createdCount} created, ${skippedCount} matching sessions skipped`
+  );
+  return Response.json({
+    success: true, sourceWeekStart: weekStart, targetWeekStart,
+    createdCount, skippedCount,
+  });
+}
+
+/**
  * @api {post} /api/admin/schedule/reassign Change the person of a session
  * @apiName AdminReassignSession
  * @apiGroup AdminSchedule

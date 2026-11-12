@@ -37,6 +37,37 @@ document.getElementById('schedule-today').addEventListener('click', () => {
   loadSchedule();
 });
 
+document.getElementById('schedule-copy-next').addEventListener('click', async (e) => {
+  if (!currentUser?.isAdmin || !scheduleWeekStart) return;
+  const targetWeekStart = shiftISO(scheduleWeekStart, 7);
+  if (!confirm(t('confirm.copyWeek', {
+    from: fmtShort(scheduleWeekStart), to: fmtShort(targetWeekStart),
+  }))) return;
+
+  const button = e.currentTarget;
+  button.disabled = true;
+  try {
+    const res = await api('/api/admin/schedule/copy-week', {
+      method: 'POST',
+      body: JSON.stringify({ weekStart: scheduleWeekStart }),
+    });
+    if (!res.ok) {
+      alert(t('err.copyWeekFailed') + (await res.text()));
+      return;
+    }
+    const data = await res.json();
+    scheduleWeekStart = data.targetWeekStart;
+    refreshScheduleViews();
+    alert(t('alert.copyWeek', {
+      count: data.createdCount, skipped: data.skippedCount,
+    }));
+  } catch (err) {
+    alert(t('err.network') + err.message);
+  } finally {
+    button.disabled = false;
+  }
+});
+
 document.getElementById('admin-schedule-grid').addEventListener('click', (e) => {
   const chip = e.target.closest('.slot-chip');
   if (chip) {

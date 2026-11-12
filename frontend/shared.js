@@ -46,6 +46,7 @@ const I18N = {
     'th.date': 'Date / time', 'th.progress': 'Progress / points',
     'schedule.title': 'Schedule',
     'schedule.prev': '← Prev week', 'schedule.today': 'Today', 'schedule.next': 'Next week →',
+    'schedule.copyNext': 'Copy week to next week',
     'schedule.empty': 'No sessions scheduled for you this week.',
     'schedule.adminHint': 'Click an empty cell to assign a session · click a chip to complete, cancel or delete it · Pts = completed points this week.',
     'schedule.loadError': 'Failed to load schedule: {msg}',
@@ -135,11 +136,13 @@ const I18N = {
     'tasks.planError': 'Failed to load Plan assignments ({status}).',
     'err.saveFailed': 'Save failed: ', 'err.network': 'Network error: ',
     'err.cloneDays': 'Choose at least one weekday.', 'err.cloneFailed': 'Clone failed: ',
+    'err.copyWeekFailed': 'Week copy failed: ',
     'err.statusFailed': 'Status update failed', 'err.deleteFailed': 'Delete failed',
     'err.assignFailed': 'Could not assign person: ',
     'err.applyFailed': 'Could not apply to following weeks: ',
     'err.codeName': 'Code and name are required.',
     'err.points': 'Default points must be a number of at least 0.',
+    'confirm.copyWeek': 'Copy the schedule from {from} to {to}? Existing matching sessions will not be duplicated.',
     'confirm.deleteDay': 'Delete this task? The deletion is recorded in history.',
     'confirm.deleteSeries': 'Delete this task AND every later occurrence of this task with the SAME time\n' +
       'on this weekday, from this date onward?\n\n' +
@@ -148,6 +151,7 @@ const I18N = {
       'The deletion is recorded in history.',
     'confirm.programDelete': 'Delete this task? If it has scheduled sessions they are kept and the task ' +
       'is only hidden from the lists; otherwise it is removed from the database.',
+    'alert.copyWeek': 'Copied {count} sessions to next week; {skipped} matching sessions were not duplicated.',
     'alert.deleteCount': 'Deleted {n} sessions from this date onward.',
     'alert.assignRepeat': 'Task added to {n} weeks (same weekday, same time). Browse to later weeks to see it.',
     'alert.assignFixed': 'Fixed schedule added: the task repeats every week for one year (53 weeks). Browse to later weeks to see it.',
@@ -188,6 +192,7 @@ const I18N = {
     'th.date': 'Ngày / giờ', 'th.progress': 'Tiến độ / điểm',
     'schedule.title': 'Lịch',
     'schedule.prev': '← Tuần trước', 'schedule.today': 'Hôm nay', 'schedule.next': 'Tuần sau →',
+    'schedule.copyNext': 'Sao chép tuần sang tuần sau',
     'schedule.empty': 'Không có phiên nào được lên lịch cho bạn trong tuần này.',
     'schedule.adminHint': 'Nhấp vào ô trống để gán phiên · nhấp vào thẻ để hoàn thành, hủy hoặc xóa · Điểm = điểm đã hoàn thành trong tuần.',
     'schedule.loadError': 'Không tải được lịch: {msg}',
@@ -275,11 +280,13 @@ const I18N = {
     'tasks.planError': 'Không tải được phân công Kế hoạch ({status}).',
     'err.saveFailed': 'Lưu thất bại: ', 'err.network': 'Lỗi mạng: ',
     'err.cloneDays': 'Hãy chọn ít nhất một ngày.', 'err.cloneFailed': 'Sao chép thất bại: ',
+    'err.copyWeekFailed': 'Không sao chép được tuần: ',
     'err.statusFailed': 'Cập nhật trạng thái thất bại', 'err.deleteFailed': 'Xóa thất bại',
     'err.assignFailed': 'Không gán được người: ',
     'err.applyFailed': 'Không áp dụng được cho các tuần sau: ',
     'err.codeName': 'Cần nhập mã và tên.',
     'err.points': 'Điểm mặc định phải là số không âm.',
+    'confirm.copyWeek': 'Sao chép lịch từ {from} sang {to}? Các phiên trùng khớp sẽ không bị sao chép thêm.',
     'confirm.deleteDay': 'Xóa nhiệm vụ này? Việc xóa được ghi lại trong lịch sử.',
     'confirm.deleteSeries': 'Xóa nhiệm vụ này VÀ mọi lần xuất hiện sau của cùng nhiệm vụ, CÙNG giờ,\n' +
       'vào ngày trong tuần này, kể từ ngày này?\n\n' +
@@ -287,6 +294,7 @@ const I18N = {
       'Các tuần trước được giữ. Phiên đã hoàn thành được giữ (tính vào điểm). Việc xóa được ghi lại trong lịch sử.',
     'confirm.programDelete': 'Xóa nhiệm vụ này? Nếu đã có phiên lên lịch, các phiên được giữ và nhiệm vụ ' +
       'chỉ bị ẩn khỏi danh sách; nếu chưa có phiên, nhiệm vụ bị xóa khỏi cơ sở dữ liệu.',
+    'alert.copyWeek': 'Đã sao chép {count} phiên sang tuần sau; không sao chép {skipped} phiên trùng khớp.',
     'alert.deleteCount': 'Đã xóa {n} phiên kể từ ngày này.',
     'alert.assignRepeat': 'Nhiệm vụ đã được thêm vào {n} tuần (cùng ngày, cùng giờ). Chuyển đến các tuần sau để xem.',
     'alert.assignFixed': 'Đã tạo lịch cố định: nhiệm vụ lặp lại mỗi tuần trong một năm (53 tuần). Chuyển đến các tuần sau để xem.',

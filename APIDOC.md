@@ -232,6 +232,17 @@ Dates must be distinct weekdays in the same Monday-Sunday week as the source ses
 
 Response: `{ "success": true, "clonedCount": 2, "sessions": [ ... ] }`.
 
+### Copy a weekly schedule to the next week
+
+```http
+POST /api/admin/schedule/copy-week
+Content-Type: application/json
+```
+
+Request: `{ "weekStart": "2026-10-19" }`, where `weekStart` is a Monday. Copies non-cancelled sessions to the corresponding dates one week later, keeps task settings and assignees, and resets copied sessions to `scheduled`. Matching sessions already present next week are not duplicated; no future recurrence is created.
+
+Response: `{ "success": true, "sourceWeekStart": "2026-10-19", "targetWeekStart": "2026-10-26", "createdCount": 5, "skippedCount": 2 }`.
+
 ### Change session status
 
 ```http

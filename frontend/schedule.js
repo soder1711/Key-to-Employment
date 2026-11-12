@@ -83,6 +83,7 @@ function switchView(view) {
 
 function loadSchedule() {
   const isAdmin = currentUser?.isAdmin;
+  document.getElementById('schedule-copy-next').style.display = isAdmin ? 'inline-block' : 'none';
   document.getElementById('admin-schedule-hint').style.display = isAdmin ? 'block' : 'none';
   document.getElementById('admin-schedule-wrap').style.display = isAdmin ? 'block' : 'none';
   document.getElementById('worker-schedule-wrap').style.display = isAdmin ? 'none' : 'block';

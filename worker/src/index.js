@@ -8,7 +8,7 @@ import {
   handleAdminSessionStatus, handleAdminDeleteSession,
   handleAdminMonthlySummary, handleAdminSetTarget,
   handleAdminReassignSession, handleAdminFollowingSessions,
-  handleAdminUpdateSession, handleAdminCloneSession,
+  handleAdminUpdateSession, handleAdminCloneSession, handleAdminCopyScheduleWeek,
   handleAdminListPrograms, handleAdminCreateProgram, handleAdminDeleteProgram,
 } from './api.js';
 
@@ -158,6 +158,10 @@ export default {
       else if (url.pathname === '/api/admin/schedule/clone' && request.method === 'POST') {
         const body = await request.json();
         response = await handleAdminCloneSession(env, currentSession, body);
+      }
+      else if (url.pathname === '/api/admin/schedule/copy-week' && request.method === 'POST') {
+        const body = await request.json();
+        response = await handleAdminCopyScheduleWeek(env, currentSession, body);
       }
       else if (url.pathname === '/api/admin/schedule/following' && request.method === 'GET') {
         response = await handleAdminFollowingSessions(env, currentSession, url);

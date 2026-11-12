@@ -6,7 +6,7 @@
 - [ ] More edit options:
   - [x] Clone for other weekdays
   - [ ] Add/remove multiple people per task
-- [ ] Default clone week task to next week (not yearly repeated write)
+- [x] Default clone week task to next week (not yearly repeated write)
 - [ ] Auto completed task on creation (completion can be unset later on) (?)
 ## Employee
 - [ ] Employee features:
