@@ -1,10 +1,10 @@
 ~~todo: point calc fix, widen UI, review past materials, many per job (?)~~
 ## Refactor
-- [ ] Split frontend into multiple modules
+- [x] Split frontend into multiple modules
 ## Task
-- [ ] Editable individual tasks
+- [x] Editable individual tasks
 - [ ] More edit options:
-  - [ ] Clone for other weekdays
+  - [x] Clone for other weekdays
   - [ ] Add/remove multiple people per task
 - [ ] Default clone week task to next week (not yearly repeated write)
 - [ ] Auto completed task on creation (completion can be unset later on) (?)
