@@ -45,16 +45,21 @@ For local development, initialize a local D1 copy:
 
 ```sh
 wrangler d1 execute task_portal --local --file=../schema/001_init.sql
-wrangler d1 execute task_portal --local --file=../schema/002_seed.sql
 wrangler d1 execute task_portal --local --file=../schema/schedule_schema.sql
-wrangler d1 execute task_portal --local --file=../schema/schedule_seed.sql
+wrangler d1 execute task_portal --local --file=../schema/seeds/002_seed.sql
+wrangler d1 execute task_portal --local --file=../schema/seeds/schedule_seed.sql
 wrangler dev
 ```
 
-For a database that already has the schedule tables, apply
-`schema/003_schedule_unassigned_sessions.sql` once to allow plan tasks to be
-created before assigning a person. Do not use `--remote` unless you intend to
-modify production data.
+`schema/` contains the current canonical schema for new databases; optional
+sample data lives in `schema/seeds/`. The one-time upgrade scripts
+for existing databases live in `migrations/`. Apply only migrations the target
+database still needs, in numeric order, and never rerun a table-rebuild or
+`ALTER TABLE` migration. In particular, apply migration `003` before `005` if
+both are needed. The current canonical schema already includes the changes from
+these migrations, so a fresh database does not need them. Verify the target
+database's existing schema before applying any migration, and do not use
+`--remote` unless you intend to modify production data.
 
 ### Preview the monthly summary without OAuth
 

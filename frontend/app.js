@@ -37,6 +37,36 @@ document.getElementById('schedule-today').addEventListener('click', () => {
   loadSchedule();
 });
 
+async function updateWeeklyTimetable(enabled, button) {
+  if (!currentUser?.isAdmin || !scheduleWeekStart) return;
+  const prompt = enabled ? 'confirm.setWeeklyTemplate' : 'confirm.disableWeeklyTemplate';
+  if (!confirm(t(prompt))) return;
+
+  button.disabled = true;
+  try {
+    const res = await api('/api/admin/schedule/weekly-timetable', {
+      method: 'POST',
+      body: JSON.stringify({ enabled, ...(enabled ? { weekStart: scheduleWeekStart } : {}) }),
+    });
+    if (!res.ok) {
+      alert(t('err.weeklyTemplateFailed') + (await res.text()));
+      return;
+    }
+    const data = await res.json();
+    weeklyTimetableEnabled = data.enabled;
+    refreshScheduleViews();
+  } catch (err) {
+    alert(t('err.network') + err.message);
+  } finally {
+    button.disabled = false;
+  }
+}
+
+document.getElementById('schedule-template-save').addEventListener('click', (e) =>
+  updateWeeklyTimetable(true, e.currentTarget));
+document.getElementById('schedule-template-disable').addEventListener('click', (e) =>
+  updateWeeklyTimetable(false, e.currentTarget));
+
 document.getElementById('schedule-copy-next').addEventListener('click', async (e) => {
   if (!currentUser?.isAdmin || !scheduleWeekStart) return;
   const targetWeekStart = shiftISO(scheduleWeekStart, 7);
@@ -132,15 +162,9 @@ document.getElementById('assign-submit').addEventListener('click', async (e) => 
   const btn = e.target;
   btn.disabled = true;
   try {
-    // Repeat check:
-    //   unchecked             -> repeatWeeks 1 (only this day, old behaviour)
-    //   checked + number      -> that many weeks, capped at 53
-    //   checked + empty box   -> repeatFixed: fixed weekly schedule,
-    //                            backend creates one year (53 weeks)
     const repeatOn = document.getElementById('assign-repeat').checked;
     const weeksRaw = document.getElementById('assign-repeat-weeks').value.trim();
-    const repeatFixed = repeatOn && weeksRaw === '';
-    const repeatWeeks = repeatOn && !repeatFixed
+    const repeatWeeks = repeatOn
       ? Math.min(53, Math.max(1, parseInt(weeksRaw, 10) || 1))
       : 1;
 
@@ -162,7 +186,6 @@ document.getElementById('assign-submit').addEventListener('click', async (e) => 
             employeeId: modalEmployeeId,
             date: modalDate,
             repeatWeeks,
-            repeatFixed,
           }),
     });
     if (!res.ok) {
@@ -171,9 +194,7 @@ document.getElementById('assign-submit').addEventListener('click', async (e) => 
       const data = await res.json().catch(() => null);
       closeModal();
       refreshScheduleViews();
-      if (!isEditing && data?.repeatFixed) {
-        alert(t('alert.assignFixed'));
-      } else if (!isEditing && data?.repeatedWeeks > 1) {
+      if (!isEditing && data?.repeatedWeeks > 1) {
         alert(t('alert.assignRepeat', { n: data.repeatedWeeks }));
       }
     }

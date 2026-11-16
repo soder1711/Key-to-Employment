@@ -3,8 +3,10 @@ import test from 'node:test';
 import {
   handleAdminCloneSession,
   handleAdminCopyScheduleWeek,
+  handleAdminSetWeeklyTimetable,
   handleAdminUpdateSession,
 } from '../src/api.js';
+import { materializeWeeklySchedule } from '../src/db.js';
 
 const admin = { isAdmin: true, employeeId: 99, email: 'admin@example.com' };
 const program = {
@@ -158,6 +160,51 @@ test('weekly copy accepts only Monday week starts', async () => {
   let queryCount = 0;
   const response = await handleAdminCopyScheduleWeek(
     { DB: { prepare() { queryCount++; } } }, admin, { weekStart: '2026-10-20' },
+  );
+
+  assert.equal(response.status, 400);
+  assert.equal(queryCount, 0);
+});
+
+test('weekly materialization attempts each requested date with idempotent occurrence keys', async () => {
+  const inserts = [];
+  const db = {
+    prepare(sql) {
+      return {
+        all: async () => ({ results: [{ template_id: 2 }] }),
+        bind(...values) {
+          return { run: async () => { inserts.push({ sql, values }); } };
+        },
+      };
+    },
+  };
+  await materializeWeeklySchedule(db, '2026-11-09', '2026-11-15');
+
+  assert.equal(inserts.length, 7);
+  assert.deepEqual(inserts.map(row => row.values[0]), [
+    '2026-11-09', '2026-11-10', '2026-11-11', '2026-11-12',
+    '2026-11-13', '2026-11-14', '2026-11-15',
+  ]);
+  assert.deepEqual(inserts.map(row => row.values[2]), [1, 2, 3, 4, 5, 6, 0]);
+  assert.ok(inserts.every(row => row.sql.includes('ON CONFLICT(template_id, template_date) DO NOTHING')));
+});
+
+test('weekly timetable changes remain admin-only', async () => {
+  let queryCount = 0;
+  const response = await handleAdminSetWeeklyTimetable(
+    { DB: { prepare() { queryCount++; } } },
+    { ...admin, isAdmin: false }, { enabled: false },
+  );
+
+  assert.equal(response.status, 403);
+  assert.equal(queryCount, 0);
+});
+
+test('weekly timetable save validates its Monday before touching the database', async () => {
+  let queryCount = 0;
+  const response = await handleAdminSetWeeklyTimetable(
+    { DB: { prepare() { queryCount++; } } }, admin,
+    { enabled: true, weekStart: '2026-11-10' },
   );
 
   assert.equal(response.status, 400);

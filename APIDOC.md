@@ -112,7 +112,7 @@ The assignment is updated only when it belongs to the authenticated employee. In
 GET /api/schedule?start=2026-10-19
 ```
 
-`start` is optional. The Worker normalizes it to the Monday of the requested week. `year` and `month` are optional and control the monthly progress summary.
+`start` is optional. The Worker normalizes it to the Monday of the requested week. If an admin weekly timetable is active, missing occurrences are materialized for the requested week before it is returned. `year` and `month` are optional and control the monthly progress summary.
 
 Response:
 
@@ -179,9 +179,33 @@ Response:
   "dates": ["2026-10-19", "...", "2026-10-25"],
   "sessions": [/* all schedule sessions */],
   "employees": [/* active employees */],
-  "programs": [/* available programs */]
+  "programs": [/* available programs */],
+  "weeklyTimetableEnabled": true
 }
 ```
+
+On read, the Worker creates only missing occurrences for this requested week. Existing occurrences are not overwritten, and no Cron Trigger is required.
+
+### Save or disable the weekly timetable
+
+```http
+POST /api/admin/schedule/weekly-timetable
+Content-Type: application/json
+```
+
+To use the selected week's non-cancelled sessions as the recurring timetable:
+
+```json
+{ "enabled": true, "weekStart": "2026-10-19" }
+```
+
+To stop future generation while keeping already-created sessions:
+
+```json
+{ "enabled": false }
+```
+
+Saving replaces the active template entries with a snapshot of that week. Future requested weeks are filled lazily; previously generated or manually edited sessions remain unchanged.
 
 ### Assign a schedule session
 
@@ -207,7 +231,7 @@ Request:
 
 Response: `{ "success": true, "session": { ... } }`.
 
-`employeeId`, `programId`, and `date` are required. Times are optional. Points must be between `0` and `100`.
+`employeeId`, `programId`, and `date` are required. Times are optional. Points must be between `0` and `100`. `repeatWeeks` optionally creates a finite series on the same weekday (maximum 53 weeks); omit it or use `1` for only this date. Ongoing weekly repetition uses the weekly timetable below.
 
 ### Edit a schedule session
 

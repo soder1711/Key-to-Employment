@@ -192,9 +192,13 @@ export async function createProgram(db, p) {
 
 // Soft delete: hides the task from pickers but keeps existing sessions intact
 export async function deactivateProgram(db, programId) {
-  return await db.prepare(
+  const result = await db.prepare(
     `UPDATE programs SET is_active = 0 WHERE program_id = ?`
   ).bind(programId).run();
+  await db.prepare(
+    `UPDATE weekly_schedule_templates SET is_active = 0 WHERE program_id = ?`
+  ).bind(programId).run();
+  return result;
 }
 
 // Hard delete: only used when no session references the task
@@ -204,10 +208,12 @@ export async function hardDeleteProgram(db, programId) {
   ).bind(programId).run();
 }
 
-export async function countProgramSessions(db, programId) {
+export async function countProgramReferences(db, programId) {
   const row = await db.prepare(
-    `SELECT COUNT(*) AS n FROM schedule_sessions WHERE program_id = ?`
-  ).bind(programId).first();
+    `SELECT
+       (SELECT COUNT(*) FROM schedule_sessions WHERE program_id = ?) +
+       (SELECT COUNT(*) FROM weekly_schedule_templates WHERE program_id = ?) AS n`
+  ).bind(programId, programId).first();
   return row?.n ?? 0;
 }
 
@@ -223,7 +229,7 @@ export async function getActiveEmployees(db) {
 // program_id is selected so series matching can key off it.
 const SESSION_SELECT = `
   SELECT s.session_id, s.program_id, s.session_date, s.start_time, s.end_time, s.status,
-         s.points, s.is_sudden, s.notes, s.employee_id,
+         s.points, s.is_sudden, s.notes, s.employee_id, s.template_id, s.template_date,
          p.code AS program_code, p.name AS program_name, p.category,
          e.first_name, e.last_name, e.email AS employee_email
   FROM schedule_sessions s
@@ -246,6 +252,122 @@ export async function getSessionById(db, sessionId) {
   return await db.prepare(
     SESSION_SELECT + ` WHERE s.session_id = ? LIMIT 1`
   ).bind(sessionId).first();
+}
+
+export async function getActiveWeeklyScheduleTemplates(db) {
+  const { results } = await db.prepare(
+    `SELECT template_id, weekday, program_id, employee_id, start_time, end_time,
+            points, is_sudden, notes, created_by
+     FROM weekly_schedule_templates
+     WHERE is_active = 1
+     ORDER BY weekday, start_time, template_id`
+  ).all();
+  return results;
+}
+
+export async function materializeWeeklySchedule(db, startDate, endDate) {
+  const templates = await getActiveWeeklyScheduleTemplates(db);
+  if (!templates.length) return;
+
+  const statement = `
+    INSERT INTO schedule_sessions
+      (session_date, program_id, employee_id, start_time, end_time, status,
+       points, is_sudden, notes, created_by, template_id, template_date)
+    SELECT ?, t.program_id, t.employee_id, t.start_time, t.end_time, 'scheduled',
+           t.points, t.is_sudden, t.notes, t.created_by, t.template_id, ?
+    FROM weekly_schedule_templates t
+    WHERE t.is_active = 1
+      AND t.weekday = ?
+      AND NOT EXISTS (
+        SELECT 1 FROM schedule_sessions s
+        WHERE s.template_id = t.template_id AND s.template_date = ?
+      )
+      AND NOT EXISTS (
+        SELECT 1 FROM weekly_schedule_exceptions x
+        WHERE x.template_id = t.template_id AND x.session_date = ?
+      )
+      AND NOT EXISTS (
+        SELECT 1 FROM schedule_sessions s
+        WHERE s.session_date = ?
+          AND s.program_id = t.program_id
+          AND s.employee_id IS t.employee_id
+          AND IFNULL(substr(s.start_time, 1, 5), '') = IFNULL(substr(t.start_time, 1, 5), '')
+          AND IFNULL(substr(s.end_time, 1, 5), '') = IFNULL(substr(t.end_time, 1, 5), '')
+      )
+    ON CONFLICT(template_id, template_date) DO NOTHING`;
+
+  for (let date = startDate; date <= endDate; date = shiftISODate(date, 1)) {
+    const weekday = new Date(`${date}T00:00:00Z`).getUTCDay();
+    await db.prepare(statement).bind(date, date, weekday, date, date, date).run();
+  }
+}
+
+export async function saveWeeklyScheduleFromWeek(db, startDate, endDate, createdBy) {
+  const [scheduled, activePrograms] = await Promise.all([
+    getSessionsBetween(db, startDate, endDate),
+    db.prepare('SELECT program_id FROM programs WHERE is_active = 1').all(),
+  ]);
+  const activeProgramIds = new Set(activePrograms.results.map(row => row.program_id));
+  const sessions = scheduled.filter(session =>
+    session.status !== 'cancelled' && activeProgramIds.has(session.program_id));
+  await db.prepare(
+    `UPDATE weekly_schedule_templates SET is_active = 0 WHERE is_active = 1`
+  ).run();
+
+  let templateCount = 0;
+  for (const session of sessions) {
+    const weekday = new Date(`${session.session_date}T00:00:00Z`).getUTCDay();
+    const values = [weekday, session.program_id, session.employee_id,
+      session.start_time, session.end_time, session.points, session.is_sudden ? 1 : 0,
+      session.notes, createdBy];
+    let templateId = session.template_id;
+    if (templateId != null) {
+      const result = await db.prepare(
+        `UPDATE weekly_schedule_templates
+         SET weekday = ?, program_id = ?, employee_id = ?, start_time = ?, end_time = ?,
+             points = ?, is_sudden = ?, notes = ?, is_active = 1
+         WHERE template_id = ?`
+      ).bind(...values.slice(0, 8), templateId).run();
+      if (!result.meta?.changes) templateId = null;
+    }
+    if (templateId == null) {
+      const result = await db.prepare(
+        `INSERT INTO weekly_schedule_templates
+           (weekday, program_id, employee_id, start_time, end_time, points,
+            is_sudden, notes, created_by, is_active)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`
+      ).bind(...values).run();
+      templateId = result.meta.last_row_id;
+    }
+    if (session.template_id == null && templateId != null) {
+      await db.prepare(
+        `UPDATE schedule_sessions SET template_id = ?, template_date = ?
+         WHERE session_id = ? AND template_id IS NULL`
+      ).bind(templateId, session.session_date, session.session_id).run();
+    }
+    templateCount++;
+  }
+  return templateCount;
+}
+
+export async function disableWeeklySchedule(db) {
+  return await db.prepare(
+    `UPDATE weekly_schedule_templates SET is_active = 0 WHERE is_active = 1`
+  ).run();
+}
+
+export async function recordWeeklyScheduleException(db, templateId, sessionDate, createdBy) {
+  return await db.prepare(
+    `INSERT OR IGNORE INTO weekly_schedule_exceptions
+       (template_id, session_date, created_by)
+     VALUES (?, ?, ?)`
+  ).bind(templateId, sessionDate, createdBy || null).run();
+}
+
+function shiftISODate(iso, days) {
+  const date = new Date(`${iso}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
 }
 
 export async function createSession(db, s) {
@@ -281,7 +403,7 @@ export async function updateSession(db, sessionId, s) {
 // (points/history), except the session that started the deletion itself.
 export async function findSeriesSessionsFrom(db, source) {
   const { results } = await db.prepare(`
-    SELECT s.session_id, s.session_date
+    SELECT s.session_id, s.session_date, s.template_id, s.template_date
     FROM schedule_sessions s
     WHERE s.program_id = ?
       AND strftime('%w', s.session_date) = strftime('%w', ?)

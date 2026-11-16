@@ -2,6 +2,7 @@
 
 let scheduleWeekStart = null;
 let scheduleLoaded = false;
+let weeklyTimetableEnabled = false;
 let schedMode = 'week';
 let monthCursor = { year: new Date().getUTCFullYear(), month: new Date().getUTCMonth() + 1 };
 let monthlySummaryLoaded = false;
@@ -84,6 +85,9 @@ function switchView(view) {
 function loadSchedule() {
   const isAdmin = currentUser?.isAdmin;
   document.getElementById('schedule-copy-next').style.display = isAdmin ? 'inline-block' : 'none';
+  document.getElementById('schedule-template-save').style.display = isAdmin ? 'inline-block' : 'none';
+  document.getElementById('schedule-template-disable').style.display =
+    isAdmin && weeklyTimetableEnabled ? 'inline-block' : 'none';
   document.getElementById('admin-schedule-hint').style.display = isAdmin ? 'block' : 'none';
   document.getElementById('admin-schedule-wrap').style.display = isAdmin ? 'block' : 'none';
   document.getElementById('worker-schedule-wrap').style.display = isAdmin ? 'none' : 'block';
@@ -188,6 +192,9 @@ async function loadAdminSchedule() {
     if (!res.ok) throw new Error(`Request failed (${res.status})`);
     const data = await res.json();
     scheduleWeekStart = data.weekStart;
+    weeklyTimetableEnabled = !!data.weeklyTimetableEnabled;
+    document.getElementById('schedule-template-disable').style.display =
+      weeklyTimetableEnabled ? 'inline-block' : 'none';
     adminPrograms = data.programs;
     adminEmployees = data.employees;
     sessionById = new Map(data.sessions.map(s => [s.session_id, s]));

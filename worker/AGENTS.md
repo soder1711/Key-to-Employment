@@ -24,7 +24,7 @@ Public routes are `/auth/google`, `/auth/google/callback`, and `/auth/logout`. O
 
 ## Database conventions
 
-- Cloudflare D1 uses SQLite syntax. The canonical schema is `/Users/quynh/Key-to-Employment/schema/001_init.sql`; seed data is in `schema/002_seed.sql`.
+- Cloudflare D1 uses SQLite syntax. The canonical schema is in `schema/` (`001_init.sql` and `schedule_schema.sql`); optional sample data is in `schema/seeds/`, and one-time upgrades for existing databases are in `migrations/`.
 - Use `?` placeholders and `.bind(...)` for every user-controlled value. Never concatenate request data into SQL.
 - Update the canonical schema files for schema changes, and consider whether existing remote databases need a safe migration rather than rerunning initialization SQL.
 - Keep foreign keys, status constraints, and indexes consistent with the existing schema.

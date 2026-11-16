@@ -9,6 +9,7 @@ import {
   handleAdminMonthlySummary, handleAdminSetTarget,
   handleAdminReassignSession, handleAdminFollowingSessions,
   handleAdminUpdateSession, handleAdminCloneSession, handleAdminCopyScheduleWeek,
+  handleAdminSetWeeklyTimetable,
   handleAdminListPrograms, handleAdminCreateProgram, handleAdminDeleteProgram,
 } from './api.js';
 
@@ -162,6 +163,10 @@ export default {
       else if (url.pathname === '/api/admin/schedule/copy-week' && request.method === 'POST') {
         const body = await request.json();
         response = await handleAdminCopyScheduleWeek(env, currentSession, body);
+      }
+      else if (url.pathname === '/api/admin/schedule/weekly-timetable' && request.method === 'POST') {
+        const body = await request.json();
+        response = await handleAdminSetWeeklyTimetable(env, currentSession, body);
       }
       else if (url.pathname === '/api/admin/schedule/following' && request.method === 'GET') {
         response = await handleAdminFollowingSessions(env, currentSession, url);

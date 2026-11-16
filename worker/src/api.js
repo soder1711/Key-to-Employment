@@ -4,10 +4,13 @@ import {
   weekStartFrom, weekDates, getPrograms, getActiveEmployees,
   getSessionsBetween, getSessionById, createSession, updateSession, setSessionStatus,
   deleteSession, logScheduleHistory, getMonthlySummary, setMonthlyTarget, clearMonthlyTarget,
+  getActiveWeeklyScheduleTemplates, materializeWeeklySchedule, saveWeeklyScheduleFromWeek,
+  disableWeeklySchedule, recordWeeklyScheduleException,
   reassignSession, getAllPrograms, getProgramById, getProgramByCode,
-  createProgram, deactivateProgram, hardDeleteProgram, countProgramSessions,
+  createProgram, deactivateProgram, hardDeleteProgram, countProgramReferences,
   findSeriesSessionsFrom, findFollowingSeries,
 } from './db.js';
+import { monthlyDateRange } from './monthly-summary.js';
 
 /**
  * @api {get} /api/me/tasks List my tasks
@@ -213,7 +216,7 @@ export async function handleAdminDeleteProgram(env, session, body) {
     return new Response('Task type not found', { status: 404 });
   }
 
-  if (await countProgramSessions(env.DB, programId)) {
+  if (await countProgramReferences(env.DB, programId)) {
     await deactivateProgram(env.DB, programId);
   } else {
     await hardDeleteProgram(env.DB, programId);
@@ -265,10 +268,8 @@ function isValidISODate(value) {
   return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value;
 }
 
-// Repeat caps: one year of weekly repeats, max.
+// Finite repeats are capped at one year; ongoing repetition uses the weekly timetable.
 const MAX_REPEAT_WEEKS = 53;
-// Empty weeks box in the UI = fixed weekly schedule -> materialized for one year.
-const FIXED_REPEAT_WEEKS = 53;
 
 function addDaysISO(iso, days) {
   const d = new Date(iso + 'T00:00:00Z');
@@ -292,6 +293,7 @@ function addDaysISO(iso, days) {
 export async function handleGetMySchedule(env, session, url) {
   const start = weekStartFrom(url.searchParams.get('start'));
   const dates = weekDates(start);
+  await materializeWeeklySchedule(env.DB, dates[0], dates[6]);
   const sessions = await getSessionsBetween(env.DB, dates[0], dates[6], session.employeeId);
 
   // Explicit ?year=&month= wins; otherwise use the month of the week's Thursday
@@ -303,6 +305,8 @@ export async function handleGetMySchedule(env, session, url) {
     year = mid.getUTCFullYear();
     month = mid.getUTCMonth() + 1;
   }
+  const monthRange = monthlyDateRange(year, month);
+  await materializeWeeklySchedule(env.DB, monthRange.start, monthRange.end);
   const rows = await getMonthlySummary(env.DB, year, month, session.employeeId);
 
   return Response.json({
@@ -333,12 +337,68 @@ export async function handleAdminGetSchedule(env, session, url) {
 
   const start = weekStartFrom(url.searchParams.get('start'));
   const dates = weekDates(start);
-  const [sessions, employees, programs] = await Promise.all([
+  await materializeWeeklySchedule(env.DB, dates[0], dates[6]);
+  const [sessions, employees, programs, templates] = await Promise.all([
     getSessionsBetween(env.DB, dates[0], dates[6]),
     getActiveEmployees(env.DB),
     getPrograms(env.DB),
+    getActiveWeeklyScheduleTemplates(env.DB),
   ]);
-  return Response.json({ weekStart: start, dates, sessions, employees, programs });
+  return Response.json({
+    weekStart: start, dates, sessions, employees, programs,
+    weeklyTimetableEnabled: templates.length > 0,
+  });
+}
+
+/**
+ * @api {post} /api/admin/schedule/weekly-timetable Save or disable the weekly timetable
+ * @apiName AdminSetWeeklyTimetable
+ * @apiGroup AdminSchedule
+ * @apiHeader {String} Cookie Encrypted admin session cookie.
+ * @apiBody {Boolean} enabled Whether weekly timetable generation is enabled.
+ * @apiBody {String} [weekStart] Monday date whose sessions become the timetable.
+ *   Required when enabled is true.
+ * @apiSuccess {Boolean} enabled Whether an active timetable remains.
+ * @apiSuccess {Number} templateCount Number of active weekly entries.
+ * @apiError 400 Invalid request.
+ * @apiError 403 Admin access required.
+ */
+export async function handleAdminSetWeeklyTimetable(env, session, body) {
+  const denied = requireAdmin(session);
+  if (denied) return denied;
+  if (typeof body?.enabled !== 'boolean') {
+    return new Response('enabled must be a boolean', { status: 400 });
+  }
+
+  let templateCount = 0;
+  if (body.enabled) {
+    const weekStart = body.weekStart;
+    if (typeof weekStart !== 'string' || !isValidISODate(weekStart) ||
+        weekStartFrom(weekStart) !== weekStart) {
+      return new Response('weekStart must be a valid Monday date', { status: 400 });
+    }
+    const dates = weekDates(weekStart);
+    await materializeWeeklySchedule(env.DB, dates[0], dates[6]);
+    templateCount = await saveWeeklyScheduleFromWeek(
+      env.DB, dates[0], dates[6], session.employeeId
+    );
+    const active = await getActiveWeeklyScheduleTemplates(env.DB);
+    templateCount = active.length;
+    await logScheduleHistory(
+      env.DB, session.email, 'template', 'week', null,
+      `Saved weekly timetable from ${weekStart} with ${templateCount} task(s)`
+    );
+  } else {
+    await disableWeeklySchedule(env.DB);
+    await logScheduleHistory(
+      env.DB, session.email, 'template', 'week', null,
+      'Disabled automatic weekly timetable generation; existing sessions were kept'
+    );
+  }
+
+  return Response.json({
+    success: true, enabled: templateCount > 0, templateCount,
+  });
 }
 
 /**
@@ -384,14 +444,11 @@ export async function handleAdminFollowingSessions(env, session, url) {
  * @apiBody {Number} [points] Credited points; calculated from the program when omitted.
  * @apiBody {Boolean} [isSudden=false] Whether this is a sudden session (doubles points).
  * @apiBody {Number} [repeatWeeks=1] Also create the same session on this weekday
- *   for the next N-1 weeks. 1 = only this week; capped at 53 (one year).
- * @apiBody {Boolean} [repeatFixed=false] Empty weeks box in the UI: fixed weekly
- *   schedule — same as repeatWeeks = 53 (one year), regardless of repeatWeeks.
+ *   for the next N-1 weeks. 1 = only this week; capped at 53.
  * @apiBody {String} [notes] Optional notes.
  * @apiSuccess {Boolean} success Always true when created.
  * @apiSuccess {Object} session The first created session.
  * @apiSuccess {Number} repeatedWeeks How many weeks the session was created for.
- * @apiSuccess {Boolean} repeatFixed Whether it was created as a fixed schedule.
  * @apiError 400 Invalid assignment payload.
  * @apiError 403 Admin access required.
  */
@@ -402,7 +459,7 @@ export async function handleAdminAssignSession(env, session, body) {
   const {
     employeeId: requestedEmployeeId,
     date, programId, startTime, endTime, points, isSudden, notes,
-    repeatWeeks, repeatFixed,
+    repeatWeeks,
   } = body;
   const employeeId = requestedEmployeeId == null || requestedEmployeeId === ''
     ? null
@@ -428,19 +485,9 @@ export async function handleAdminAssignSession(env, session, body) {
   if (startTime && !TIME_RE.test(startTime)) return new Response('Invalid start time', { status: 400 });
   if (endTime && !TIME_RE.test(endTime)) return new Response('Invalid end time', { status: 400 });
 
-  // Repeat check:
-  //   repeatWeeks = 1        -> only this week (default, old behaviour)
-  //   repeatWeeks = N (>1)   -> same weekday/time for N weeks, capped at 53
-  //   repeatFixed = true      -> empty weeks box: fixed weekly schedule,
-  //                              materialized for one year (FIXED_REPEAT_WEEKS)
-  let repeat = 1;
-  if (repeatFixed === true) {
-    repeat = FIXED_REPEAT_WEEKS;
-  } else {
-    repeat = Number(repeatWeeks);
-    if (!Number.isInteger(repeat) || repeat < 1) repeat = 1;
-    if (repeat > MAX_REPEAT_WEEKS) repeat = MAX_REPEAT_WEEKS;
-  }
+  let repeat = Number(repeatWeeks);
+  if (!Number.isInteger(repeat) || repeat < 1) repeat = 1;
+  if (repeat > MAX_REPEAT_WEEKS) repeat = MAX_REPEAT_WEEKS;
 
   // Automatic point calculation: derive from the program default when not provided
   let pts = Number(points);
@@ -484,7 +531,6 @@ export async function handleAdminAssignSession(env, session, body) {
     success: true,
     session: created,
     repeatedWeeks: repeat,
-    repeatFixed: repeatFixed === true,
   });
 }
 
@@ -836,6 +882,11 @@ export async function handleAdminDeleteSession(env, session, body) {
     // (points/history), except the session that started the deletion.
     const following = await findSeriesSessionsFrom(env.DB, before);
     for (const row of following) {
+      if (row.template_id != null && row.template_date) {
+        await recordWeeklyScheduleException(
+          env.DB, row.template_id, row.template_date, session.employeeId
+        );
+      }
       await deleteSession(env.DB, row.session_id);
     }
     await logScheduleHistory(
@@ -852,6 +903,11 @@ export async function handleAdminDeleteSession(env, session, body) {
     });
   }
 
+  if (before.template_id != null && before.template_date) {
+    await recordWeeklyScheduleException(
+      env.DB, before.template_id, before.template_date, session.employeeId
+    );
+  }
   await deleteSession(env.DB, sessionId);
   await logScheduleHistory(
     env.DB, session.email, 'delete', 'session', sessionId,
@@ -886,6 +942,8 @@ export async function handleAdminMonthlySummary(env, session, url) {
   if (!Number.isInteger(year) || year < 1 || year > 9999 || month < 1 || month > 12) {
     return new Response('Invalid year or month', { status: 400 });
   }
+  const monthRange = monthlyDateRange(year, month);
+  await materializeWeeklySchedule(env.DB, monthRange.start, monthRange.end);
   const rows = await getMonthlySummary(env.DB, year, month);
   return Response.json({ year, month, rows });
 }

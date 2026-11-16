@@ -94,7 +94,7 @@ function refreshAssignDefaults() {
 
 function resetAssignRepeat() {
   document.getElementById('assign-repeat').checked = false;
-  document.getElementById('assign-repeat-weeks').value = ''; // empty = fixed schedule
+  document.getElementById('assign-repeat-weeks').value = '';
   document.getElementById('assign-repeat-row').style.display = 'none';
 }
 
