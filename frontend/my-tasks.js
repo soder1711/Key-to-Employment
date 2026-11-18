@@ -62,7 +62,8 @@ async function loadMyTasks() {
     empty.style.display = 'none';
     tbody.innerHTML = rows.join('');
   }
-  document.getElementById('my-tasks-section').style.display = 'block';
+  document.getElementById('my-tasks-section').style.display =
+    document.getElementById('nav-tasks').classList.contains('active') ? 'block' : 'none';
 }
 
 // ================= Sign-in / bootstrap =================

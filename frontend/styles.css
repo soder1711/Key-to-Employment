@@ -97,6 +97,7 @@ button { font-family: inherit; }
 }
 
 .container { max-width: 960px; margin: 0 auto; padding: 1.5rem 1rem 3rem; }
+.container.schedule-workspace { max-width: 1440px; }
 
 .card {
   background: var(--card);
@@ -333,12 +334,21 @@ button { font-family: inherit; }
 .mini-tag { display: inline-block; padding: 1px 6px; border-radius: 999px; font-size: 0.66rem; font-weight: 700; }
 .mini-tag.sudden { background: #fef3c7; color: #b45309; }
 .mini-tag.weekly-tag { background: #ede9fe; color: #5b21b6; border: 1px solid #c4b5fd; }
-.timetable-editor { margin: 0.75rem 0 1rem; padding: 1rem; border: 1px solid var(--line); border-radius: 10px; background: #f8fafc; }
-.timetable-entry-list { display: grid; gap: 0.5rem; margin-bottom: 1rem; }
-.timetable-entry { display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; padding: 0.6rem; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
-.timetable-actions { display: flex; flex-wrap: wrap; gap: 0.35rem; }
-.timetable-editor form { display: grid; gap: 0.55rem; }
-.timetable-editor textarea { width: 100%; }
+.schedule-mode-switch { gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap; }
+.schedule-tools { margin: 0.75rem 0; }
+.schedule-tools summary { cursor: pointer; color: var(--muted); margin-bottom: 0.5rem; }
+.change-dialog { border: 1px solid var(--line); max-height: 90vh; overflow-y: auto; }
+.change-dialog::backdrop { background: rgba(15, 23, 42, 0.5); }
+.change-dialog .modal-context { white-space: pre-line; }
+.change-dialog:not([open]) { display: none; }
+@media (max-width: 640px) {
+  #assign-rule-fields .modal-row { flex-direction: column; }
+}
+.modal input[type="date"] {
+  width: 100%; min-width: 0; padding: 0.45rem 0.55rem; border: 1px solid var(--line);
+  border-radius: 8px; font: inherit; font-size: 0.9rem;
+}
+#assign-rule-fields .modal-row > div { min-width: 0; }
 .slot-chip.recurring { border: 1px solid rgba(255,255,255,0.75); }
 
 /* ---------- Totals & monthly progress ---------- */
@@ -386,6 +396,8 @@ button { font-family: inherit; }
   border-radius: 6px; font-size: 0.72rem; font-weight: 700;
   cursor: pointer; background: var(--blue-600); color: #fff;
 }
+.slot-chip.timetable-chip { display: flex; flex-direction: column; align-items: flex-start; gap: 0.2rem; text-align: left; white-space: normal; font: inherit; font-size: 0.72rem; width: calc(100% - 4px); }
+.timetable-chip small { font-weight: 400; }
 .slot-chip.completed { background: #16a34a; }
 .slot-chip.cancelled { background: #94a3b8; text-decoration: line-through; }
 .slot-chip.sudden { outline: 2px dashed #b45309; outline-offset: -2px; }

@@ -45,12 +45,23 @@ const I18N = {
     'th.task': 'Task', 'th.priority': 'Priority / category', 'th.status': 'Status',
     'th.date': 'Date / time', 'th.progress': 'Progress / points',
     'schedule.title': 'Schedule',
+    'schedule.view': 'Schedule view', 'schedule.dated': 'Dated schedule', 'schedule.timetable': 'Weekly timetable',
+    'schedule.tools': 'Import and copy tools', 'schedule.seriesTools': 'Series management',
+    'schedule.ruleDates': '{start} to {end}', 'schedule.noEnd': 'no end date',
+    'schedule.effectiveFrom': 'Latest settings from {date}', 'schedule.upcomingFrom': 'Upcoming settings from {date}',
+    'schedule.confirmChange': 'Confirm change',
+    'schedule.futureImpact': 'From {date}, this weekly rule changes. Past and completed sessions stay unchanged. Existing future exceptions will {policy}.',
+    'schedule.occurrenceImpact': 'Only {date} is affected. The weekly rule and other occurrences stay unchanged.',
+    'schedule.endImpact': 'Occurrences on or after the selected date will stop. Earlier settings and completed sessions stay unchanged.',
+    'schedule.stopAllSummary': 'Stop ALL recurring entries. One-off sessions are not affected.',
     'schedule.prev': '← Prev week', 'schedule.today': 'Today', 'schedule.next': 'Next week →',
     'schedule.copyNext': 'Copy week to next week',
     'schedule.templateSave': 'Import this week into timetable',
     'schedule.templateDisable': 'Stop weekly timetable',
     'schedule.timetableEdit': 'Edit weekly timetable',
-    'schedule.timetableHint': 'Recurring entries are projected into schedules and summaries without creating session rows. Sessions store actual completion and occurrence notes.',
+    'schedule.timetableHint': 'Set the normal repeating week using the same people-by-day grid. Click a cell to add a recurring rule, or a task to edit it. Chips show the latest settings, including upcoming changes; planned totals combine those rules, not a specific dated week. Use Dated schedule for actual occurrences and completion.',
+    'schedule.ruleContext': 'Recurring rule: repeats on the selected weekday within its date range. Completion and actual notes belong to dated occurrences.',
+    'schedule.invalidRange': 'End date must be on or after the start date.',
     'schedule.timetableEmpty': 'No recurring entries yet.',
     'schedule.weekly': 'Weekly', 'schedule.weeklyModified': 'Weekly - Modified',
     'schedule.day': 'Weekday', 'schedule.assignee': 'Assigned person',
@@ -73,18 +84,18 @@ const I18N = {
     'schedule.importConfirm': 'Import non-recurring sessions from {date} into the weekly timetable? Existing recurring entries are kept.',
     'schedule.stopConfirm': 'Stop all recurring entries from {date} onward? Earlier settings and completed sessions remain unchanged.',
     'schedule.empty': 'No sessions scheduled for you this week.',
-    'schedule.adminHint': 'Click an empty cell to assign a session · click a chip to edit or update it. Save a week as the weekly timetable to generate future weeks when viewed; disable it anytime. Pts = completed points this week.',
+    'schedule.adminHint': 'Click an empty cell to add a one-off session; click a task to record completion or change its schedule. Use Weekly timetable for recurring work. Earned points count completed sessions only.',
     'schedule.loadError': 'Failed to load schedule: {msg}',
     'sth.date': 'Date', 'sth.program': 'Program', 'sth.category': 'Category',
     'sth.time': 'Time', 'sth.points': 'Points', 'sth.status': 'Status',
-    'grid.employee': 'Employee', 'grid.pts': 'Pts',
+    'grid.employee': 'Employee', 'grid.pts': 'Earned points',
     'plan.title': 'Weekly plan', 'plan.adminTag': 'admin', 'plan.manage': 'Manage tasks',
-    'plan.hint': 'Drag a person from the top onto a task to assign them. A recurring entry updates this and future occurrences from the displayed date after confirmation; a one-off session changes only that session. Earlier and completed sessions stay unchanged. Click a task for options. One day is shown at a time — use the arrows (or ← → keys) to browse. Use “Edit weekly timetable” to manage recurring entries.',
+    'plan.hint': 'Drag a person onto a task to assign them. For recurring work, choose only this occurrence or this and future occurrences in the change dialog. One-off sessions change only that session. Use Schedule → Weekly timetable to manage recurring rules. Browse days with the arrows (or ← → keys).',
     'plan.prev': '← Previous day', 'plan.today': 'Today', 'plan.next': 'Next day →',
     'plan.people': 'People',
     'plan.morning': 'Morning', 'plan.afternoon': 'Afternoon and evening',
     'plan.dropHere': 'Drop person here', 'plan.noTasks': 'No tasks yet',
-    'plan.addBtn': '+ Add task…', 'plan.pointsTotal': 'Points total',
+    'plan.addBtn': '+ Add one-off session…', 'plan.pointsTotal': 'Planned points',
     'plan.emptyPeople': 'No active employees.', 'plan.unassignedRow': 'Unassigned',
     'plan.loadError': 'Failed to load plan: {msg}',
     'plan.loadErrorStatus': 'Failed to load plan ({status}).',
@@ -100,12 +111,12 @@ const I18N = {
     'modal.task': 'Task', 'modal.date': 'Date', 'modal.start': 'Start', 'modal.end': 'End',
     'modal.points': 'Points (calculated automatically)', 'modal.pointsEditable': 'Points',
     'modal.sudden': ' Sudden session (doubles the points)',
-    'modal.repeat': ' Repeat every week (same weekday & time)',
+    'modal.repeat': ' Copy as one-off sessions for a limited number of weeks',
     'modal.repeatWeeks': 'Repeat for (weeks, including this one)',
-    'modal.repeatNote': 'Enter weeks (max 53); empty means this week only. For ongoing repeats, save a week as the weekly timetable.',
+    'modal.repeatNote': 'Creates separate one-off sessions (max 53 weeks), not a recurring rule. For ongoing work, use Weekly timetable in Schedule.',
     'modal.notes': 'Notes', 'modal.notesPlaceholder': 'optional', 'modal.notesPrefix': 'Notes: ',
-    'modal.add': 'Add task',
-    'modal.assignTitle': 'Assign session', 'modal.addTitle': 'Add task',
+    'modal.add': 'Add one-off session',
+    'modal.assignTitle': 'Add one-off session', 'modal.addTitle': 'Add one-off session',
     'modal.detailsTitle': 'Task details', 'modal.editTitle': 'Edit task',
     'modal.cloneTitle': 'Clone task to weekdays',
     'clone.chooseDays': 'Choose other weekdays in this week:',
@@ -189,12 +200,23 @@ const I18N = {
     'th.task': 'Nhiệm vụ', 'th.priority': 'Ưu tiên / danh mục', 'th.status': 'Trạng thái',
     'th.date': 'Ngày / giờ', 'th.progress': 'Tiến độ / điểm',
     'schedule.title': 'Lịch',
+    'schedule.view': 'Chế độ xem lịch', 'schedule.dated': 'Lịch theo ngày', 'schedule.timetable': 'Thời khóa biểu hàng tuần',
+    'schedule.tools': 'Công cụ nhập và sao chép', 'schedule.seriesTools': 'Quản lý chuỗi',
+    'schedule.ruleDates': '{start} đến {end}', 'schedule.noEnd': 'không có ngày kết thúc',
+    'schedule.effectiveFrom': 'Cài đặt mới nhất từ {date}', 'schedule.upcomingFrom': 'Cài đặt sắp tới từ {date}',
+    'schedule.confirmChange': 'Xác nhận thay đổi',
+    'schedule.futureImpact': 'Từ {date}, quy tắc hàng tuần sẽ thay đổi. Các phiên trước và đã hoàn thành không đổi. Các ngoại lệ tương lai sẽ được {policy}.',
+    'schedule.occurrenceImpact': 'Chỉ ngày {date} bị ảnh hưởng. Quy tắc hàng tuần và các lần khác không đổi.',
+    'schedule.endImpact': 'Các lần từ ngày được chọn trở đi sẽ dừng. Cài đặt trước đó và các phiên đã hoàn thành không đổi.',
+    'schedule.stopAllSummary': 'Dừng TẤT CẢ mục lặp lại. Các phiên riêng lẻ không bị ảnh hưởng.',
     'schedule.prev': '← Tuần trước', 'schedule.today': 'Hôm nay', 'schedule.next': 'Tuần sau →',
     'schedule.copyNext': 'Sao chép tuần sang tuần sau',
     'schedule.templateSave': 'Nhập tuần này vào thời khóa biểu',
     'schedule.templateDisable': 'Tắt thời khóa biểu hàng tuần',
     'schedule.timetableEdit': 'Sửa thời khóa biểu hàng tuần',
-    'schedule.timetableHint': 'Các mục lặp lại được hiển thị trong lịch và tổng kết mà không tạo phiên trong cơ sở dữ liệu. Phiên lưu trạng thái hoàn thành thực tế và ghi chú riêng cho lần đó.',
+    'schedule.timetableHint': 'Thiết lập tuần lặp lại bằng cùng bảng nhân sự theo ngày. Nhấp ô để thêm quy tắc, hoặc nhiệm vụ để sửa. Thẻ hiển thị cài đặt mới nhất, kể cả thay đổi sắp tới; tổng điểm dự kiến cộng các quy tắc này, không phải một tuần cụ thể. Dùng Lịch theo ngày để xem các lần thực tế và ghi nhận hoàn thành.',
+    'schedule.ruleContext': 'Quy tắc lặp lại: lặp vào ngày trong tuần đã chọn trong khoảng ngày. Hoàn thành và ghi chú thực tế thuộc từng lần theo ngày.',
+    'schedule.invalidRange': 'Ngày kết thúc phải từ ngày bắt đầu trở đi.',
     'schedule.timetableEmpty': 'Chưa có mục lặp lại.',
     'schedule.weekly': 'Hàng tuần', 'schedule.weeklyModified': 'Hàng tuần - Đã sửa',
     'schedule.day': 'Ngày trong tuần', 'schedule.assignee': 'Người được giao',
@@ -217,18 +239,18 @@ const I18N = {
     'schedule.importConfirm': 'Nhập các phiên không lặp lại từ tuần {date} vào thời khóa biểu? Các mục lặp lại hiện có được giữ lại.',
     'schedule.stopConfirm': 'Dừng tất cả mục lặp lại từ {date}? Cài đặt trước đó và các phiên đã hoàn thành không đổi.',
     'schedule.empty': 'Không có phiên nào được lên lịch cho bạn trong tuần này.',
-    'schedule.adminHint': 'Nhấp vào ô trống để gán phiên · nhấp vào thẻ để sửa hoặc cập nhật. Lưu một tuần làm thời khóa biểu để tạo các tuần sau khi được xem; có thể tắt bất cứ lúc nào. Điểm = điểm đã hoàn thành trong tuần.',
+    'schedule.adminHint': 'Nhấp ô trống để thêm phiên riêng lẻ; nhấp nhiệm vụ để ghi nhận hoàn thành hoặc sửa lịch. Dùng Thời khóa biểu hàng tuần cho công việc lặp lại. Điểm đã đạt chỉ tính phiên đã hoàn thành.',
     'schedule.loadError': 'Không tải được lịch: {msg}',
     'sth.date': 'Ngày', 'sth.program': 'Chương trình', 'sth.category': 'Danh mục',
     'sth.time': 'Giờ', 'sth.points': 'Điểm', 'sth.status': 'Trạng thái',
-    'grid.employee': 'Nhân viên', 'grid.pts': 'Điểm',
+    'grid.employee': 'Nhân viên', 'grid.pts': 'Điểm đã đạt',
     'plan.title': 'Kế hoạch tuần', 'plan.adminTag': 'quản trị', 'plan.manage': 'Quản lý nhiệm vụ',
-    'plan.hint': 'Kéo người từ phía trên vào nhiệm vụ để giao. Mục lặp lại sẽ cập nhật lần này và các lần sau kể từ ngày đang xem sau khi xác nhận; phiên riêng lẻ chỉ thay đổi phiên đó. Phiên trước và đã hoàn thành được giữ nguyên. Nhấp nhiệm vụ để xem tùy chọn. Mỗi lần hiển thị một ngày — dùng mũi tên (hoặc phím ← →) để duyệt. Dùng “Sửa thời khóa biểu hàng tuần” để quản lý mục lặp lại.',
+    'plan.hint': 'Kéo người vào nhiệm vụ để giao. Với công việc lặp lại, chọn chỉ lần này hoặc lần này và các lần sau trong hộp thoại thay đổi. Phiên riêng lẻ chỉ thay đổi phiên đó. Dùng Lịch → Thời khóa biểu hàng tuần để quản lý quy tắc lặp lại. Duyệt ngày bằng mũi tên (hoặc phím ← →).',
     'plan.prev': '← Ngày trước', 'plan.today': 'Hôm nay', 'plan.next': 'Ngày sau →',
     'plan.people': 'Nhân sự',
     'plan.morning': 'Buổi sáng', 'plan.afternoon': 'Buổi chiều và tối',
     'plan.dropHere': 'Thả người vào đây', 'plan.noTasks': 'Chưa có nhiệm vụ',
-    'plan.addBtn': '+ Thêm nhiệm vụ…', 'plan.pointsTotal': 'Tổng điểm',
+    'plan.addBtn': '+ Thêm phiên riêng lẻ…', 'plan.pointsTotal': 'Điểm dự kiến',
     'plan.emptyPeople': 'Không có nhân sự đang hoạt động.', 'plan.unassignedRow': 'Chưa gán',
     'plan.loadError': 'Không tải được kế hoạch: {msg}',
     'plan.loadErrorStatus': 'Không tải được kế hoạch ({status}).',
@@ -244,12 +266,12 @@ const I18N = {
     'modal.task': 'Nhiệm vụ', 'modal.date': 'Ngày', 'modal.start': 'Bắt đầu', 'modal.end': 'Kết thúc',
     'modal.points': 'Điểm (tính tự động)', 'modal.pointsEditable': 'Điểm',
     'modal.sudden': ' Phiên đột xuất (nhân đôi điểm)',
-    'modal.repeat': ' Lặp lại mỗi tuần (cùng ngày & giờ)',
+    'modal.repeat': ' Sao chép thành phiên riêng lẻ trong số tuần giới hạn',
     'modal.repeatWeeks': 'Lặp lại (số tuần, kể cả tuần này)',
-    'modal.repeatNote': 'Nhập số tuần (tối đa 53); để trống nghĩa là chỉ tuần này. Muốn lặp lâu dài, hãy lưu tuần này làm thời khóa biểu hàng tuần.',
+    'modal.repeatNote': 'Tạo các phiên riêng lẻ (tối đa 53 tuần), không tạo quy tắc lặp lại. Với công việc lâu dài, dùng Thời khóa biểu hàng tuần trong Lịch.',
     'modal.notes': 'Ghi chú', 'modal.notesPlaceholder': 'không bắt buộc', 'modal.notesPrefix': 'Ghi chú: ',
-    'modal.add': 'Thêm nhiệm vụ',
-    'modal.assignTitle': 'Gán phiên', 'modal.addTitle': 'Thêm nhiệm vụ',
+    'modal.add': 'Thêm phiên riêng lẻ',
+    'modal.assignTitle': 'Thêm phiên riêng lẻ', 'modal.addTitle': 'Thêm phiên riêng lẻ',
     'modal.detailsTitle': 'Chi tiết nhiệm vụ', 'modal.editTitle': 'Sửa nhiệm vụ',
     'modal.cloneTitle': 'Sao chép nhiệm vụ sang các ngày trong tuần',
     'clone.chooseDays': 'Chọn các ngày khác trong tuần này:',
@@ -326,6 +348,9 @@ function applyTranslations() {
   document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
     el.placeholder = t(el.dataset.i18nPlaceholder);
   });
+  document.querySelectorAll('[data-i18n-aria-label]').forEach(el => {
+    el.setAttribute('aria-label', t(el.dataset.i18nAriaLabel));
+  });
 }
 
 function refreshLangButtons() {
@@ -350,6 +375,13 @@ function setLang(newLang) {
     } else {
       loadMyTasks();
       if (scheduleLoaded) loadSchedule();
+      if (scheduleViewMode === 'timetable') {
+        renderTimetableEntries();
+      }
+      if (editingTimetable) {
+        populateRulePickers();
+        translateRuleModal();
+      }
       if (planLoaded) loadPlanBoard();
     }
     if (monthlySummaryLoaded) loadMonthlySummary();

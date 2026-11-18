@@ -206,26 +206,35 @@ async function onPersonDropped(evt) {
   if (Number.isSafeInteger(seriesId) && seriesId > 0 && occurrenceDate) {
     const occurrence = planSessions.find(item => item.recurring_series_id === seriesId &&
       item.recurrence_date === occurrenceDate);
-    const name = planEmployeeName(employeeId);
-    if (!occurrence || !confirm(t('schedule.reassignConfirm', { name, date: occurrenceDate }))) {
+    if (!occurrence) {
       renderPlanBoard();
       return;
     }
-    const replaceFutureExceptions = confirm(t('schedule.replaceExceptionsConfirm'));
+    renderPlanBoard();
+    const change = await requestScheduleChange({ title: t('schedule.assignee'),
+      summary: scheduleChangeSummary(occurrence, { ...occurrence, employeeId }),
+      date: occurrenceDate > todayISO() ? occurrenceDate : todayISO(),
+      occurrenceDate, allowOccurrence: true, allowReplace: true });
+    if (!change) return;
     try {
       const res = await api('/api/admin/schedule/timetable', {
         method: 'POST',
         body: JSON.stringify({
-          operation: 'edit', seriesId, cutoffDate: occurrenceDate,
-          employeeId, replaceFutureExceptions,
+          ...(change.scope === 'future'
+            ? { operation: 'edit', seriesId, cutoffDate: change.cutoffDate,
+                employeeId, replaceFutureExceptions: change.replaceFutureExceptions }
+            : { operation: 'exception', action: 'modify', seriesId, cutoffDate: occurrenceDate,
+                occurrenceDate, movedDate: occurrence.session_date, employeeId,
+                programId: occurrence.program_id, startTime: occurrence.start_time,
+                endTime: occurrence.end_time, points: Number(occurrence.points),
+                isSudden: !!occurrence.is_sudden, notes: occurrence.notes || null }),
         }),
       });
       if (!res.ok) alert(t('err.assignFailed') + (await res.text()));
     } catch (err) {
       alert(t('err.network') + err.message);
     }
-    await loadPlanBoard();
-    await loadMyTasks();
+    refreshScheduleViews();
     return;
   }
   const sessionId = Number(evt.to.dataset.sessionId);
@@ -301,6 +310,11 @@ function openPlanAddModal(date, period) {
   document.getElementById('assign-sudden').checked = false;
   document.getElementById('assign-notes').value = '';
   resetAssignRepeat();
+  editingSession = false;
+  document.getElementById('assign-date-row').style.display = 'none';
+  document.getElementById('assign-repeat-option').style.display = 'block';
+  document.getElementById('assign-submit').textContent = t('modal.add');
+  document.querySelector('label[for="assign-points"]').textContent = t('modal.points');
   refreshAssignDefaults();
   openModal('assign');
 }

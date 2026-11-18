@@ -56,48 +56,23 @@
         <div class="card-head">
           <h2 data-i18n="schedule.title">Schedule</h2>
         </div>
+        <div id="schedule-mode-switch" class="schedule-mode-switch" style="display:none;" aria-label="Schedule view" data-i18n-aria-label="schedule.view">
+          <button id="schedule-mode-dated" class="btn small" aria-pressed="true" data-i18n="schedule.dated">Dated schedule</button>
+          <button id="schedule-mode-timetable" class="btn ghost small" aria-pressed="false" data-i18n="schedule.timetable">Weekly timetable</button>
+        </div>
+        <div id="dated-schedule-panel">
         <div class="week-nav">
           <button id="schedule-prev" class="btn ghost small" data-i18n="schedule.prev">← Prev week</button>
           <button id="schedule-today" class="btn small" data-i18n="schedule.today">Today</button>
           <button id="schedule-next" class="btn ghost small" data-i18n="schedule.next">Next week →</button>
-          <button id="schedule-copy-next" class="btn small" style="display:none;" data-i18n="schedule.copyNext">Copy week to next week</button>
-          <button id="schedule-template-save" class="btn small" style="display:none;" data-i18n="schedule.templateSave">Save this week as weekly timetable</button>
-          <button id="schedule-template-disable" class="btn ghost small" style="display:none;" data-i18n="schedule.templateDisable">Stop weekly timetable</button>
-          <button id="schedule-timetable-edit" class="btn ghost small" style="display:none;" data-i18n="schedule.timetableEdit">Edit weekly timetable</button>
           <span id="schedule-week-label" class="week-label"></span>
         </div>
-        <div id="timetable-editor" class="timetable-editor" style="display:none;">
-          <p class="hint" data-i18n="schedule.timetableHint">Recurring entries are projected into schedules and summaries without creating session rows. Sessions store actual completion and occurrence notes.</p>
-          <div id="timetable-entry-list" class="timetable-entry-list"></div>
-          <form id="timetable-entry-form">
-            <input type="hidden" id="recurring-series-id">
-            <div class="modal-row">
-              <div><label for="recurring-weekday" data-i18n="schedule.day">Weekday</label><select id="recurring-weekday"></select></div>
-              <div><label for="recurring-program" data-i18n="modal.task">Task</label><select id="recurring-program"></select></div>
-              <div><label for="recurring-employee" data-i18n="schedule.assignee">Assigned person</label><select id="recurring-employee"></select></div>
-            </div>
-            <div class="modal-row">
-              <div><label for="recurring-start" data-i18n="modal.start">Start</label><input type="time" id="recurring-start"></div>
-              <div><label for="recurring-end" data-i18n="modal.end">End</label><input type="time" id="recurring-end"></div>
-              <div><label for="recurring-points" data-i18n="modal.pointsEditable">Points</label><input type="number" id="recurring-points" min="0" max="100" step="0.5" required></div>
-            </div>
-            <label class="check-row"><input type="checkbox" id="recurring-sudden"><span data-i18n="modal.sudden"> Sudden session (doubles the points)</span></label>
-            <label for="recurring-notes" data-i18n="modal.notes">Notes</label>
-            <input type="text" id="recurring-notes" maxlength="1000">
-            <div class="modal-row">
-              <div><label for="recurring-start-date" data-i18n="schedule.startDate">Starts on</label><input type="date" id="recurring-start-date" required></div>
-              <div><label for="recurring-end-date" data-i18n="schedule.endDate">Ends on (optional)</label><input type="date" id="recurring-end-date"></div>
-              <div id="recurring-cutoff-wrap" style="display:none;"><label for="recurring-cutoff" data-i18n="schedule.applyFrom">Apply schedule changes from</label><input type="date" id="recurring-cutoff"></div>
-            </div>
-            <label id="recurring-replace-exceptions-wrap" class="check-row" style="display:none;"><input type="checkbox" id="recurring-replace-exceptions"><span data-i18n="schedule.preserveExceptions">Replace future occurrence exceptions</span></label>
-            <div class="modal-actions">
-              <button id="recurring-save" class="btn small" type="submit" data-i18n="schedule.createEntry">Add recurring entry</button>
-              <button id="recurring-cancel-edit" class="btn small ghost" type="button" style="display:none;" data-i18n="schedule.cancelEdit">Cancel edit</button>
-            </div>
-            <p id="timetable-editor-error" class="error" style="display:none;" role="alert"></p>
-          </form>
-        </div>
-        <p id="admin-schedule-hint" class="hint" style="display:none;" data-i18n="schedule.adminHint">Click an empty cell to assign a session · click a chip to complete, cancel or delete it · Pts = completed points this week.</p>
+        <details id="schedule-tools" class="schedule-tools" style="display:none;">
+          <summary data-i18n="schedule.tools">Import and copy tools</summary>
+          <button id="schedule-copy-next" class="btn ghost small" data-i18n="schedule.copyNext">Copy week to next week</button>
+          <button id="schedule-template-save" class="btn ghost small" data-i18n="schedule.templateSave">Import this week into timetable</button>
+        </details>
+        <p id="admin-schedule-hint" class="hint" style="display:none;" data-i18n="schedule.adminHint"></p>
         <div id="admin-schedule-wrap" class="grid-scroll" style="display:none;">
           <table class="sched-grid" id="admin-schedule-grid"></table>
         </div>
@@ -116,6 +91,16 @@
         </div>
         <div id="my-schedule-empty" class="empty" style="display:none;" data-i18n="schedule.empty">No sessions scheduled for you this week.</div>
         <div id="my-week-totals" class="week-totals" style="display:none;"></div>
+        </div>
+        <div id="timetable-editor" style="display:none;">
+          <p class="hint" data-i18n="schedule.timetableHint">Recurring entries are projected into schedules and summaries without creating session rows. Sessions store actual completion and occurrence notes.</p>
+          <div class="grid-scroll"><table id="timetable-grid" class="sched-grid"></table></div>
+          <p id="timetable-editor-error" class="error" style="display:none;" role="alert"></p>
+          <details class="schedule-tools">
+            <summary data-i18n="schedule.seriesTools">Series management</summary>
+            <button id="schedule-template-disable" class="btn danger small" style="display:none;" data-i18n="schedule.templateDisable">Stop weekly timetable</button>
+          </details>
+        </div>
         <div id="schedule-error" class="error" style="display:none;"></div>
       </section>
 
@@ -198,8 +183,18 @@
         <button id="modal-close" class="modal-x" aria-label="Close">✕</button>
       </div>
 
-      <div id="modal-assign-form">
+      <form id="modal-assign-form">
         <p id="assign-context" class="modal-context"></p>
+        <div id="assign-rule-fields" style="display:none;">
+          <div class="modal-row">
+            <div><label for="assign-weekday" data-i18n="schedule.day">Weekday</label><select id="assign-weekday"></select></div>
+            <div><label for="assign-employee" data-i18n="schedule.assignee">Assigned person</label><select id="assign-employee"></select></div>
+          </div>
+          <div class="modal-row">
+            <div><label for="assign-rule-start" data-i18n="schedule.startDate">Starts on</label><input id="assign-rule-start" type="date" disabled></div>
+            <div><label for="assign-rule-end" data-i18n="schedule.endDate">Ends on (optional)</label><input id="assign-rule-end" type="date" disabled></div>
+          </div>
+        </div>
         <div id="assign-date-row" style="display:none;">
           <label for="assign-date" data-i18n="modal.date">Date</label>
           <input type="date" id="assign-date">
@@ -217,18 +212,6 @@
           </div>
         </div>
         <p id="assign-period-hint" class="assign-repeat-note"></p>
-        <div id="recurring-edit-scope" style="display:none;">
-          <label for="recurring-edit-mode" data-i18n="schedule.editScope">Apply edit to</label>
-          <select id="recurring-edit-mode">
-            <option value="future" data-i18n="schedule.thisFuture">This and future occurrences</option>
-            <option value="occurrence" data-i18n="schedule.onlyThis">Only this occurrence</option>
-          </select>
-          <div id="recurring-edit-cutoff-wrap">
-            <label for="recurring-edit-cutoff" data-i18n="schedule.applyFrom">Apply schedule changes from</label>
-            <input type="date" id="recurring-edit-cutoff">
-          </div>
-          <label id="recurring-edit-preserve-wrap" class="check-row"><input type="checkbox" id="recurring-edit-replace-exceptions"><span data-i18n="schedule.preserveExceptions">Replace future occurrence exceptions</span></label>
-        </div>
         <label for="assign-points" data-i18n="modal.points">Points (calculated automatically)</label>
         <input type="number" id="assign-points" min="0" max="100" step="0.5" readonly>
         <label class="check-row"><input type="checkbox" id="assign-sudden"><span data-i18n="modal.sudden"> Sudden session (doubles the points)</span></label>
@@ -241,9 +224,10 @@
           </div>
         </div>
         <label for="assign-notes" data-i18n="modal.notes">Notes</label>
-        <input type="text" id="assign-notes" data-i18n-placeholder="modal.notesPlaceholder" placeholder="optional">
-        <button id="assign-submit" class="btn modal-submit" data-i18n="modal.add">Add task</button>
-      </div>
+        <input type="text" id="assign-notes" maxlength="1000" data-i18n-placeholder="modal.notesPlaceholder" placeholder="optional">
+        <button id="assign-submit" type="submit" class="btn modal-submit" data-i18n="modal.add">Add task</button>
+        <button id="assign-rule-stop" type="button" class="btn danger small" style="display:none;" data-i18n="schedule.endSeries">End series from date</button>
+      </form>
 
       <div id="modal-details" style="display:none;">
         <div id="detail-info" class="modal-context"></div>
@@ -332,6 +316,28 @@
       <p id="program-error" class="error" style="display:none;"></p>
     </div>
   </div>
+
+  <dialog id="schedule-change-dialog" class="modal change-dialog" aria-labelledby="schedule-change-title">
+    <form id="schedule-change-form">
+      <div class="modal-head"><h3 id="schedule-change-title"></h3></div>
+      <p id="schedule-change-summary" class="modal-context"></p>
+      <label for="schedule-change-scope" data-i18n="schedule.editScope">Apply edit to</label>
+      <select id="schedule-change-scope">
+        <option value="future" data-i18n="schedule.thisFuture">This and future occurrences</option>
+        <option value="occurrence" data-i18n="schedule.onlyThis">Only this occurrence</option>
+      </select>
+      <div id="schedule-change-date-wrap">
+        <label for="schedule-change-date" data-i18n="schedule.applyFrom">Apply schedule changes from</label>
+        <input id="schedule-change-date" type="date" required>
+      </div>
+      <label id="schedule-change-replace-wrap" class="check-row"><input id="schedule-change-replace" type="checkbox"><span data-i18n="schedule.preserveExceptions">Replace future occurrence exceptions</span></label>
+      <p id="schedule-change-impact" class="hint" aria-live="polite"></p>
+      <div class="modal-actions">
+        <button id="schedule-change-cancel" type="button" class="btn ghost" data-i18n="schedule.cancelEdit">Cancel edit</button>
+        <button type="submit" class="btn" data-i18n="schedule.confirmChange">Confirm change</button>
+      </div>
+    </form>
+  </dialog>
 
   <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js"></script>
   <script src="shared.js" defer></script>

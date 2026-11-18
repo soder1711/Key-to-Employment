@@ -19,6 +19,15 @@
 - [ ] Verify OAuth-backed admin and D1 behavior in a browser before deployment.
 - [x] Update README and API documentation to explain timetable ownership, session records, recurrence markers, and present/future edit behavior.
 
+## Weekly timetable UX: first iteration
+- [x] Add admin Weekly timetable / Dated schedule switch; retain employee dated schedule.
+- [x] Reuse the dated schedule's employee-by-weekday grid and assignment form for recurring rules; show planned totals and visible effective dates.
+- [x] Move import/copy and stop-all actions into secondary tools.
+- [x] Use a shared scope/date/impact dialog for recurring edits, reassignment, cancellation, and ending series.
+- [x] Preserve exceptions by default and keep completion/actual notes occurrence-only.
+- [x] Clarify one-off creation and planned versus earned point labels; widen the scheduling workspace.
+- [ ] Validate the new controls with OAuth-backed admin/employee accounts and D1 before deployment.
+
 ## Refactor
 - [x] Split frontend into multiple modules
 ## Task

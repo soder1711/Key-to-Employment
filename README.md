@@ -28,6 +28,16 @@ Each recurring entry has a stable series ID. Schedule and monthly-summary reads 
 
 Session rows represent actual dated outcomes, such as completion, credited points, and occurrence-only notes. Completing a projected occurrence creates its session record; merely viewing a week does not. Existing copied/manual sessions remain one-offs, while records formerly linked to weekly templates retain their history during migration.
 
+### Finding and using the timetable
+
+- Admins: open **Schedule**, then switch between **Dated schedule** and **Weekly timetable**. Employees retain their personal dated schedule.
+- **Weekly timetable** reuses the dated schedule's employee-by-weekday grid and assignment form. Click a cell to add a recurring rule for that person and weekday, or click a rule to edit it. The grid shows planned totals and the latest settings' effective dates, including upcoming changes; it is not a historical-week preview. Use **Dated schedule** to inspect occurrences for a particular week.
+- **Dated schedule** is for completion, actual notes, and exceptions. Clicking an empty cell adds a one-off session. **Import and copy tools** contains the optional setup shortcuts; finite repeat copies remain separate one-off sessions.
+- Saving recurring edits or dragging a person onto a recurring task opens a change dialog with a before/after summary. Choose **This and future occurrences** (default) with an effective date, or **Only this occurrence** when editing a dated task. Existing future exceptions are preserved unless explicitly replaced. Cancelling the dialog makes no change.
+- End an individual series from its timetable rule or task details. **Series management** contains **Stop weekly timetable**, which ends all recurring entries from a selected date without affecting one-offs. Completion and actual notes remain occurrence-only.
+
+For a browser smoke test with an authenticated admin, add a recurring entry, inspect it in a future dated week, cancel a pending edit, save an occurrence-only edit, then save a future edit with exceptions preserved. Check the same task as an employee and confirm timetable controls are absent. Also check the Vietnamese labels and the horizontally scrollable grid on mobile. The localhost monthly-summary demo below does not preview the timetable.
+
 ## Local setup
 
 ### Prerequisites
@@ -94,6 +104,8 @@ For a manual Worker deployment, run `wrangler deploy --config wrangler.toml` fro
 There is no package manifest, build step, or linter. The monthly-summary aggregation tests use Node's built-in test runner. Before submitting changes:
 
 - Run `node --experimental-default-type=module --test worker/tests/monthly-summary.test.mjs`.
+- Run `node --experimental-default-type=module --test worker/tests/recurrence.test.mjs worker/tests/schedule-edits.test.mjs` for recurrence/API regressions.
+- Run `node --test frontend/tests/timetable.test.mjs` for timetable grouping, mode gating, and change-dialog behavior.
 - Run `node --check` on changed JavaScript files.
 - Review API routes and database bindings manually.
 - Smoke-test the localhost demo and, when available, authenticated behavior in a browser.

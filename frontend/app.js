@@ -43,9 +43,10 @@ async function updateWeeklyTimetable(enabled, button) {
   if (enabled) {
     if (!confirm(t('schedule.importConfirm', { date: fmtShort(scheduleWeekStart) }))) return;
   } else {
-    cutoffDate = window.prompt(t('schedule.applyFrom'), todayISO());
-    if (!cutoffDate || !/^\d{4}-\d{2}-\d{2}$/.test(cutoffDate) ||
-        !confirm(t('schedule.stopConfirm', { date: cutoffDate }))) return;
+    const change = await requestScheduleChange({ title: t('schedule.templateDisable'),
+      summary: t('schedule.stopAllSummary'), impact: t('schedule.endImpact') });
+    if (!change) return;
+    cutoffDate = change.cutoffDate;
   }
 
   button.disabled = true;
@@ -72,7 +73,8 @@ document.getElementById('schedule-template-save').addEventListener('click', (e) 
   updateWeeklyTimetable(true, e.currentTarget));
 document.getElementById('schedule-template-disable').addEventListener('click', (e) =>
   updateWeeklyTimetable(false, e.currentTarget));
-document.getElementById('schedule-timetable-edit').addEventListener('click', openTimetableEditor);
+document.getElementById('schedule-mode-dated').addEventListener('click', () => setScheduleMode('dated'));
+document.getElementById('schedule-mode-timetable').addEventListener('click', () => setScheduleMode('timetable'));
 
 document.getElementById('schedule-copy-next').addEventListener('click', async (e) => {
   if (!currentUser?.isAdmin || !scheduleWeekStart) return;
@@ -129,6 +131,7 @@ document.getElementById('plan-today').addEventListener('click', () => goToPlanDa
 document.addEventListener('keydown', (e) => {
   if (!planLoaded) return;
   if (document.getElementById('plan-section').style.display !== 'block') return;
+  if (document.getElementById('schedule-change-dialog').open) return;
   if (modal.style.display === 'flex' || programModal.style.display === 'flex') return;
   const tag = ((document.activeElement && document.activeElement.tagName) || '').toUpperCase();
   if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
@@ -146,71 +149,35 @@ document.getElementById('plan-days').addEventListener('click', (e) => {
   if (chip) openDetailsFromElement(chip);
 });
 
-document.getElementById('timetable-entry-list').addEventListener('click', async (event) => {
+document.getElementById('timetable-grid').addEventListener('click', (event) => {
   const editButton = event.target.closest('[data-timetable-edit]');
   if (editButton) {
-    editRecurringEntry(Number(editButton.dataset.timetableEdit));
+    const rule = recurringEntries.find(item => Number(item.series_id) === Number(editButton.dataset.timetableEdit));
+    if (rule) openRuleModal(rule.employee_id, rule.weekday, rule);
     return;
   }
-  const endButton = event.target.closest('[data-timetable-end]');
-  if (!endButton) return;
-  const cutoffDate = window.prompt(t('schedule.applyFrom'), todayISO());
-  if (!cutoffDate || !/^\d{4}-\d{2}-\d{2}$/.test(cutoffDate) ||
-      !confirm(t('schedule.endSeriesConfirm', { date: cutoffDate }))) return;
-  const response = await api('/api/admin/schedule/timetable', {
-    method: 'POST',
-    body: JSON.stringify({ operation: 'end', seriesId: Number(endButton.dataset.timetableEnd), cutoffDate }),
-  });
-  if (!response.ok) {
-    document.getElementById('timetable-editor-error').textContent = await response.text();
-    document.getElementById('timetable-editor-error').style.display = 'block';
-    return;
-  }
-  resetRecurringEditor();
-  await loadTimetableEditor();
-  refreshScheduleViews();
+  const cell = event.target.closest('.grid-cell');
+  if (cell) openRuleModal(cell.dataset.employeeId ? Number(cell.dataset.employeeId) : null, Number(cell.dataset.weekday));
 });
 
-document.getElementById('recurring-cancel-edit').addEventListener('click', resetRecurringEditor);
-document.getElementById('timetable-entry-form').addEventListener('submit', async (event) => {
-  event.preventDefault();
-  const seriesId = Number(document.getElementById('recurring-series-id').value) || null;
-  const cutoffDate = document.getElementById('recurring-cutoff').value;
-  const replaceFutureExceptions = document.getElementById('recurring-replace-exceptions').checked;
-  if (seriesId && (!cutoffDate || !confirm(t('schedule.recurringEditConfirm', {
-    date: cutoffDate,
-    policy: t(replaceFutureExceptions ? 'schedule.exceptionReplaced' : 'schedule.exceptionPreserved'),
-  })))) return;
-  const body = {
-    operation: seriesId ? 'edit' : 'create',
-    ...(seriesId ? { seriesId, cutoffDate, replaceFutureExceptions } : {}),
-    weekday: Number(document.getElementById('recurring-weekday').value),
-    programId: Number(document.getElementById('recurring-program').value),
-    employeeId: document.getElementById('recurring-employee').value
-      ? Number(document.getElementById('recurring-employee').value) : null,
-    startTime: document.getElementById('recurring-start').value || null,
-    endTime: document.getElementById('recurring-end').value || null,
-    points: Number(document.getElementById('recurring-points').value),
-    isSudden: document.getElementById('recurring-sudden').checked,
-    notes: document.getElementById('recurring-notes').value || null,
-    startDate: document.getElementById('recurring-start-date').value,
-    endDate: document.getElementById('recurring-end-date').value || null,
-  };
-  const error = document.getElementById('timetable-editor-error');
-  error.style.display = 'none';
-  const button = document.getElementById('recurring-save');
+document.getElementById('assign-rule-stop').addEventListener('click', async (event) => {
+  if (!editingTimetable || !currentRule) return;
+  const entry = currentRule;
+  const change = await requestScheduleChange({ title: t('schedule.endSeries'),
+    summary: entry.program_name, impact: t('schedule.endImpact') });
+  if (!change) return;
+  const button = event.currentTarget;
   button.disabled = true;
   try {
     const response = await api('/api/admin/schedule/timetable', {
-      method: 'POST', body: JSON.stringify(body),
+      method: 'POST',
+      body: JSON.stringify({ operation: 'end', seriesId: entry.series_id, cutoffDate: change.cutoffDate }),
     });
     if (!response.ok) throw new Error(await response.text());
-    resetRecurringEditor();
-    await loadTimetableEditor();
+    closeModal();
     refreshScheduleViews();
   } catch (err) {
-    error.textContent = err.message;
-    error.style.display = 'block';
+    showModalError(err.message);
   } finally {
     button.disabled = false;
   }
@@ -225,7 +192,11 @@ document.getElementById('assign-program').addEventListener('change', (e) => {
   if (e.target.value === '__new__') { openProgramModal(); return; }
   refreshAssignDefaults();
 });
-document.getElementById('assign-sudden').addEventListener('change', refreshAssignDefaults);
+document.getElementById('assign-sudden').addEventListener('change', () => {
+  if (!editingTimetable) { refreshAssignDefaults(); return; }
+  const input = document.getElementById('assign-points');
+  input.value = Number(input.value) * (document.getElementById('assign-sudden').checked ? 2 : 0.5);
+});
 
 // Live allocation hint while the start time is edited
 document.getElementById('assign-start').addEventListener('input', updateAssignPeriodHint);
@@ -234,8 +205,10 @@ document.getElementById('assign-repeat').addEventListener('change', (e) => {
   document.getElementById('assign-repeat-row').style.display = e.target.checked ? 'block' : 'none';
 });
 
-document.getElementById('assign-submit').addEventListener('click', async (e) => {
-  const btn = e.target;
+document.getElementById('modal-assign-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = document.getElementById('assign-submit');
+  if (btn.disabled) return;
   btn.disabled = true;
   try {
     const repeatOn = document.getElementById('assign-repeat').checked;
@@ -253,6 +226,10 @@ document.getElementById('assign-submit').addEventListener('click', async (e) => 
       isSudden: document.getElementById('assign-sudden').checked,
       notes: document.getElementById('assign-notes').value || null,
     };
+    if (editingTimetable) {
+      await saveTimetableRule(payload);
+      return;
+    }
     let endpoint = isEditing ? '/api/admin/schedule/update' : '/api/admin/schedule/assign';
     let requestBody = isEditing
       ? { ...payload, sessionId: currentSession.session_id, sessionDate: document.getElementById('assign-date').value }
@@ -263,24 +240,22 @@ document.getElementById('assign-submit').addEventListener('click', async (e) => 
           repeatWeeks,
         };
     if (isEditing && currentSession.is_recurring) {
-      const scope = document.getElementById('recurring-edit-mode').value;
       const movedDate = document.getElementById('assign-date').value;
       const seriesId = currentSession.recurring_series_id;
-      if (scope === 'future') {
-        const cutoffDate = document.getElementById('recurring-edit-cutoff').value;
-        const replaceFutureExceptions = document.getElementById('recurring-edit-replace-exceptions').checked;
-        if (!cutoffDate || !confirm(t('schedule.recurringEditConfirm', {
-          date: cutoffDate,
-          policy: t(replaceFutureExceptions ? 'schedule.exceptionReplaced' : 'schedule.exceptionPreserved'),
-        }))) return;
+      const occurrenceDate = currentSession.recurrence_date || currentSession.session_date;
+      const weekday = new Date(`${movedDate}T00:00:00Z`).getUTCDay();
+      const change = await requestScheduleChange({ title: t('modal.editTitle'),
+        summary: `${scheduleChangeSummary(currentSession, { ...currentSession, ...payload, weekday })}\n${currentSession.session_date} → ${movedDate}`,
+        date: occurrenceDate > todayISO() ? occurrenceDate : todayISO(), occurrenceDate,
+        allowOccurrence: true, allowReplace: true });
+      if (!change) return;
+      if (change.scope === 'future') {
         endpoint = '/api/admin/schedule/timetable';
         requestBody = {
-          operation: 'edit', seriesId, cutoffDate,
-          weekday: new Date(`${movedDate}T00:00:00Z`).getUTCDay(),
-          replaceFutureExceptions, ...payload,
+          operation: 'edit', seriesId, cutoffDate: change.cutoffDate,
+          weekday, replaceFutureExceptions: change.replaceFutureExceptions, ...payload,
         };
       } else {
-        if (!confirm(t('schedule.exceptionEditConfirm', { date: currentSession.session_date }))) return;
         endpoint = '/api/admin/schedule/timetable';
         requestBody = {
           operation: 'exception', action: 'modify', seriesId,
@@ -313,11 +288,6 @@ document.getElementById('assign-submit').addEventListener('click', async (e) => 
 
 document.getElementById('session-edit').addEventListener('click', openSessionEdit);
 document.getElementById('session-clone').addEventListener('click', openSessionClone);
-document.getElementById('recurring-edit-mode').addEventListener('change', (event) => {
-  const showFuture = event.target.value === 'future';
-  document.getElementById('recurring-edit-cutoff-wrap').style.display = showFuture ? 'block' : 'none';
-  document.getElementById('recurring-edit-preserve-wrap').style.display = showFuture ? 'flex' : 'none';
-});
 document.getElementById('clone-back').addEventListener('click', () => {
   if (currentSession) openDetailsModal(currentSession.session_id);
 });
@@ -351,8 +321,11 @@ document.getElementById('clone-submit').addEventListener('click', async (e) => {
 document.querySelectorAll('#modal-details [data-status]').forEach(b => {
   b.addEventListener('click', async () => {
     if (!currentSession) return;
-    if (currentSession.is_recurring && b.dataset.status === 'cancelled' &&
-        !confirm(t('schedule.cancelOccurrenceConfirm', { date: currentSession.session_date }))) return;
+    if (currentSession.is_recurring && b.dataset.status === 'cancelled') {
+      const change = await requestScheduleChange({ title: t('action.cancel'), summary: currentSession.program_name,
+        scope: 'occurrence', occurrenceDate: currentSession.session_date });
+      if (!change) return;
+    }
     const body = currentSession.is_recurring
       ? { ...recurringSessionPayload(currentSession), status: b.dataset.status,
           occurrenceNotes: document.getElementById('occurrence-notes').value || null }
@@ -369,7 +342,11 @@ document.querySelectorAll('#modal-details [data-status]').forEach(b => {
 // Delete only the clicked day
 document.getElementById('session-delete').addEventListener('click', async () => {
   if (!currentSession) return;
-  if (!confirm(t('confirm.deleteDay'))) return;
+  if (currentSession.is_recurring) {
+    const change = await requestScheduleChange({ title: t('action.deleteDay'), summary: currentSession.program_name,
+      scope: 'occurrence', occurrenceDate: currentSession.session_date });
+    if (!change) return;
+  } else if (!confirm(t('confirm.deleteDay'))) return;
   const body = currentSession.is_recurring
     ? recurringSessionPayload(currentSession)
     : { sessionId: currentSession.session_id };
@@ -384,20 +361,20 @@ document.getElementById('session-delete').addEventListener('click', async () => 
 document.getElementById('session-end-series').addEventListener('click', async () => {
   if (!currentSession?.is_recurring) return;
   const recurrenceDate = currentSession.recurrence_date || currentSession.session_date;
-  const cutoffDate = recurrenceDate > todayISO() ? recurrenceDate : todayISO();
-  if (!confirm(t('schedule.endSeriesConfirm', { date: cutoffDate }))) return;
-  const response = await api('/api/admin/schedule/timetable', {
-    method: 'POST',
-    body: JSON.stringify({
-      operation: 'end', seriesId: currentSession.recurring_series_id, cutoffDate,
-    }),
-  });
-  if (!response.ok) {
-    showModalError(await response.text());
-    return;
+  const change = await requestScheduleChange({ title: t('schedule.endSeries'), summary: currentSession.program_name,
+    date: recurrenceDate > todayISO() ? recurrenceDate : todayISO(), impact: t('schedule.endImpact') });
+  if (!change) return;
+  try {
+    const response = await api('/api/admin/schedule/timetable', {
+      method: 'POST',
+      body: JSON.stringify({ operation: 'end', seriesId: currentSession.recurring_series_id, cutoffDate: change.cutoffDate }),
+    });
+    if (!response.ok) throw new Error(await response.text());
+    closeModal();
+    refreshScheduleViews();
+  } catch (err) {
+    showModalError(err.message);
   }
-  closeModal();
-  refreshScheduleViews();
 });
 
 document.getElementById('occurrence-notes-save').addEventListener('click', async () => {

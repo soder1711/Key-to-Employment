@@ -4,10 +4,92 @@ const modal = document.getElementById('session-modal');
 const programModal = document.getElementById('program-modal');
 
 let editingSession = false;
+let editingTimetable = false;
+let currentRule = null;
+
+function scheduleChangeSummary(before, after) {
+  const describe = item => {
+    const program = adminPrograms.find(p => p.program_id === Number(item.programId ?? item.program_id));
+    const employeeId = item.employeeId !== undefined ? item.employeeId : item.employee_id;
+    const employee = adminEmployees.find(e => e.employee_id === Number(employeeId));
+    const details = [program?.name || item.program_name, employee ? `${employee.first_name} ${employee.last_name}`.trim() : t('person.unassigned'),
+      dayName(Number(item.weekday ?? new Date(`${item.session_date}T00:00:00Z`).getUTCDay())),
+      fmtTime(item.startTime !== undefined ? item.startTime : item.start_time),
+      fmtTime(item.endTime !== undefined ? item.endTime : item.end_time),
+      `${Number(item.points).toFixed(1)} ${t('unit.pts')}`];
+    const startDate = item.startDate ?? item.start_date;
+    if (startDate) details.push(t('schedule.ruleDates', { start: startDate,
+      end: (item.endDate !== undefined ? item.endDate : item.end_date) || t('schedule.noEnd') }));
+    if (item.isSudden ?? item.is_sudden) details.push(t('tag.sudden'));
+    details.push(`${t('modal.notesPrefix')}${item.notes || '—'}`);
+    return details.join(' · ');
+  };
+  return `${describe(before)} → ${describe(after)}`;
+}
+
+function requestScheduleChange({ title, summary, date = todayISO(), occurrenceDate = null,
+  allowOccurrence = false, scope = 'future', allowReplace = false, minDate = todayISO(), impact = null }) {
+  const dialog = document.getElementById('schedule-change-dialog');
+  if (dialog.open) return Promise.resolve(null);
+  const form = document.getElementById('schedule-change-form');
+  const scopeInput = document.getElementById('schedule-change-scope');
+  const dateInput = document.getElementById('schedule-change-date');
+  const replace = document.getElementById('schedule-change-replace');
+  const previousFocus = document.activeElement;
+  document.getElementById('schedule-change-title').textContent = title;
+  document.getElementById('schedule-change-summary').textContent = summary;
+  scopeInput.value = scope;
+  scopeInput.disabled = !allowOccurrence;
+  dateInput.value = date;
+  dateInput.min = minDate;
+  replace.checked = false;
+  const updateImpact = () => {
+    const future = scopeInput.value === 'future';
+    dateInput.disabled = !future;
+    document.getElementById('schedule-change-date-wrap').style.display = future ? 'block' : 'none';
+    document.getElementById('schedule-change-replace-wrap').style.display = future && allowReplace ? 'flex' : 'none';
+    document.getElementById('schedule-change-impact').textContent = impact || (future
+      ? t('schedule.futureImpact', { date: dateInput.value,
+          policy: t(replace.checked && allowReplace ? 'schedule.exceptionReplaced' : 'schedule.exceptionPreserved') })
+      : t('schedule.occurrenceImpact', { date: occurrenceDate }));
+  };
+  updateImpact();
+  return new Promise(resolve => {
+    let result = null;
+    const submit = event => {
+      event.preventDefault();
+      if (!form.reportValidity()) return;
+      result = { scope: scopeInput.value, cutoffDate: scopeInput.value === 'future' ? dateInput.value : occurrenceDate,
+        replaceFutureExceptions: scopeInput.value === 'future' && allowReplace && replace.checked };
+      dialog.close();
+    };
+    const cancel = () => dialog.close();
+    const finish = () => {
+      form.removeEventListener('submit', submit);
+      form.removeEventListener('input', updateImpact);
+      document.getElementById('schedule-change-cancel').removeEventListener('click', cancel);
+      previousFocus?.focus();
+      resolve(result);
+    };
+    form.addEventListener('submit', submit);
+    form.addEventListener('input', updateImpact);
+    document.getElementById('schedule-change-cancel').addEventListener('click', cancel);
+    dialog.addEventListener('close', finish, { once: true });
+    dialog.showModal();
+  });
+}
 
 function openModal(which) {
+  editingTimetable = which === 'rule';
+  document.getElementById('assign-rule-fields').style.display = editingTimetable ? 'block' : 'none';
+  document.getElementById('assign-rule-stop').style.display = editingTimetable && currentRule ? 'inline-block' : 'none';
+  document.getElementById('assign-rule-start').disabled = !editingTimetable || !!currentRule;
+  document.getElementById('assign-rule-start').required = editingTimetable;
+  document.getElementById('assign-rule-end').disabled = !editingTimetable;
+  document.getElementById('assign-program').required = editingTimetable;
+  document.getElementById('assign-points').required = editingTimetable;
   document.getElementById('modal-assign-form').style.display =
-    which === 'assign' || which === 'edit' ? 'block' : 'none';
+    which === 'assign' || which === 'edit' || editingTimetable ? 'block' : 'none';
   document.getElementById('modal-details').style.display = which === 'details' ? 'block' : 'none';
   document.getElementById('session-clone-form').style.display = which === 'clone' ? 'block' : 'none';
   document.getElementById('modal-error').style.display = 'none';
@@ -18,6 +100,8 @@ function closeModal() {
   modal.style.display = 'none';
   currentSession = null;
   editingSession = false;
+  editingTimetable = false;
+  currentRule = null;
 }
 
 function showModalError(msg) {
@@ -83,9 +167,91 @@ function refreshAssignDefaults() {
     (document.getElementById('assign-sudden').checked ? 2 : 1);
   const ptsInput = document.getElementById('assign-points');
   ptsInput.value = pts;
-  ptsInput.readOnly = !editingSession;
+  ptsInput.readOnly = !editingSession && !editingTimetable;
 
   updateAssignPeriodHint();
+}
+
+function populateRulePickers() {
+  const weekday = document.getElementById('assign-weekday');
+  const employee = document.getElementById('assign-employee');
+  const dayValue = weekday.value;
+  const employeeValue = employee.value;
+  weekday.innerHTML = [1, 2, 3, 4, 5, 6, 0].map(day =>
+    `<option value="${day}">${escapeHtml(dayName(day))}</option>`).join('');
+  const employees = [...adminEmployees];
+  if (currentRule?.employee_id != null && !employees.some(item => item.employee_id === currentRule.employee_id)) {
+    employees.push({ employee_id: currentRule.employee_id, first_name: currentRule.first_name, last_name: currentRule.last_name });
+  }
+  employee.innerHTML = `<option value="">${escapeHtml(t('person.unassigned'))}</option>` + employees.map(item =>
+    `<option value="${item.employee_id}">${escapeHtml(`${item.first_name || ''} ${item.last_name || ''}`.trim() || t('modal.employee', { id: item.employee_id }))}</option>`).join('');
+  if (dayValue) weekday.value = dayValue;
+  employee.value = employeeValue;
+}
+
+function openRuleModal(employeeId, weekday, rule = null) {
+  currentSession = null;
+  currentRule = rule;
+  editingSession = false;
+  planPeriod = null;
+  openModal('rule');
+  populateRulePickers();
+  document.getElementById('assign-weekday').value = String(rule?.weekday ?? weekday);
+  document.getElementById('assign-employee').value = rule?.employee_id ?? employeeId ?? '';
+  document.getElementById('assign-rule-start').value = rule?.start_date || todayISO();
+  document.getElementById('assign-rule-end').value = rule?.end_date || '';
+  document.getElementById('assign-date-row').style.display = 'none';
+  document.getElementById('assign-repeat-option').style.display = 'none';
+  resetAssignRepeat();
+  populatePrograms(rule?.program_id, rule);
+  document.getElementById('assign-sudden').checked = !!rule?.is_sudden;
+  refreshAssignDefaults();
+  if (rule) {
+    document.getElementById('assign-program').value = String(rule.program_id);
+    document.getElementById('assign-start').value = rule.start_time || '';
+    document.getElementById('assign-end').value = rule.end_time || '';
+    document.getElementById('assign-points').value = rule.points;
+  }
+  document.getElementById('assign-notes').value = rule?.notes || '';
+  document.querySelector('label[for="assign-points"]').textContent = t('modal.pointsEditable');
+  translateRuleModal();
+  document.getElementById('assign-weekday').focus();
+}
+
+function translateRuleModal() {
+  const title = t(currentRule ? 'schedule.saveEntry' : 'schedule.createEntry');
+  document.getElementById('modal-title').textContent = title;
+  document.getElementById('assign-submit').textContent = title;
+  document.querySelector('label[for="assign-points"]').textContent = t('modal.pointsEditable');
+  document.getElementById('assign-context').textContent = currentRule
+    ? `${currentRule.program_name} · ${t('schedule.effectiveFrom', { date: currentRule.effective_from })}`
+    : t('schedule.ruleContext');
+}
+
+async function saveTimetableRule(payload) {
+  const body = {
+    ...payload, operation: currentRule ? 'edit' : 'create',
+    weekday: Number(document.getElementById('assign-weekday').value),
+    employeeId: document.getElementById('assign-employee').value ? Number(document.getElementById('assign-employee').value) : null,
+    startDate: document.getElementById('assign-rule-start').value,
+    endDate: document.getElementById('assign-rule-end').value || null,
+  };
+  if (body.endDate && body.endDate < body.startDate) {
+    showModalError(t('schedule.invalidRange'));
+    return;
+  }
+  if (currentRule) {
+    const change = await requestScheduleChange({ title: t('schedule.saveEntry'),
+      summary: scheduleChangeSummary(currentRule, body),
+      date: currentRule.effective_from > todayISO() ? currentRule.effective_from : todayISO(), allowReplace: true });
+    if (!change) return;
+    Object.assign(body, { seriesId: currentRule.series_id, cutoffDate: change.cutoffDate,
+      replaceFutureExceptions: change.replaceFutureExceptions });
+  }
+  const response = await api('/api/admin/schedule/timetable', { method: 'POST', body: JSON.stringify(body) });
+  if (!response.ok) throw new Error(await response.text());
+  closeModal();
+  refreshScheduleViews();
 }
 
 function resetAssignRepeat() {
@@ -156,14 +322,6 @@ function openSessionEdit() {
   document.getElementById('assign-date-row').style.display = 'block';
   document.querySelector('label[for="assign-date"]').textContent =
     t(s.is_recurring ? 'schedule.moveTo' : 'modal.date');
-  document.getElementById('recurring-edit-scope').style.display = s.is_recurring ? 'block' : 'none';
-  const recurrenceDate = s.recurrence_date || s.session_date;
-  document.getElementById('recurring-edit-cutoff').value =
-    recurrenceDate > todayISO() ? recurrenceDate : todayISO();
-  document.getElementById('recurring-edit-mode').value = 'future';
-  document.getElementById('recurring-edit-cutoff-wrap').style.display = s.is_recurring ? 'block' : 'none';
-  document.getElementById('recurring-edit-preserve-wrap').style.display = s.is_recurring ? 'flex' : 'none';
-  document.getElementById('recurring-edit-replace-exceptions').checked = false;
   document.getElementById('assign-repeat-option').style.display = 'none';
   document.getElementById('assign-date').value = s.session_date;
   populatePrograms(s.program_id, s);
