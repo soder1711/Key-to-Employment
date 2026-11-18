@@ -47,8 +47,31 @@ const I18N = {
     'schedule.title': 'Schedule',
     'schedule.prev': '← Prev week', 'schedule.today': 'Today', 'schedule.next': 'Next week →',
     'schedule.copyNext': 'Copy week to next week',
-    'schedule.templateSave': 'Save this week as weekly timetable',
+    'schedule.templateSave': 'Import this week into timetable',
     'schedule.templateDisable': 'Stop weekly timetable',
+    'schedule.timetableEdit': 'Edit weekly timetable',
+    'schedule.timetableHint': 'Recurring entries are projected into schedules and summaries without creating session rows. Sessions store actual completion and occurrence notes.',
+    'schedule.timetableEmpty': 'No recurring entries yet.',
+    'schedule.weekly': 'Weekly', 'schedule.weeklyModified': 'Weekly - Modified',
+    'schedule.day': 'Weekday', 'schedule.assignee': 'Assigned person',
+    'schedule.editScope': 'Apply edit to',
+    'schedule.thisFuture': 'This and future occurrences', 'schedule.onlyThis': 'Only this occurrence',
+    'schedule.moveTo': 'Move occurrence to',
+    'schedule.startDate': 'Starts on', 'schedule.endDate': 'Ends on (optional)',
+    'schedule.applyFrom': 'Apply schedule changes from',
+    'schedule.preserveExceptions': 'Replace future occurrence exceptions',
+    'schedule.saveEntry': 'Save recurring entry', 'schedule.createEntry': 'Add recurring entry',
+    'schedule.cancelEdit': 'Cancel edit', 'schedule.endSeries': 'End series from date',
+    'schedule.endSeriesConfirm': 'End this weekly series from {date}? Earlier settings and completed sessions will remain unchanged.',
+    'schedule.recurringEditConfirm': 'Apply this schedule change to this and future occurrences from {date}? Past and completed sessions remain unchanged. Future exceptions will {policy}.',
+    'schedule.exceptionEditConfirm': 'Change only the occurrence on {date}? This will be saved as a “Weekly - Modified” exception.',
+    'schedule.exceptionPreserved': 'be preserved', 'schedule.exceptionReplaced': 'be replaced',
+    'schedule.reassignConfirm': 'Assign this recurring entry to {name} from {date} onward? Past and completed sessions remain unchanged.',
+    'schedule.cancelOccurrenceConfirm': 'Cancel only the occurrence on {date}? The weekly series will continue.',
+    'schedule.replaceExceptionsConfirm': 'Replace existing future exceptions for this weekly series? Choose No to preserve them.',
+    'schedule.noteSave': 'Save occurrence note', 'schedule.actualNote': 'Actual session note',
+    'schedule.importConfirm': 'Import non-recurring sessions from {date} into the weekly timetable? Existing recurring entries are kept.',
+    'schedule.stopConfirm': 'Stop all recurring entries from {date} onward? Earlier settings and completed sessions remain unchanged.',
     'schedule.empty': 'No sessions scheduled for you this week.',
     'schedule.adminHint': 'Click an empty cell to assign a session · click a chip to edit or update it. Save a week as the weekly timetable to generate future weeks when viewed; disable it anytime. Pts = completed points this week.',
     'schedule.loadError': 'Failed to load schedule: {msg}',
@@ -56,13 +79,7 @@ const I18N = {
     'sth.time': 'Time', 'sth.points': 'Points', 'sth.status': 'Status',
     'grid.employee': 'Employee', 'grid.pts': 'Pts',
     'plan.title': 'Weekly plan', 'plan.adminTag': 'admin', 'plan.manage': 'Manage tasks',
-    'plan.hint': 'Drag a person from the top onto a task to give it a person. ' +
-      'If the same task (same time) exists on this weekday in following weeks, a popup asks ' +
-      'whether to apply the person to this day only or to all following weeks — with an option ' +
-      'to override weeks that already have a person. Points are added up automatically. ' +
-      'Click a task for options. One day is shown at a time — use the arrows (or ← → keys) to see another day. ' +
-      '"Delete + following weeks" removes every later occurrence with the same task, same time and same weekday; anything else is kept. ' +
-      'Use "Manage tasks" to create new tasks or delete them from the list.',
+    'plan.hint': 'Drag a person from the top onto a task to assign them. A recurring entry updates this and future occurrences from the displayed date after confirmation; a one-off session changes only that session. Earlier and completed sessions stay unchanged. Click a task for options. One day is shown at a time — use the arrows (or ← → keys) to browse. Use “Edit weekly timetable” to manage recurring entries.',
     'plan.prev': '← Previous day', 'plan.today': 'Today', 'plan.next': 'Next day →',
     'plan.people': 'People',
     'plan.morning': 'Morning', 'plan.afternoon': 'Afternoon and evening',
@@ -97,19 +114,7 @@ const I18N = {
     'action.edit': 'Edit', 'action.cloneWeekdays': 'Clone to weekdays',
     'action.saveChanges': 'Save changes', 'action.back': 'Back', 'action.clone': 'Clone',
     'action.complete': '✓ Complete', 'action.reopen': '↺ Reopen', 'action.cancel': '✕ Cancel',
-    'action.deleteDay': 'Delete this day', 'action.deleteSeries': 'Delete + following weeks',
-    'apply.title': 'Apply person to following weeks?',
-    'apply.override': ' Override weeks that already have a person',
-    'apply.note': 'Unchecked: only weeks without a person get this person; weeks that already ' +
-      'have someone keep theirs. Checked: every following week gets this person, replacing existing ones.',
-    'apply.one': 'This day only', 'apply.all': 'Apply to all following weeks',
-    'apply.lead': 'You put <strong>{name}</strong> on this week\u2019s task.',
-    'apply.count1': 'There is <strong>1</strong> similar task',
-    'apply.countN': 'There are <strong>{n}</strong> similar tasks',
-    'apply.tail': 'in following weeks (same task, same time, same weekday)',
-    'apply.has1': 'of which already has a person',
-    'apply.hasN': 'of which already have a person',
-    'apply.ask': 'Apply {name} there too?',
+    'action.deleteDay': 'Delete this day',
     'programs.title': 'Tasks',
     'programs.context': 'Create new tasks or delete them from the list. Deleting a task that ' +
       'already has scheduled sessions only hides it (the sessions are kept); a task with no ' +
@@ -141,24 +146,14 @@ const I18N = {
     'err.weeklyTemplateFailed': 'Weekly timetable update failed: ',
     'err.statusFailed': 'Status update failed', 'err.deleteFailed': 'Delete failed',
     'err.assignFailed': 'Could not assign person: ',
-    'err.applyFailed': 'Could not apply to following weeks: ',
     'err.codeName': 'Code and name are required.',
     'err.points': 'Default points must be a number of at least 0.',
     'confirm.copyWeek': 'Copy the schedule from {from} to {to}? Existing matching sessions will not be duplicated.',
-    'confirm.setWeeklyTemplate': 'Use this week as the repeating timetable? Future weeks will be generated when viewed; already-created sessions stay unchanged.',
-    'confirm.disableWeeklyTemplate': 'Stop generating sessions from the weekly timetable? Existing sessions will stay on the schedule.',
     'confirm.deleteDay': 'Delete this task? The deletion is recorded in history.',
-    'confirm.deleteSeries': 'Delete this task AND every later occurrence of this task with the SAME time\n' +
-      'on this weekday, from this date onward?\n\n' +
-      'Same task at a different time, or on a different weekday, is kept.\n' +
-      'Earlier weeks are kept. Already completed sessions are kept (they count toward points). ' +
-      'The deletion is recorded in history.',
     'confirm.programDelete': 'Delete this task? If it has scheduled sessions they are kept and the task ' +
       'is only hidden from the lists; otherwise it is removed from the database.',
     'alert.copyWeek': 'Copied {count} sessions to next week; {skipped} matching sessions were not duplicated.',
-    'alert.deleteCount': 'Deleted {n} sessions from this date onward.',
     'alert.assignRepeat': 'Task added to {n} weeks (same weekday, same time). Browse to later weeks to see it.',
-    'alert.applySkipped': 'Applied to {a} following week(s); skipped {s} that already had a person.',
     'common.today': 'today',
     'day.sun': 'Sun', 'day.mon': 'Mon', 'day.tue': 'Tue', 'day.wed': 'Wed',
     'day.thu': 'Thu', 'day.fri': 'Fri', 'day.sat': 'Sat',
@@ -196,8 +191,31 @@ const I18N = {
     'schedule.title': 'Lịch',
     'schedule.prev': '← Tuần trước', 'schedule.today': 'Hôm nay', 'schedule.next': 'Tuần sau →',
     'schedule.copyNext': 'Sao chép tuần sang tuần sau',
-    'schedule.templateSave': 'Lưu tuần này làm thời khóa biểu hàng tuần',
+    'schedule.templateSave': 'Nhập tuần này vào thời khóa biểu',
     'schedule.templateDisable': 'Tắt thời khóa biểu hàng tuần',
+    'schedule.timetableEdit': 'Sửa thời khóa biểu hàng tuần',
+    'schedule.timetableHint': 'Các mục lặp lại được hiển thị trong lịch và tổng kết mà không tạo phiên trong cơ sở dữ liệu. Phiên lưu trạng thái hoàn thành thực tế và ghi chú riêng cho lần đó.',
+    'schedule.timetableEmpty': 'Chưa có mục lặp lại.',
+    'schedule.weekly': 'Hàng tuần', 'schedule.weeklyModified': 'Hàng tuần - Đã sửa',
+    'schedule.day': 'Ngày trong tuần', 'schedule.assignee': 'Người được giao',
+    'schedule.editScope': 'Áp dụng chỉnh sửa cho',
+    'schedule.thisFuture': 'Lần này và các lần sau', 'schedule.onlyThis': 'Chỉ lần này',
+    'schedule.moveTo': 'Chuyển lần xuất hiện đến',
+    'schedule.startDate': 'Bắt đầu từ', 'schedule.endDate': 'Kết thúc vào (không bắt buộc)',
+    'schedule.applyFrom': 'Áp dụng thay đổi lịch từ ngày',
+    'schedule.preserveExceptions': 'Thay thế các ngoại lệ trong tương lai',
+    'schedule.saveEntry': 'Lưu mục lặp lại', 'schedule.createEntry': 'Thêm mục lặp lại',
+    'schedule.cancelEdit': 'Hủy sửa', 'schedule.endSeries': 'Kết thúc chuỗi từ ngày',
+    'schedule.endSeriesConfirm': 'Kết thúc chuỗi hàng tuần này từ {date}? Cài đặt trước đó và các phiên đã hoàn thành sẽ không đổi.',
+    'schedule.recurringEditConfirm': 'Áp dụng thay đổi lịch cho lần này và các lần sau từ {date}? Các phiên trước và đã hoàn thành không đổi. Các ngoại lệ tương lai sẽ được {policy}.',
+    'schedule.exceptionEditConfirm': 'Chỉ thay đổi lần xuất hiện ngày {date}? Thay đổi sẽ được lưu thành ngoại lệ “Hàng tuần - Đã sửa”.',
+    'schedule.exceptionPreserved': 'giữ lại', 'schedule.exceptionReplaced': 'thay thế',
+    'schedule.reassignConfirm': 'Giao mục lặp lại này cho {name} từ {date}? Các phiên trước và đã hoàn thành không đổi.',
+    'schedule.cancelOccurrenceConfirm': 'Chỉ hủy lần xuất hiện ngày {date}? Chuỗi hàng tuần vẫn tiếp tục.',
+    'schedule.replaceExceptionsConfirm': 'Thay thế các ngoại lệ tương lai của chuỗi này? Chọn Không để giữ nguyên.',
+    'schedule.noteSave': 'Lưu ghi chú phiên', 'schedule.actualNote': 'Ghi chú phiên thực tế',
+    'schedule.importConfirm': 'Nhập các phiên không lặp lại từ tuần {date} vào thời khóa biểu? Các mục lặp lại hiện có được giữ lại.',
+    'schedule.stopConfirm': 'Dừng tất cả mục lặp lại từ {date}? Cài đặt trước đó và các phiên đã hoàn thành không đổi.',
     'schedule.empty': 'Không có phiên nào được lên lịch cho bạn trong tuần này.',
     'schedule.adminHint': 'Nhấp vào ô trống để gán phiên · nhấp vào thẻ để sửa hoặc cập nhật. Lưu một tuần làm thời khóa biểu để tạo các tuần sau khi được xem; có thể tắt bất cứ lúc nào. Điểm = điểm đã hoàn thành trong tuần.',
     'schedule.loadError': 'Không tải được lịch: {msg}',
@@ -205,12 +223,7 @@ const I18N = {
     'sth.time': 'Giờ', 'sth.points': 'Điểm', 'sth.status': 'Trạng thái',
     'grid.employee': 'Nhân viên', 'grid.pts': 'Điểm',
     'plan.title': 'Kế hoạch tuần', 'plan.adminTag': 'quản trị', 'plan.manage': 'Quản lý nhiệm vụ',
-    'plan.hint': 'Kéo một người từ phía trên vào một nhiệm vụ để gán người. ' +
-      'Nếu cùng nhiệm vụ (cùng giờ) tồn tại ở ngày trong tuần này ở các tuần sau, một cửa sổ sẽ hỏi ' +
-      'bạn muốn gán người chỉ cho ngày này hay cho tất cả các tuần sau — kèm tùy chọn ghi đè các tuần đã có người. ' +
-      'Điểm được cộng tự động. Nhấp vào nhiệm vụ để xem tùy chọn. Mỗi lần hiển thị một ngày — dùng mũi tên (hoặc phím ← →) để xem ngày khác. ' +
-      '"Xóa + các tuần sau" xóa mọi lần xuất hiện sau có cùng nhiệm vụ, cùng giờ, cùng ngày trong tuần; những cái khác được giữ. ' +
-      'Dùng "Quản lý nhiệm vụ" để tạo nhiệm vụ mới hoặc xóa khỏi danh sách.',
+    'plan.hint': 'Kéo người từ phía trên vào nhiệm vụ để giao. Mục lặp lại sẽ cập nhật lần này và các lần sau kể từ ngày đang xem sau khi xác nhận; phiên riêng lẻ chỉ thay đổi phiên đó. Phiên trước và đã hoàn thành được giữ nguyên. Nhấp nhiệm vụ để xem tùy chọn. Mỗi lần hiển thị một ngày — dùng mũi tên (hoặc phím ← →) để duyệt. Dùng “Sửa thời khóa biểu hàng tuần” để quản lý mục lặp lại.',
     'plan.prev': '← Ngày trước', 'plan.today': 'Hôm nay', 'plan.next': 'Ngày sau →',
     'plan.people': 'Nhân sự',
     'plan.morning': 'Buổi sáng', 'plan.afternoon': 'Buổi chiều và tối',
@@ -245,19 +258,7 @@ const I18N = {
     'action.edit': 'Sửa', 'action.cloneWeekdays': 'Sao chép sang ngày khác',
     'action.saveChanges': 'Lưu thay đổi', 'action.back': 'Quay lại', 'action.clone': 'Sao chép',
     'action.complete': '✓ Hoàn thành', 'action.reopen': '↺ Mở lại', 'action.cancel': '✕ Hủy',
-    'action.deleteDay': 'Xóa ngày này', 'action.deleteSeries': 'Xóa + các tuần sau',
-    'apply.title': 'Gán người cho các tuần sau?',
-    'apply.override': ' Ghi đè các tuần đã có người',
-    'apply.note': 'Bỏ chọn: chỉ những tuần chưa có người mới được gán người này; những tuần đã có ' +
-      'người giữ nguyên. Chọn: mọi tuần sau đều được gán người này, thay người hiện tại.',
-    'apply.one': 'Chỉ ngày này', 'apply.all': 'Áp dụng cho tất cả các tuần sau',
-    'apply.lead': 'Bạn đã gán <strong>{name}</strong> cho nhiệm vụ tuần này.',
-    'apply.count1': 'Có <strong>1</strong> nhiệm vụ tương tự',
-    'apply.countN': 'Có <strong>{n}</strong> nhiệm vụ tương tự',
-    'apply.tail': 'ở các tuần sau (cùng nhiệm vụ, cùng giờ, cùng ngày trong tuần)',
-    'apply.has1': 'trong số đó đã có người',
-    'apply.hasN': 'trong số đó đã có người',
-    'apply.ask': 'Gán {name} ở đó luôn không?',
+    'action.deleteDay': 'Xóa ngày này',
     'programs.title': 'Nhiệm vụ',
     'programs.context': 'Tạo nhiệm vụ mới hoặc xóa khỏi danh sách. Xóa nhiệm vụ đã có phiên lên lịch ' +
       'thì chỉ ẩn đi (các phiên được giữ); nhiệm vụ chưa có phiên sẽ bị xóa khỏi cơ sở dữ liệu.',
@@ -288,23 +289,14 @@ const I18N = {
     'err.weeklyTemplateFailed': 'Không cập nhật được thời khóa biểu: ',
     'err.statusFailed': 'Cập nhật trạng thái thất bại', 'err.deleteFailed': 'Xóa thất bại',
     'err.assignFailed': 'Không gán được người: ',
-    'err.applyFailed': 'Không áp dụng được cho các tuần sau: ',
     'err.codeName': 'Cần nhập mã và tên.',
     'err.points': 'Điểm mặc định phải là số không âm.',
     'confirm.copyWeek': 'Sao chép lịch từ {from} sang {to}? Các phiên trùng khớp sẽ không bị sao chép thêm.',
-    'confirm.setWeeklyTemplate': 'Dùng tuần này làm thời khóa biểu lặp lại? Các tuần sau sẽ được tạo khi xem; phiên đã tạo sẽ không thay đổi.',
-    'confirm.disableWeeklyTemplate': 'Dừng tạo phiên theo thời khóa biểu hàng tuần? Các phiên hiện có vẫn được giữ.',
     'confirm.deleteDay': 'Xóa nhiệm vụ này? Việc xóa được ghi lại trong lịch sử.',
-    'confirm.deleteSeries': 'Xóa nhiệm vụ này VÀ mọi lần xuất hiện sau của cùng nhiệm vụ, CÙNG giờ,\n' +
-      'vào ngày trong tuần này, kể từ ngày này?\n\n' +
-      'Cùng nhiệm vụ nhưng khác giờ, hoặc khác ngày trong tuần, sẽ được giữ.\n' +
-      'Các tuần trước được giữ. Phiên đã hoàn thành được giữ (tính vào điểm). Việc xóa được ghi lại trong lịch sử.',
     'confirm.programDelete': 'Xóa nhiệm vụ này? Nếu đã có phiên lên lịch, các phiên được giữ và nhiệm vụ ' +
       'chỉ bị ẩn khỏi danh sách; nếu chưa có phiên, nhiệm vụ bị xóa khỏi cơ sở dữ liệu.',
     'alert.copyWeek': 'Đã sao chép {count} phiên sang tuần sau; không sao chép {skipped} phiên trùng khớp.',
-    'alert.deleteCount': 'Đã xóa {n} phiên kể từ ngày này.',
     'alert.assignRepeat': 'Nhiệm vụ đã được thêm vào {n} tuần (cùng ngày, cùng giờ). Chuyển đến các tuần sau để xem.',
-    'alert.applySkipped': 'Đã gán cho {a} tuần sau; bỏ qua {s} tuần đã có người.',
     'common.today': 'hôm nay',
     'day.sun': 'Chủ Nhật', 'day.mon': 'Thứ Hai', 'day.tue': 'Thứ Ba', 'day.wed': 'Thứ Tư',
     'day.thu': 'Thứ Năm', 'day.fri': 'Thứ Sáu', 'day.sat': 'Thứ Bảy',
@@ -391,6 +383,12 @@ function progressBar(pct) {
       <div class="progress"><div class="progress-fill" style="width:${p}%"></div></div>
       <span class="pct">${p}%</span>
     </div>`;
+}
+
+function scheduleBadge(item) {
+  if (!item?.is_recurring) return '';
+  const label = item.is_modified ? t('schedule.weeklyModified') : t('schedule.weekly');
+  return ` <span class="mini-tag weekly-tag">${escapeHtml(label)}</span>`;
 }
 
 function statusPill(status) {

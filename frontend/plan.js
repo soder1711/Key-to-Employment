@@ -34,19 +34,27 @@ function planCells(s) {
   if (!s) return '<td></td><td></td><td></td>';
   const person = s.employee_id != null
     ? `<span class="person-chip assigned" data-employee-id="${s.employee_id}"
-              data-session-id="${s.session_id}"
+              data-session-id="${s.session_id ?? ''}" data-series-id="${s.recurring_series_id ?? ''}"
+              data-occurrence-date="${s.recurrence_date || s.session_date}"
+              data-display-date="${s.session_date}" data-recurrence-date="${s.recurrence_date || s.session_date}"
               title="${escapeHtml(t('plan.clickOptions'))}">
          ${escapeHtml(planEmployeeName(s.employee_id))}</span>`
     : `<span class="drop-here">${escapeHtml(t('plan.dropHere'))}</span>`;
   return `
     <td class="cell-task">
-      <button type="button" class="task-link" data-session-id="${s.session_id}"
-              title="${escapeHtml(t('plan.clickOptions'))}">${escapeHtml(s.program_name)}</button>
+      <button type="button" class="task-link" data-session-id="${s.session_id ?? ''}"
+              data-series-id="${s.recurring_series_id ?? ''}"
+              data-occurrence-date="${s.recurrence_date || s.session_date}"
+              data-display-date="${s.session_date}" data-recurrence-date="${s.recurrence_date || s.session_date}"
+              title="${escapeHtml(t('plan.clickOptions'))}">${escapeHtml(s.program_name)}${scheduleBadge(s)}</button>
       ${s.is_sudden ? `<span class="mini-tag sudden">${escapeHtml(t('tag.sudden'))}</span>` : ''}
       <span class="task-sub">${fmtTime(s.start_time)}${s.end_time ? '–' + fmtTime(s.end_time) : ''}</span>
     </td>
     <td class="cell-pts">${Number(s.points || 0).toFixed(1)}</td>
-    <td class="cell-person-slot" data-session-id="${s.session_id}">${person}</td>`;
+    <td class="cell-person-slot" data-session-id="${s.session_id ?? ''}"
+        data-series-id="${s.recurring_series_id ?? ''}"
+        data-occurrence-date="${s.recurrence_date || s.session_date}"
+        data-display-date="${s.session_date}" data-recurrence-date="${s.recurrence_date || s.session_date}">${person}</td>`;
 }
 
 function renderDayTable(date) {
@@ -193,8 +201,36 @@ function initPlanSortables() {
 
 async function onPersonDropped(evt) {
   const employeeId = Number(evt.item.dataset.employeeId);
+  const seriesId = Number(evt.to.dataset.seriesId);
+  const occurrenceDate = evt.to.dataset.recurrenceDate || evt.to.dataset.occurrenceDate;
+  if (Number.isSafeInteger(seriesId) && seriesId > 0 && occurrenceDate) {
+    const occurrence = planSessions.find(item => item.recurring_series_id === seriesId &&
+      item.recurrence_date === occurrenceDate);
+    const name = planEmployeeName(employeeId);
+    if (!occurrence || !confirm(t('schedule.reassignConfirm', { name, date: occurrenceDate }))) {
+      renderPlanBoard();
+      return;
+    }
+    const replaceFutureExceptions = confirm(t('schedule.replaceExceptionsConfirm'));
+    try {
+      const res = await api('/api/admin/schedule/timetable', {
+        method: 'POST',
+        body: JSON.stringify({
+          operation: 'edit', seriesId, cutoffDate: occurrenceDate,
+          employeeId, replaceFutureExceptions,
+        }),
+      });
+      if (!res.ok) alert(t('err.assignFailed') + (await res.text()));
+    } catch (err) {
+      alert(t('err.network') + err.message);
+    }
+    await loadPlanBoard();
+    await loadMyTasks();
+    return;
+  }
   const sessionId = Number(evt.to.dataset.sessionId);
-  if (!Number.isInteger(employeeId) || !Number.isInteger(sessionId)) {
+  if (!Number.isSafeInteger(employeeId) || employeeId < 1 ||
+      !Number.isSafeInteger(sessionId) || sessionId < 1) {
     renderPlanBoard();
     return;
   }
@@ -210,30 +246,6 @@ async function onPersonDropped(evt) {
 
   await loadPlanBoard(); // always re-render from saved data
   await loadMyTasks();
-
-  // Ask about applying the same person to the following weeks
-  try {
-    const res = await api(`/api/admin/schedule/following?sessionId=${sessionId}`);
-    if (!res.ok) return;
-    const { following } = await res.json();
-    if (!following || !following.length) return;
-    const name = planEmployeeName(employeeId);
-    pendingApply = { sessionId, employeeId };
-    const withPerson = following.filter(s => s.employee_id != null).length;
-    let ctx = t('apply.lead', { name: escapeHtml(name) }) + ' ' +
-      (following.length === 1
-        ? t('apply.count1')
-        : t('apply.countN', { n: following.length })) + ' ' +
-      t('apply.tail');
-    if (withPerson) {
-      ctx += ', ' + withPerson + ' ' +
-        (withPerson === 1 ? t('apply.has1') : t('apply.hasN', { n: withPerson }));
-    }
-    ctx += ' ' + t('apply.ask', { name: escapeHtml(name) });
-    document.getElementById('apply-context').innerHTML = ctx;
-    document.getElementById('apply-override').checked = false;
-    applyModal.style.display = 'flex';
-  } catch { /* ignore — the single reassign already succeeded */ }
 }
 
 async function loadPlanBoard() {
@@ -252,6 +264,8 @@ async function loadPlanBoard() {
   adminEmployees = data.employees;
   adminPrograms = data.programs;
   sessionById = new Map(data.sessions.map(s => [s.session_id, s]));
+  sessionByOccurrence = new Map(data.sessions.filter(s => s.is_recurring)
+    .map(s => [`${s.recurring_series_id}:${s.recurrence_date || s.session_date}`, s]));
   renderPlanBoard(); // renders only planDayCursor's table + day label
 }
 

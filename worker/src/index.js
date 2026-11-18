@@ -7,9 +7,9 @@ import {
   handleGetMySchedule, handleAdminGetSchedule, handleAdminAssignSession,
   handleAdminSessionStatus, handleAdminDeleteSession,
   handleAdminMonthlySummary, handleAdminSetTarget,
-  handleAdminReassignSession, handleAdminFollowingSessions,
+  handleAdminReassignSession,
   handleAdminUpdateSession, handleAdminCloneSession, handleAdminCopyScheduleWeek,
-  handleAdminSetWeeklyTimetable,
+  handleAdminSetWeeklyTimetable, handleAdminGetTimetable, handleAdminRecurringTimetable,
   handleAdminListPrograms, handleAdminCreateProgram, handleAdminDeleteProgram,
 } from './api.js';
 
@@ -168,8 +168,12 @@ export default {
         const body = await request.json();
         response = await handleAdminSetWeeklyTimetable(env, currentSession, body);
       }
-      else if (url.pathname === '/api/admin/schedule/following' && request.method === 'GET') {
-        response = await handleAdminFollowingSessions(env, currentSession, url);
+      else if (url.pathname === '/api/admin/schedule/timetable' && request.method === 'GET') {
+        response = await handleAdminGetTimetable(env, currentSession);
+      }
+      else if (url.pathname === '/api/admin/schedule/timetable' && request.method === 'POST') {
+        const body = await request.json();
+        response = await handleAdminRecurringTimetable(env, currentSession, body);
       }
       else if (url.pathname === '/api/admin/schedule/reassign' && request.method === 'POST') {
         const body = await request.json();

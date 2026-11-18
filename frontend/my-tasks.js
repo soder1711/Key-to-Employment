@@ -48,7 +48,7 @@ async function loadMyTasks() {
     ...tasks.map(renderMyTaskRow),
     ...planSessions.map(s => `
       <tr>
-        <td class="cell-task"><span class="task-name">${escapeHtml(s.program_name)}</span></td>
+        <td class="cell-task"><span class="task-name">${escapeHtml(s.program_name)}${scheduleBadge(s)}</span></td>
         <td><span class="cat-tag ${escapeHtml(s.category)}">${escapeHtml(s.category)}</span></td>
         <td>${statusPill(s.status)}</td>
         <td class="cell-due">${fmtCellDate(s.session_date)} · ${fmtTime(s.start_time)}${s.end_time ? '–' + fmtTime(s.end_time) : ''}</td>

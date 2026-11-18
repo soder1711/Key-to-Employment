@@ -1,4 +1,24 @@
 ~~todo: point calc fix, widen UI, review past materials, many per job (?)~~
+## Hot patch: enhance weekly timetable
+- [x] Make the weekly timetable the source of truth for recurring schedules:
+  - [x] Add a dedicated Monday-Sunday timetable editor; keep importing an existing week as an optional setup shortcut.
+  - [x] Define recurring entries with weekday, time, task type, assigned person, planned points, an explicit start date, and an optional end date.
+  - [x] Project dated occurrences for requested ranges without creating session rows just because a week is viewed; use shared expansion logic across schedule views and monthly summaries.
+  - [x] Keep sessions as dated records of completion, credited points, actual details, and occurrence-specific notes.
+- [x] Give recurring entries stable series IDs; replace task/weekday/time similarity matching for bulk operations.
+- [x] Preserve earlier timetable settings with effective-dated versions when changes apply from a selected date onward.
+- [x] Make recurring entries stand out with a consistent "Weekly" badge in personal task lists, weekly schedules, planning boards, and session details; do not rely on colour alone.
+- [x] Default recurring schedule edits to "This and future occurrences", with an explicit cutoff and confirmation; cover edits, drag-and-drop reassignment, moves, cancellations, and ending a series.
+  - [x] Keep completion and actual-session notes occurrence-only; preserve past and completed session records.
+  - [x] Decide whether to support "Only this occurrence" schedule edits; if supported, persist exceptions and show "Weekly - Modified" with the overridden details.
+  - [x] Preserve existing future exceptions by default; require an explicit option to replace them.
+  - [x] Apply bulk changes atomically and record their scope in schedule history.
+- [x] Add a coordinated schema migration and API/client updates; preserve existing copied sessions as one-offs unless an admin explicitly groups them into a series.
+- [x] Add focused tests for recurrence boundaries, version cutoffs, series isolation, historical/completed record preservation, and exceptions if supported.
+- [x] Smoke-test badges and edit scope across views using a local mocked admin API.
+- [ ] Verify OAuth-backed admin and D1 behavior in a browser before deployment.
+- [x] Update README and API documentation to explain timetable ownership, session records, recurrence markers, and present/future edit behavior.
+
 ## Refactor
 - [x] Split frontend into multiple modules
 ## Task

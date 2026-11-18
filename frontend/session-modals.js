@@ -2,10 +2,6 @@
 
 const modal = document.getElementById('session-modal');
 const programModal = document.getElementById('program-modal');
-const applyModal = document.getElementById('apply-modal');
-
-// Drag & drop "apply to all following weeks?" state
-let pendingApply = null;
 
 let editingSession = false;
 
@@ -101,6 +97,7 @@ function resetAssignRepeat() {
 function openAssignModal(employeeId, date) {
   editingSession = false;
   document.getElementById('assign-date-row').style.display = 'none';
+  document.querySelector('label[for="assign-date"]').textContent = t('modal.date');
   document.getElementById('assign-repeat-option').style.display = 'block';
   document.getElementById('assign-submit').textContent = t('modal.add');
   document.querySelector('label[for="assign-points"]').textContent = t('modal.points');
@@ -125,8 +122,10 @@ function openAssignModal(employeeId, date) {
   openModal('assign');
 }
 
-function openDetailsModal(sessionId) {
-  const s = sessionById.get(sessionId);
+function openDetailsModal(sessionId, seriesId = null, occurrenceDate = null) {
+  const s = seriesId != null
+    ? sessionByOccurrence.get(`${seriesId}:${occurrenceDate}`)
+    : sessionById.get(sessionId);
   if (!s) return;
   currentSession = s;
   const person = s.first_name
@@ -134,12 +133,16 @@ function openDetailsModal(sessionId) {
     : `<em>${escapeHtml(t('person.unassigned'))}</em>`;
   document.getElementById('modal-title').textContent = t('modal.detailsTitle');
   document.getElementById('detail-info').innerHTML = `
-    <strong>${escapeHtml(s.program_name)}</strong> (${escapeHtml(s.category)})<br>
+    <strong>${escapeHtml(s.program_name)}</strong>${scheduleBadge(s)} (${escapeHtml(s.category)})<br>
     ${person} · ${fmtCellDate(s.session_date)}<br>
     ${fmtTime(s.start_time)}${s.end_time ? '–' + fmtTime(s.end_time) : ''} ·
     ${Number(s.points).toFixed(1)} ${t('unit.pts')}${s.is_sudden ? ` · ${escapeHtml(t('tag.sudden'))}` : ''} ·
     <span class="status-pill ${escapeHtml(s.status)}">${escapeHtml(t('status.' + s.status))}</span>
-    ${s.notes ? `<br>${escapeHtml(t('modal.notesPrefix'))}${escapeHtml(s.notes)}` : ''}`;
+    ${(s.occurrence_notes || s.notes) ? `<br>${escapeHtml(t('modal.notesPrefix'))}${escapeHtml(s.occurrence_notes || s.notes)}` : ''}`;
+  document.getElementById('recurring-details').style.display = s.is_recurring ? 'block' : 'none';
+  document.getElementById('occurrence-notes').value = s.occurrence_notes || '';
+  document.getElementById('session-clone').style.display = s.is_recurring ? 'none' : 'inline-block';
+  document.getElementById('session-end-series').style.display = s.is_recurring ? 'inline-block' : 'none';
   openModal('details');
 }
 
@@ -151,6 +154,16 @@ function openSessionEdit() {
   document.getElementById('assign-context').textContent =
     `${s.program_name} · ${fmtCellDate(s.session_date)}`;
   document.getElementById('assign-date-row').style.display = 'block';
+  document.querySelector('label[for="assign-date"]').textContent =
+    t(s.is_recurring ? 'schedule.moveTo' : 'modal.date');
+  document.getElementById('recurring-edit-scope').style.display = s.is_recurring ? 'block' : 'none';
+  const recurrenceDate = s.recurrence_date || s.session_date;
+  document.getElementById('recurring-edit-cutoff').value =
+    recurrenceDate > todayISO() ? recurrenceDate : todayISO();
+  document.getElementById('recurring-edit-mode').value = 'future';
+  document.getElementById('recurring-edit-cutoff-wrap').style.display = s.is_recurring ? 'block' : 'none';
+  document.getElementById('recurring-edit-preserve-wrap').style.display = s.is_recurring ? 'flex' : 'none';
+  document.getElementById('recurring-edit-replace-exceptions').checked = false;
   document.getElementById('assign-repeat-option').style.display = 'none';
   document.getElementById('assign-date').value = s.session_date;
   populatePrograms(s.program_id, s);
@@ -165,6 +178,14 @@ function openSessionEdit() {
   document.getElementById('assign-submit').textContent = t('action.saveChanges');
   updateAssignPeriodHint();
   openModal('edit');
+}
+
+function recurringSessionPayload(s) {
+  return {
+    seriesId: s.recurring_series_id,
+    occurrenceDate: s.recurrence_date || s.session_date,
+    displayDate: s.session_date,
+  };
 }
 
 function openSessionClone() {

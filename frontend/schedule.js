@@ -9,6 +9,8 @@ let monthlySummaryLoaded = false;
 let adminPrograms = [];
 let adminEmployees = [];
 let sessionById = new Map();
+let sessionByOccurrence = new Map();
+let recurringEntries = [];
 let modalEmployeeId = null;
 let modalDate = null;
 let currentSession = null;
@@ -88,6 +90,7 @@ function loadSchedule() {
   document.getElementById('schedule-template-save').style.display = isAdmin ? 'inline-block' : 'none';
   document.getElementById('schedule-template-disable').style.display =
     isAdmin && weeklyTimetableEnabled ? 'inline-block' : 'none';
+  document.getElementById('schedule-timetable-edit').style.display = isAdmin ? 'inline-block' : 'none';
   document.getElementById('admin-schedule-hint').style.display = isAdmin ? 'block' : 'none';
   document.getElementById('admin-schedule-wrap').style.display = isAdmin ? 'block' : 'none';
   document.getElementById('worker-schedule-wrap').style.display = isAdmin ? 'none' : 'block';
@@ -123,7 +126,7 @@ async function loadMySchedule() {
       tbody.innerHTML = data.sessions.map(s => `
         <tr${s.status === 'cancelled' ? ' class="cancelled-row"' : ''}>
           <td>${fmtCellDate(s.session_date)}</td>
-          <td>${escapeHtml(s.program_name)}${s.is_sudden ? ` <span class="mini-tag sudden">${escapeHtml(t('tag.sudden'))}</span>` : ''}</td>
+          <td>${escapeHtml(s.program_name)}${scheduleBadge(s)}${s.is_sudden ? ` <span class="mini-tag sudden">${escapeHtml(t('tag.sudden'))}</span>` : ''}</td>
           <td><span class="cat-tag ${escapeHtml(s.category)}">${escapeHtml(s.category)}</span></td>
           <td>${s.start_time ? fmtTime(s.start_time) : '—'}${s.end_time ? '–' + fmtTime(s.end_time) : ''}</td>
           <td class="pts">${Number(s.points).toFixed(1)}</td>
@@ -178,10 +181,13 @@ function renderMonthProgress(summary, label) {
 
 function slotChipHtml(s) {
   return `
-    <span class="slot-chip ${escapeHtml(s.status)}${s.is_sudden ? ' sudden' : ''}"
-          data-session-id="${s.session_id}"
+    <span class="slot-chip ${escapeHtml(s.status)}${s.is_sudden ? ' sudden' : ''}${s.is_recurring ? ' recurring' : ''}"
+          data-session-id="${s.session_id ?? ''}"
+          data-series-id="${s.recurring_series_id ?? ''}"
+          data-occurrence-date="${s.recurrence_date || s.session_date}"
+          data-display-date="${s.session_date}" data-recurrence-date="${s.recurrence_date || s.session_date}"
           title="${escapeHtml(s.program_name)} · ${fmtTime(s.start_time)} · ${Number(s.points).toFixed(1)} ${t('unit.pts')} · ${escapeHtml(t('status.' + s.status))}">
-      ${escapeHtml(s.program_code)}${s.start_time ? ' ' + fmtTime(s.start_time) : ''}
+      ${escapeHtml(s.program_code)}${s.start_time ? ' ' + fmtTime(s.start_time) : ''}${scheduleBadge(s)}
     </span>`;
 }
 
@@ -198,6 +204,8 @@ async function loadAdminSchedule() {
     adminPrograms = data.programs;
     adminEmployees = data.employees;
     sessionById = new Map(data.sessions.map(s => [s.session_id, s]));
+    sessionByOccurrence = new Map(data.sessions.filter(s => s.is_recurring)
+      .map(s => [`${s.recurring_series_id}:${s.recurrence_date || s.session_date}`, s]));
 
     document.getElementById('schedule-week-label').textContent =
       `${fmtShort(data.dates[0])} – ${fmtShort(data.dates[6])}`;
@@ -256,6 +264,102 @@ async function loadAdminSchedule() {
     error.textContent = t('schedule.loadError', { msg: err.message });
     error.style.display = 'block';
   }
+}
+
+function openTimetableEditor() {
+  const panel = document.getElementById('timetable-editor');
+  const opening = panel.style.display === 'none';
+  panel.style.display = opening ? 'block' : 'none';
+  if (opening) loadTimetableEditor();
+}
+
+async function loadTimetableEditor() {
+  const error = document.getElementById('timetable-editor-error');
+  error.style.display = 'none';
+  try {
+    const response = await api('/api/admin/schedule/timetable');
+    if (!response.ok) throw new Error(`Request failed (${response.status})`);
+    const data = await response.json();
+    recurringEntries = data.entries;
+    populateRecurringPickers();
+    renderTimetableEntries();
+  } catch (err) {
+    error.textContent = t('schedule.loadError', { msg: err.message });
+    error.style.display = 'block';
+  }
+}
+
+function populateRecurringPickers() {
+  const days = [1, 2, 3, 4, 5, 6, 0];
+  document.getElementById('recurring-weekday').innerHTML = days.map(day =>
+    `<option value="${day}">${escapeHtml(dayName(day))}</option>`).join('');
+  document.getElementById('recurring-program').innerHTML = adminPrograms.map(program =>
+    `<option value="${program.program_id}">${escapeHtml(program.code)} — ${escapeHtml(program.name)}</option>`).join('');
+  document.getElementById('recurring-employee').innerHTML =
+    `<option value="">${escapeHtml(t('person.unassigned'))}</option>` + adminEmployees.map(employee =>
+      `<option value="${employee.employee_id}">${escapeHtml(`${employee.first_name} ${employee.last_name}`.trim())}</option>`).join('');
+}
+
+function renderTimetableEntries() {
+  const target = document.getElementById('timetable-entry-list');
+  if (!recurringEntries.length) {
+    target.innerHTML = `<p class="empty">${escapeHtml(t('schedule.timetableEmpty'))}</p>`;
+    return;
+  }
+  target.innerHTML = recurringEntries.map(entry => `
+    <div class="timetable-entry">
+      <span><strong>${escapeHtml(dayName(entry.weekday))}</strong> · ${escapeHtml(entry.start_time || '—')}
+        ${entry.end_time ? `–${escapeHtml(entry.end_time)}` : ''} · ${escapeHtml(entry.program_name)}
+        · ${escapeHtml(entry.first_name ? `${entry.first_name} ${entry.last_name}`.trim() : t('person.unassigned'))}
+        · ${Number(entry.points).toFixed(1)} ${escapeHtml(t('unit.pts'))}
+        <span class="mini-tag weekly-tag">${escapeHtml(t('schedule.weekly'))}</span></span>
+      <span class="timetable-actions">
+        <button type="button" class="btn ghost small" data-timetable-edit="${entry.series_id}">${escapeHtml(t('action.edit'))}</button>
+        <button type="button" class="btn danger small" data-timetable-end="${entry.series_id}">${escapeHtml(t('schedule.endSeries'))}</button>
+      </span>
+    </div>`).join('');
+}
+
+function resetRecurringEditor() {
+  document.getElementById('timetable-entry-form').reset();
+  document.getElementById('recurring-series-id').value = '';
+  document.getElementById('recurring-start-date').value = todayISO();
+  document.getElementById('recurring-start-date').disabled = false;
+  document.getElementById('recurring-cutoff').value = todayISO();
+  document.getElementById('recurring-cutoff-wrap').style.display = 'none';
+  document.getElementById('recurring-replace-exceptions-wrap').style.display = 'none';
+  document.getElementById('recurring-save').textContent = t('schedule.createEntry');
+  document.getElementById('recurring-cancel-edit').style.display = 'none';
+}
+
+function editRecurringEntry(seriesId) {
+  const entry = recurringEntries.find(item => Number(item.series_id) === seriesId);
+  if (!entry) return;
+  document.getElementById('recurring-series-id').value = entry.series_id;
+  document.getElementById('recurring-weekday').value = entry.weekday;
+  document.getElementById('recurring-program').value = entry.program_id;
+  document.getElementById('recurring-employee').value = entry.employee_id ?? '';
+  document.getElementById('recurring-start').value = entry.start_time || '';
+  document.getElementById('recurring-end').value = entry.end_time || '';
+  document.getElementById('recurring-points').value = entry.points;
+  document.getElementById('recurring-sudden').checked = !!entry.is_sudden;
+  document.getElementById('recurring-notes').value = entry.notes || '';
+  document.getElementById('recurring-start-date').value = entry.start_date;
+  document.getElementById('recurring-start-date').disabled = true;
+  document.getElementById('recurring-end-date').value = entry.end_date || '';
+  document.getElementById('recurring-cutoff').value =
+    entry.effective_from > todayISO() ? entry.effective_from : todayISO();
+  document.getElementById('recurring-cutoff-wrap').style.display = 'block';
+  document.getElementById('recurring-replace-exceptions-wrap').style.display = 'flex';
+  document.getElementById('recurring-save').textContent = t('schedule.saveEntry');
+  document.getElementById('recurring-cancel-edit').style.display = 'inline-block';
+}
+
+function openDetailsFromElement(element) {
+  const seriesId = Number(element.dataset.seriesId);
+  const date = element.dataset.recurrenceDate || element.dataset.occurrenceDate;
+  if (seriesId && date) openDetailsModal(null, seriesId, date);
+  else openDetailsModal(Number(element.dataset.sessionId));
 }
 
 // ---------- Month view ----------

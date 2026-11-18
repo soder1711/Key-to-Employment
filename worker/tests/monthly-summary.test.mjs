@@ -149,14 +149,12 @@ test('clearMonthlyTarget deletes only the selected employee month override', asy
 });
 
 test('getMonthlySummary binds exact dates and employee scope', async () => {
-  let sql;
-  let bindings;
+  const statements = [];
   const db = {
     prepare(statement) {
-      sql = statement;
       return {
         bind(...values) {
-          bindings = values;
+          statements.push({ sql: statement, bindings: values });
           return { all: async () => ({ results: [session(1, '2024-02-29', 'completed', 2.5)] }) };
         },
       };
@@ -164,7 +162,51 @@ test('getMonthlySummary binds exact dates and employee scope', async () => {
   };
 
   const [summary] = await getMonthlySummary(db, 2024, 2, 7);
-  assert.deepEqual(bindings, ['2024-02-01', '2024-02-29', 2024, 2, 7]);
-  assert.match(sql, /AND e\.employee_id = \?/);
+  const monthlyQuery = statements.find(item => item.sql.includes('LEFT JOIN monthly_targets'));
+  assert.deepEqual(monthlyQuery.bindings, ['2024-02-01', '2024-02-29', 2024, 2, 7]);
+  assert.match(monthlyQuery.sql, /s\.recurring_series_id IS NULL/);
+  assert.match(monthlyQuery.sql, /AND e\.employee_id = \?/);
   assert.equal(summary.days_21_end_points, 2.5);
+});
+
+test('monthly summary counts projected recurring work without inserting sessions', async () => {
+  let writeCount = 0;
+  const db = {
+    prepare(sql) {
+      return {
+        bind() {
+          return {
+            all: async () => {
+              if (sql.includes('LEFT JOIN monthly_targets')) {
+                return { results: [{
+                  employee_id: 7, first_name: 'Test', last_name: 'Employee',
+                  email: 'test@example.com', target_points: 20, target_is_override: 1,
+                  session_id: null, session_date: null, status: null, points: null,
+                }] };
+              }
+              if (sql.includes('FROM recurring_schedule_versions')) {
+                return { results: [{
+                  series_id: 12, weekday: 1, program_id: 2, employee_id: 7,
+                  start_time: '09:00', end_time: '10:00', points: 2, is_sudden: 0,
+                  notes: null, start_date: '2026-11-02', end_date: null,
+                  effective_from: '2026-11-02', effective_to: null,
+                  program_code: 'TASK', program_name: 'Weekly task', category: 'general',
+                  first_name: 'Test', last_name: 'Employee', employee_email: 'test@example.com',
+                }] };
+              }
+              return { results: [] };
+            },
+            run: async () => { writeCount++; return { success: true }; },
+          };
+        },
+      };
+    },
+  };
+
+  const [summary] = await getMonthlySummary(db, 2026, 11);
+  assert.equal(summary.scheduled_sessions, 5);
+  assert.equal(summary.total_sessions, 5);
+  assert.equal(summary.potential_points, 10);
+  assert.equal(summary.completed_sessions, 0);
+  assert.equal(writeCount, 0);
 });

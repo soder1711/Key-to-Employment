@@ -2,13 +2,16 @@ import {
   getEmployeeTasks, getTaskDetail, updateAssignmentProgress,
   getAllTasks, getAnyTaskDetail, updateAssignmentProgressAsAdmin,
   weekStartFrom, weekDates, getPrograms, getActiveEmployees,
-  getSessionsBetween, getSessionById, createSession, updateSession, setSessionStatus,
+  getSessionsBetween, getScheduleBetween, getRecurringOccurrencesBetween,
+  getRecurringOccurrenceByKey, clearRecurringException,
+  getSessionById, createSession, updateSession, setSessionStatus,
   deleteSession, logScheduleHistory, getMonthlySummary, setMonthlyTarget, clearMonthlyTarget,
-  getActiveWeeklyScheduleTemplates, materializeWeeklySchedule, saveWeeklyScheduleFromWeek,
-  disableWeeklySchedule, recordWeeklyScheduleException,
+  getRecurringTimetable, getRecurringVersionAt, createRecurringSeries,
+  createRecurringSeriesBatch,
+  updateRecurringSeriesFrom, endRecurringSeriesFrom, endRecurringTimetableFrom,
+  setRecurringException, saveRecurringOccurrence,
   reassignSession, getAllPrograms, getProgramById, getProgramByCode,
   createProgram, deactivateProgram, hardDeleteProgram, countProgramReferences,
-  findSeriesSessionsFrom, findFollowingSeries,
 } from './db.js';
 import { monthlyDateRange } from './monthly-summary.js';
 
@@ -293,8 +296,7 @@ function addDaysISO(iso, days) {
 export async function handleGetMySchedule(env, session, url) {
   const start = weekStartFrom(url.searchParams.get('start'));
   const dates = weekDates(start);
-  await materializeWeeklySchedule(env.DB, dates[0], dates[6]);
-  const sessions = await getSessionsBetween(env.DB, dates[0], dates[6], session.employeeId);
+  const sessions = await getScheduleBetween(env.DB, dates[0], dates[6], session.employeeId);
 
   // Explicit ?year=&month= wins; otherwise use the month of the week's Thursday
   let year = parseInt(url.searchParams.get('year'), 10);
@@ -306,7 +308,6 @@ export async function handleGetMySchedule(env, session, url) {
     month = mid.getUTCMonth() + 1;
   }
   const monthRange = monthlyDateRange(year, month);
-  await materializeWeeklySchedule(env.DB, monthRange.start, monthRange.end);
   const rows = await getMonthlySummary(env.DB, year, month, session.employeeId);
 
   return Response.json({
@@ -337,16 +338,15 @@ export async function handleAdminGetSchedule(env, session, url) {
 
   const start = weekStartFrom(url.searchParams.get('start'));
   const dates = weekDates(start);
-  await materializeWeeklySchedule(env.DB, dates[0], dates[6]);
-  const [sessions, employees, programs, templates] = await Promise.all([
-    getSessionsBetween(env.DB, dates[0], dates[6]),
+  const [sessions, employees, programs, timetable] = await Promise.all([
+    getScheduleBetween(env.DB, dates[0], dates[6]),
     getActiveEmployees(env.DB),
     getPrograms(env.DB),
-    getActiveWeeklyScheduleTemplates(env.DB),
+    getRecurringTimetable(env.DB),
   ]);
   return Response.json({
     weekStart: start, dates, sessions, employees, programs,
-    weeklyTimetableEnabled: templates.length > 0,
+    weeklyTimetableEnabled: timetable.length > 0,
   });
 }
 
@@ -370,65 +370,188 @@ export async function handleAdminSetWeeklyTimetable(env, session, body) {
     return new Response('enabled must be a boolean', { status: 400 });
   }
 
-  let templateCount = 0;
-  if (body.enabled) {
-    const weekStart = body.weekStart;
-    if (typeof weekStart !== 'string' || !isValidISODate(weekStart) ||
-        weekStartFrom(weekStart) !== weekStart) {
-      return new Response('weekStart must be a valid Monday date', { status: 400 });
-    }
-    const dates = weekDates(weekStart);
-    await materializeWeeklySchedule(env.DB, dates[0], dates[6]);
-    templateCount = await saveWeeklyScheduleFromWeek(
-      env.DB, dates[0], dates[6], session.employeeId
-    );
-    const active = await getActiveWeeklyScheduleTemplates(env.DB);
-    templateCount = active.length;
-    await logScheduleHistory(
-      env.DB, session.email, 'template', 'week', null,
-      `Saved weekly timetable from ${weekStart} with ${templateCount} task(s)`
-    );
-  } else {
-    await disableWeeklySchedule(env.DB);
-    await logScheduleHistory(
-      env.DB, session.email, 'template', 'week', null,
-      'Disabled automatic weekly timetable generation; existing sessions were kept'
-    );
+  if (!body.enabled) {
+    const cutoffDate = body.cutoffDate || new Date().toISOString().slice(0, 10);
+    if (!isValidISODate(cutoffDate)) return new Response('Invalid cutoff date', { status: 400 });
+    await endRecurringTimetableFrom(env.DB, cutoffDate, session.email);
+    return Response.json({ success: true, enabled: false, cutoffDate });
   }
 
+  const weekStart = body.weekStart;
+  if (typeof weekStart !== 'string' || !isValidISODate(weekStart) ||
+      weekStartFrom(weekStart) !== weekStart) {
+    return new Response('weekStart must be a valid Monday date', { status: 400 });
+  }
+  const endDate = addDaysISO(weekStart, 6);
+  const sourceSessions = (await getScheduleBetween(env.DB, weekStart, endDate))
+    .filter(row => !row.is_recurring && row.status !== 'cancelled');
+  const versions = sourceSessions.map(occurrence => {
+    const weekday = new Date(`${occurrence.session_date}T00:00:00Z`).getUTCDay();
+    return {
+      weekday, programId: occurrence.program_id, employeeId: occurrence.employee_id,
+      startTime: occurrence.start_time, endTime: occurrence.end_time,
+      points: Number(occurrence.points), isSudden: !!occurrence.is_sudden,
+      notes: occurrence.notes || null, startDate: weekStart, endDate: null,
+      effectiveFrom: weekStart,
+    };
+  });
+  const seriesIds = await createRecurringSeriesBatch(
+    env.DB, versions, session.employeeId, session.email,
+    `Imported ${versions.length} one-off session(s) from ${weekStart}`,
+  );
   return Response.json({
-    success: true, enabled: templateCount > 0, templateCount,
+    success: true, enabled: seriesIds.length > 0, templateCount: seriesIds.length,
+    seriesIds,
   });
 }
 
-/**
- * @api {get} /api/admin/schedule/following List following similar sessions
- * @apiName AdminFollowingSessions
- * @apiGroup AdminSchedule
- * @apiDescription Returns every session AFTER the given one that is the same
- *   task (program), same start/end time and same weekday — the "apply to
- *   following weeks" candidates after a drag & drop.
- * @apiHeader {String} Cookie Encrypted admin session cookie.
- * @apiQuery {Number} sessionId Source session identifier.
- * @apiSuccess {Object[]} following Matching later sessions with their dates
- *   and current person (employee_id), so the frontend can count skips.
- * @apiError 400 Invalid session identifier.
- * @apiError 403 Admin access required.
- * @apiError 404 Session not found.
- */
-export async function handleAdminFollowingSessions(env, session, url) {
+function recurringInput(body, current = null, effectiveFrom = null) {
+  const field = (key, currentKey, fallback = null) =>
+    body[key] === undefined ? (current?.[currentKey] ?? fallback) : body[key];
+  const sudden = field('isSudden', 'is_sudden', false);
+  if (body.isSudden !== undefined && typeof body.isSudden !== 'boolean') return null;
+  const version = {
+    weekday: Number(field('weekday', 'weekday')),
+    programId: Number(field('programId', 'program_id')),
+    employeeId: field('employeeId', 'employee_id') == null
+      ? null : Number(field('employeeId', 'employee_id')),
+    startTime: field('startTime', 'start_time') || null,
+    endTime: field('endTime', 'end_time') || null,
+    points: Number(field('points', 'points')),
+    isSudden: typeof sudden === 'boolean' ? sudden : Number(sudden) === 1,
+    movedDate: body.movedDate || null,
+    notes: field('notes', 'notes') || null,
+    startDate: field('startDate', 'start_date', effectiveFrom),
+    endDate: field('endDate', 'end_date') || null,
+    effectiveFrom: effectiveFrom || field('effectiveFrom', 'effective_from'),
+  };
+  const validTime = value => value === null ||
+    (typeof value === 'string' && TIME_RE.test(value) &&
+      Number(value.slice(0, 2)) <= 23 && Number(value.slice(3, 5)) <= 59);
+  if (!Number.isInteger(version.weekday) || version.weekday < 0 || version.weekday > 6 ||
+      !Number.isSafeInteger(version.programId) || version.programId < 1 ||
+      (version.employeeId !== null && (!Number.isSafeInteger(version.employeeId) || version.employeeId < 1)) ||
+      !Number.isFinite(version.points) || version.points < 0 || version.points > 100 ||
+      typeof version.isSudden !== 'boolean' || !validTime(version.startTime) ||
+      !validTime(version.endTime) ||
+      (version.notes !== null && (typeof version.notes !== 'string' || version.notes.length > 1000)) ||
+      !isValidISODate(version.startDate) ||
+      (version.endDate !== null && (!isValidISODate(version.endDate) || version.endDate < version.startDate)) ||
+      !isValidISODate(version.effectiveFrom) ||
+      (version.movedDate !== null && !isValidISODate(version.movedDate))) return null;
+  return version;
+}
+
+async function validateRecurringAssignment(env, version) {
+  const program = await getProgramById(env.DB, version.programId);
+  if (!program || !program.is_active) return 'Unknown or inactive task type';
+  if (version.employeeId !== null) {
+    const employee = await env.DB.prepare(
+      'SELECT employee_id FROM employees WHERE employee_id = ? AND is_active = 1'
+    ).bind(version.employeeId).first();
+    if (!employee) return 'Unknown or inactive employee';
+  }
+  return null;
+}
+
+export async function handleAdminGetTimetable(env, session) {
   const denied = requireAdmin(session);
   if (denied) return denied;
+  const entries = await getRecurringTimetable(env.DB);
+  return Response.json({ entries });
+}
 
-  const sessionId = Number(url.searchParams.get('sessionId'));
-  if (!Number.isSafeInteger(sessionId) || sessionId < 1) {
-    return new Response('Invalid session id', { status: 400 });
+export async function handleAdminRecurringTimetable(env, session, body) {
+  const denied = requireAdmin(session);
+  if (denied) return denied;
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return new Response('Invalid timetable action', { status: 400 });
   }
-  const source = await getSessionById(env.DB, sessionId);
-  if (!source) return new Response('Session not found', { status: 404 });
 
-  const following = await findFollowingSeries(env.DB, source);
-  return Response.json({ following });
+  const operation = body.operation;
+  if (operation === 'create') {
+    const effectiveFrom = body.startDate;
+    const version = recurringInput(body, null, effectiveFrom);
+    if (!version) return new Response('Invalid recurring entry', { status: 400 });
+    const invalid = await validateRecurringAssignment(env, version);
+    if (invalid) return new Response(invalid, { status: 400 });
+    const seriesId = await createRecurringSeries(env.DB, version, session.employeeId, session.email);
+    return Response.json({ success: true, seriesId }, { status: 201 });
+  }
+
+  const seriesId = Number(body.seriesId);
+  const cutoffDate = body.cutoffDate;
+  if (!Number.isSafeInteger(seriesId) || seriesId < 1 ||
+      typeof cutoffDate !== 'string' || !isValidISODate(cutoffDate)) {
+    return new Response('Invalid series identifier or cutoff date', { status: 400 });
+  }
+  if (operation === 'end') {
+    const entry = (await getRecurringTimetable(env.DB))
+      .find(item => Number(item.series_id) === seriesId);
+    if (!entry) return new Response('Recurring entry not found', { status: 404 });
+    await endRecurringSeriesFrom(env.DB, seriesId, cutoffDate, session.email);
+    return Response.json({ success: true, seriesId, cutoffDate });
+  }
+  const current = await getRecurringVersionAt(env.DB, seriesId, cutoffDate);
+  if (!current) return new Response('Recurring entry not found for cutoff date', { status: 404 });
+  if (operation === 'edit') {
+    if (cutoffDate < new Date().toISOString().slice(0, 10)) {
+      return new Response('Recurring schedule edits must start today or later', { status: 400 });
+    }
+    const version = recurringInput(body, current, cutoffDate);
+    if (!version) return new Response('Invalid recurring entry', { status: 400 });
+    const invalid = await validateRecurringAssignment(env, version);
+    if (invalid) return new Response(invalid, { status: 400 });
+    if (typeof body.replaceFutureExceptions !== 'boolean') {
+      return new Response('replaceFutureExceptions must be a boolean', { status: 400 });
+    }
+    await updateRecurringSeriesFrom(env.DB, seriesId, current, version, cutoffDate,
+      body.replaceFutureExceptions, session.employeeId, session.email);
+    return Response.json({ success: true, seriesId, cutoffDate });
+  }
+
+  if (operation === 'exception') {
+    const occurrenceDate = body.occurrenceDate;
+    if (typeof occurrenceDate !== 'string' || !isValidISODate(occurrenceDate) ||
+        occurrenceDate < current.start_date ||
+        (current.end_date && occurrenceDate > current.end_date)) {
+      return new Response('Invalid occurrence date', { status: 400 });
+    }
+    const displayDate = body.action === 'modify' && body.movedDate
+      ? body.movedDate : occurrenceDate;
+    if (!isValidISODate(displayDate)) return new Response('Invalid moved date', { status: 400 });
+    const occurrence = await getRecurringOccurrenceByKey(env.DB, seriesId, occurrenceDate);
+    if (!occurrence) return new Response('Recurring occurrence not found', { status: 404 });
+    if (body.action === 'cancel') {
+      if (occurrence.status === 'completed') {
+        return new Response('Completed occurrences cannot be cancelled', { status: 409 });
+      }
+      if (occurrence.is_projected) {
+        await setRecurringException(env.DB, seriesId, occurrenceDate, 'cancelled', null, session.employeeId);
+      } else {
+        await setSessionStatus(env.DB, occurrence.session_id, 'cancelled');
+      }
+      await logScheduleHistory(env.DB, session.email, 'cancel', 'recurring-occurrence', seriesId,
+        `Cancelled series ${seriesId} occurrence ${occurrenceDate}`);
+      return Response.json({ success: true, occurrenceDate });
+    }
+    if (body.action === 'modify') {
+      if (occurrence.status === 'completed') {
+        return new Response('Completed occurrences cannot be modified', { status: 409 });
+      }
+      const version = recurringInput({ ...body, startDate: current.start_date }, current, cutoffDate);
+      if (!version) return new Response('Invalid occurrence override', { status: 400 });
+      const invalid = await validateRecurringAssignment(env, version);
+      if (invalid) return new Response(invalid, { status: 400 });
+      await setRecurringException(env.DB, seriesId, occurrenceDate, 'modified', version, session.employeeId);
+      await logScheduleHistory(env.DB, session.email, 'modify', 'recurring-occurrence', seriesId,
+        `Modified series ${seriesId} occurrence ${occurrenceDate}`);
+      return Response.json({ success: true, occurrenceDate, modified: true });
+    }
+    return new Response('Invalid occurrence action', { status: 400 });
+  }
+
+  return new Response('Unknown timetable operation', { status: 400 });
 }
 
 /**
@@ -729,20 +852,12 @@ export async function handleAdminCopyScheduleWeek(env, session, body) {
  * @api {post} /api/admin/schedule/reassign Change the person of a session
  * @apiName AdminReassignSession
  * @apiGroup AdminSchedule
- * @apiDescription Reassigns the given session. With applyFollowing=true it
- *   also applies the same person to every LATER session of the same series
- *   (same task, same start/end time, same weekday): without override only
- *   weeks that have no person yet, with override every following week.
+ * @apiDescription Reassigns one one-off session. Recurring entries are updated
+ *   through the effective-dated timetable endpoint, which targets a stable series ID.
  * @apiHeader {String} Cookie Encrypted admin session cookie.
  * @apiBody {Number} sessionId Session identifier.
  * @apiBody {Number} employeeId New employee identifier.
- * @apiBody {Boolean} [applyFollowing=false] Also apply to all following weeks.
- * @apiBody {Boolean} [override=false] Also replace people already assigned
- *   in following weeks; otherwise those weeks are skipped.
  * @apiSuccess {Boolean} success Always true when updated.
- * @apiSuccess {Number} [applied] How many following weeks were updated.
- * @apiSuccess {Number} [skipped] How many following weeks were skipped
- *   because they already had a person and override was unchecked.
  * @apiError 400 Invalid payload or unknown employee.
  * @apiError 403 Admin access required.
  * @apiError 404 Session not found.
@@ -751,7 +866,7 @@ export async function handleAdminReassignSession(env, session, body) {
   const denied = requireAdmin(session);
   if (denied) return denied;
 
-  const { sessionId, employeeId, applyFollowing, override } = body;
+  const { sessionId, employeeId, applyFollowing } = body;
   if (!Number.isInteger(sessionId) || !Number.isInteger(employeeId)) {
     return new Response('Invalid reassign payload', { status: 400 });
   }
@@ -764,39 +879,18 @@ export async function handleAdminReassignSession(env, session, body) {
   }
   const before = await getSessionById(env.DB, sessionId);
   if (!before) return new Response('Session not found', { status: 404 });
+  if (before.recurring_series_id != null) {
+    return new Response('Edit recurring assignments through the timetable endpoint', { status: 400 });
+  }
+  if (applyFollowing === true) {
+    return new Response('Bulk reassignment requires a recurring timetable series', { status: 400 });
+  }
 
   // The clicked session itself is always reassigned
   const result = await reassignSession(env.DB, sessionId, employeeId);
   if (result.meta.changes === 0) return new Response('Session not found', { status: 404 });
 
   const person = `${employee.first_name} ${employee.last_name}`;
-
-  // "Apply to all following weeks": same task, same start/end time, same
-  // weekday, strictly after this date. Completed ones are never touched.
-  // Without override, weeks that already have a person are skipped.
-  if (applyFollowing === true) {
-    const following = await findFollowingSeries(env.DB, before);
-    let applied = 0;
-    let skipped = 0;
-    for (const row of following) {
-      if (override !== true && row.employee_id != null) {
-        skipped++;
-        continue;
-      }
-      await reassignSession(env.DB, row.session_id, employeeId);
-      applied++;
-    }
-    await logScheduleHistory(
-      env.DB, session.email, 'reassign', 'session', sessionId,
-      `"${before.program_name}" ${before.session_date}: ` +
-      `${before.first_name ? before.first_name + ' ' + before.last_name : 'unassigned'}` +
-      ` -> ${person}` +
-      ` — applied to ${applied} following week(s)` +
-      (override !== true ? `, skipped ${skipped} that already had a person` : ', override on')
-    );
-    return Response.json({ success: true, applied, skipped });
-  }
-
   await logScheduleHistory(
     env.DB, session.email, 'reassign', 'session', sessionId,
     `"${before.program_name}" ${before.session_date}: ` +
@@ -822,11 +916,46 @@ export async function handleAdminSessionStatus(env, session, body) {
   const denied = requireAdmin(session);
   if (denied) return denied;
 
-  const { sessionId, status } = body;
-  if (!Number.isInteger(sessionId) ||
-      !['scheduled', 'completed', 'cancelled'].includes(status)) {
+  const { sessionId, status, seriesId, occurrenceDate, occurrenceNotes } = body;
+  if (!['scheduled', 'completed', 'cancelled'].includes(status)) {
     return new Response('Invalid status change', { status: 400 });
   }
+  if (Number.isSafeInteger(seriesId) && typeof occurrenceDate === 'string' &&
+      isValidISODate(occurrenceDate)) {
+    let occurrence = await getRecurringOccurrenceByKey(env.DB, seriesId, occurrenceDate);
+    if (!occurrence) return new Response('Recurring occurrence not found', { status: 404 });
+    if (status === 'scheduled' && occurrence.is_projected && occurrence.status === 'scheduled') {
+      return Response.json({ success: true });
+    }
+    let restoreAsException = false;
+    if (status === 'scheduled') {
+      if (occurrence.is_projected && occurrence.status === 'cancelled') {
+        restoreAsException = true;
+        await setRecurringException(env.DB, seriesId, occurrenceDate, 'modified', {
+          movedDate: occurrence.session_date,
+          programId: occurrence.program_id,
+          employeeId: occurrence.employee_id,
+          startTime: occurrence.start_time,
+          endTime: occurrence.end_time,
+          points: Number(occurrence.points),
+          isSudden: !!occurrence.is_sudden,
+          notes: occurrence.notes || null,
+        }, session.employeeId);
+      } else {
+        await clearRecurringException(env.DB, seriesId, occurrenceDate);
+      }
+      occurrence = await getRecurringOccurrenceByKey(env.DB, seriesId, occurrenceDate);
+    }
+    if (status === 'cancelled' && occurrence.is_projected) {
+      await setRecurringException(env.DB, seriesId, occurrenceDate, 'cancelled', null, session.employeeId);
+    } else if (!restoreAsException) {
+      await saveRecurringOccurrence(env.DB, occurrence, status, occurrenceNotes);
+    }
+    await logScheduleHistory(env.DB, session.email, 'status', 'recurring-occurrence', seriesId,
+      `Series ${seriesId} occurrence ${occurrenceDate}: ${occurrence.status} -> ${status}`);
+    return Response.json({ success: true });
+  }
+  if (!Number.isInteger(sessionId)) return new Response('Invalid status change', { status: 400 });
   const before = await getSessionById(env.DB, sessionId);
   if (!before) return new Response('Session not found', { status: 404 });
 
@@ -845,16 +974,10 @@ export async function handleAdminSessionStatus(env, session, body) {
  * @api {post} /api/admin/schedule/delete Delete schedule session
  * @apiName AdminDeleteSession
  * @apiGroup AdminSchedule
- * @apiDescription With deleteFollowing=true it also deletes every LATER
- *   occurrence of the same series: same task, same start time, same end
- *   time, same weekday, from this date onward. A same-task session with a
- *   different time or on a different weekday is never deleted. Weeks
- *   before this date are never touched; completed later sessions are kept
- *   so points and history survive.
+ * @apiDescription Cancels one recurring occurrence or deletes one one-off
+ *   session. Ending a recurring series uses the timetable endpoint and a cutoff date.
  * @apiHeader {String} Cookie Encrypted admin session cookie.
  * @apiBody {Number} sessionId Session identifier.
- * @apiBody {Boolean} [deleteFollowing=false] Also delete every later
- *   occurrence of the same series (same task, same time, same weekday).
  * @apiSuccess {Boolean} success Always true when deleted.
  * @apiSuccess {Number} deletedCount How many sessions were removed.
  * @apiSuccess {Boolean} deletedFollowing Whether the series tail was removed.
@@ -869,45 +992,42 @@ export async function handleAdminDeleteSession(env, session, body) {
     return new Response('Invalid delete payload', { status: 400 });
   }
 
-  const { sessionId, deleteFollowing } = body;
+  const { sessionId, seriesId, occurrenceDate } = body;
+  if (body.deleteFollowing === true) {
+    return new Response('End recurring series through the timetable endpoint', { status: 400 });
+  }
+  if (Number.isSafeInteger(seriesId) && typeof occurrenceDate === 'string' &&
+      isValidISODate(occurrenceDate)) {
+    const occurrence = await getRecurringOccurrenceByKey(env.DB, seriesId, occurrenceDate);
+    if (!occurrence) return new Response('Recurring occurrence not found', { status: 404 });
+    if (occurrence.status === 'completed') {
+      return new Response('Completed occurrences cannot be deleted', { status: 409 });
+    }
+    if (occurrence.is_projected) {
+      await setRecurringException(env.DB, seriesId, occurrenceDate, 'cancelled', null, session.employeeId);
+    } else {
+      await setSessionStatus(env.DB, occurrence.session_id, 'cancelled');
+    }
+    await logScheduleHistory(env.DB, session.email, 'cancel', 'recurring-occurrence', seriesId,
+      `Cancelled series ${seriesId} occurrence ${occurrenceDate}`);
+    return Response.json({ success: true, deletedCount: 1 });
+  }
   if (!Number.isInteger(sessionId)) return new Response('Invalid session id', { status: 400 });
   const before = await getSessionById(env.DB, sessionId);
   if (!before) return new Response('Session not found', { status: 404 });
 
-  if (deleteFollowing === true) {
-    // Delete this session AND all later occurrences of the same series:
-    // same task, SAME START AND END TIME, same weekday, from this date on.
-    // Same task at a different time, or on a different weekday, is kept.
-    // Earlier weeks are untouched. Completed sessions are kept
-    // (points/history), except the session that started the deletion.
-    const following = await findSeriesSessionsFrom(env.DB, before);
-    for (const row of following) {
-      if (row.template_id != null && row.template_date) {
-        await recordWeeklyScheduleException(
-          env.DB, row.template_id, row.template_date, session.employeeId
-        );
-      }
-      await deleteSession(env.DB, row.session_id);
+  if (before.recurring_series_id != null) {
+    if (before.status === 'completed') {
+      return new Response('Completed occurrences cannot be deleted', { status: 409 });
     }
+    await setSessionStatus(env.DB, sessionId, 'cancelled');
     await logScheduleHistory(
-      env.DB, session.email, 'delete', 'session', sessionId,
-      `Deleted "${before.program_name}" ${before.session_date} ` +
-      `(${before.first_name} ${before.last_name}, was ${before.status}) ` +
-      `plus ${Math.max(0, following.length - 1)} later occurrence(s) ` +
-      `with the same time on this weekday from this date onward`
+      env.DB, session.email, 'cancel', 'recurring-occurrence', before.recurring_series_id,
+      `Cancelled series ${before.recurring_series_id} occurrence ${before.recurrence_date}`
     );
-    return Response.json({
-      success: true,
-      deletedCount: following.length,
-      deletedFollowing: true,
-    });
+    return Response.json({ success: true, deletedCount: 1 });
   }
 
-  if (before.template_id != null && before.template_date) {
-    await recordWeeklyScheduleException(
-      env.DB, before.template_id, before.template_date, session.employeeId
-    );
-  }
   await deleteSession(env.DB, sessionId);
   await logScheduleHistory(
     env.DB, session.email, 'delete', 'session', sessionId,
@@ -942,8 +1062,6 @@ export async function handleAdminMonthlySummary(env, session, url) {
   if (!Number.isInteger(year) || year < 1 || year > 9999 || month < 1 || month > 12) {
     return new Response('Invalid year or month', { status: 400 });
   }
-  const monthRange = monthlyDateRange(year, month);
-  await materializeWeeklySchedule(env.DB, monthRange.start, monthRange.end);
   const rows = await getMonthlySummary(env.DB, year, month);
   return Response.json({ year, month, rows });
 }

@@ -59,10 +59,3 @@ function closeProgramModal() {
   programModal.style.display = 'none';
 }
 
-// ---- Apply-to-following-weeks modal ----
-
-function closeApplyModal() {
-  applyModal.style.display = 'none';
-  pendingApply = null;
-}
-

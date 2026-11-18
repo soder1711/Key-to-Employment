@@ -20,6 +20,14 @@ A small employee task and schedule portal built with a static frontend and a Clo
 
 The Worker restricts CORS to `FRONTEND_URL`, and authorization is enforced by the Worker rather than the frontend.
 
+## Weekly timetable
+
+The admin weekly timetable is the source of truth for recurring work. Admins can add recurring entries directly for a weekday, task type, assigned person, time, planned points, and explicit start and optional end dates. Importing a displayed week is also available as a setup shortcut; it imports one-off sessions and leaves existing recurring series alone.
+
+Each recurring entry has a stable series ID. Schedule and monthly-summary reads expand the effective-dated series into dated occurrences without creating database session rows. “This and future occurrences” edits take an explicit cutoff date and preserve earlier versions and future one-off exceptions by default. Admins can explicitly replace exceptions, modify or move a single occurrence, cancel an occurrence, or end a series from a date onward. The “Weekly” and “Weekly - Modified” text badges identify recurring and overridden occurrences.
+
+Session rows represent actual dated outcomes, such as completion, credited points, and occurrence-only notes. Completing a projected occurrence creates its session record; merely viewing a week does not. Existing copied/manual sessions remain one-offs, while records formerly linked to weekly templates retain their history during migration.
+
 ## Local setup
 
 ### Prerequisites
@@ -56,8 +64,10 @@ sample data lives in `schema/seeds/`. The one-time upgrade scripts
 for existing databases live in `migrations/`. Apply only migrations the target
 database still needs, in numeric order, and never rerun a table-rebuild or
 `ALTER TABLE` migration. In particular, apply migration `003` before `005` if
-both are needed. The current canonical schema already includes the changes from
-these migrations, so a fresh database does not need them. Verify the target
+both are needed; apply migration `006_recurring_schedule_series.sql` after `005`
+when upgrading an existing weekly-timetable database. The current canonical
+schema already includes the changes from these migrations, so a fresh database
+does not need them. Verify the target
 database's existing schema before applying any migration, and do not use
 `--remote` unless you intend to modify production data.
 
