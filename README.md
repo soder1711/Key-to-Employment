@@ -106,6 +106,7 @@ There is no package manifest, build step, or linter. The monthly-summary aggrega
 
 - Run `node --experimental-default-type=module --test worker/tests/monthly-summary.test.mjs`.
 - Run `node --experimental-default-type=module --test worker/tests/recurrence.test.mjs worker/tests/schedule-edits.test.mjs` for recurrence/API regressions.
+- Worker CI initializes an isolated Wrangler local D1, seeds legacy-template session fixtures, applies migration 007, and asserts that historical one-off copies are detached without changing active recurring occurrences. The Worker deployment waits for these tests to pass.
 - Run `node --test frontend/tests/timetable.test.mjs` for timetable grouping, mode gating, and change-dialog behavior.
 - Run `node --check` on changed JavaScript files.
 - Review API routes and database bindings manually.

@@ -1,0 +1,50 @@
+name: Worker CI
+
+on:
+  workflow_call:
+  pull_request:
+    paths:
+      - 'worker/**'
+      - 'schema/**'
+      - 'migrations/**'
+      - '.github/test-fixtures/**'
+      - 'wrangler.d1-test.toml'
+      - '.github/workflows/worker-ci.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'schema/**'
+      - 'migrations/**'
+      - '.github/test-fixtures/**'
+      - 'wrangler.d1-test.toml'
+      - '.github/workflows/worker-ci.yml'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./worker
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Run Worker tests
+        run: node --experimental-default-type=module --test tests/*.test.mjs
+
+      - name: Initialize isolated local D1
+        run: npx --yes wrangler@4 d1 execute task-portal-ci --local --config ../wrangler.d1-test.toml --persist-to "$RUNNER_TEMP/wrangler-d1" --file ../schema/001_init.sql
+
+      - name: Apply schedule schema to local D1
+        run: npx --yes wrangler@4 d1 execute task-portal-ci --local --config ../wrangler.d1-test.toml --persist-to "$RUNNER_TEMP/wrangler-d1" --file ../schema/schedule_schema.sql
+
+      - name: Seed legacy copy fixtures
+        run: npx --yes wrangler@4 d1 execute task-portal-ci --local --config ../wrangler.d1-test.toml --persist-to "$RUNNER_TEMP/wrangler-d1" --file ../.github/test-fixtures/legacy-weekly-copies.sql
+
+      - name: Test legacy-copy migration against local D1
+        run: |
+          npx --yes wrangler@4 d1 execute task-portal-ci --local --config ../wrangler.d1-test.toml --persist-to "$RUNNER_TEMP/wrangler-d1" --file ../migrations/007_legacy_weekly_copies_are_one_offs.sql
+          npx --yes wrangler@4 d1 execute task-portal-ci --local --config ../wrangler.d1-test.toml --persist-to "$RUNNER_TEMP/wrangler-d1" --file ../.github/test-fixtures/legacy-weekly-copies-assertions.sql
