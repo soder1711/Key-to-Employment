@@ -6,6 +6,7 @@ let planLoaded = false;
 let planDates = [];
 let planSessions = [];
 let planPeriod = null;
+let planViewMode = 'sessions';
 const planSortables = [];
 
 function planEmployeeName(id) {
@@ -144,7 +145,35 @@ function renderPlanBoard() {
   planDayCursor = day;
   document.getElementById('plan-days').innerHTML = renderDayTable(day);
   updatePlanDayLabel();
-  initPlanSortables();
+  if (planViewMode === 'sessions') initPlanSortables();
+  else destroyPlanSortables();
+}
+
+function setPlanViewMode(mode) {
+  planViewMode = currentUser?.isAdmin && mode === 'timetable' ? 'timetable' : 'sessions';
+  const timetable = planViewMode === 'timetable';
+  document.getElementById('plan-sessions-panel').style.display = timetable ? 'none' : 'block';
+  document.getElementById('plan-timetable-panel').style.display = timetable ? 'block' : 'none';
+  for (const value of ['sessions', 'timetable']) {
+    const button = document.getElementById(`plan-mode-${value}`);
+    button.setAttribute('aria-pressed', String(value === planViewMode));
+    button.classList.toggle('ghost', value !== planViewMode);
+  }
+  if (timetable) loadPlanTimetable();
+  else if (planLoaded) renderPlanBoard();
+}
+
+async function loadPlanTimetable() {
+  const error = document.getElementById('plan-error');
+  try {
+    await loadRecurringEntries();
+    renderTimetableEntries('plan-timetable-grid');
+    error.style.display = 'none';
+  } catch (err) {
+    document.getElementById('plan-timetable-grid').innerHTML = '';
+    error.textContent = t('plan.loadError', { msg: err.message });
+    error.style.display = 'block';
+  }
 }
 
 // Jump to any day; loads that day's week when it crosses a week boundary
@@ -216,7 +245,19 @@ async function onPersonDropped(evt) {
       date: occurrenceDate > todayISO() ? occurrenceDate : todayISO(),
       occurrenceDate, allowOccurrence: true, allowReplace: true });
     if (!change) return;
+    const recurrenceDate = occurrence.recurrence_date || occurrence.session_date;
+    const conflictCandidate = {
+      employeeId,
+      weekday: new Date(`${recurrenceDate}T00:00:00Z`).getUTCDay(),
+      startTime: occurrence.start_time,
+      endTime: occurrence.end_time,
+      startDate: occurrence.start_date || recurrenceDate,
+      endDate: occurrence.end_date || null,
+      effectiveFrom: change.scope === 'future' ? change.cutoffDate : undefined,
+      occurrenceDate: change.scope === 'occurrence' ? recurrenceDate : undefined,
+    };
     try {
+      if (!await confirmRecurringRuleConflict(conflictCandidate, seriesId)) return;
       const res = await api('/api/admin/schedule/timetable', {
         method: 'POST',
         body: JSON.stringify({
@@ -295,6 +336,7 @@ function refreshScheduleViews() {
   if (planLoaded) loadPlanBoard();
   scheduleLoaded = true; // schedule table always refreshes afterwards
   loadSchedule();
+  if (planLoaded && planViewMode === 'timetable' && scheduleViewMode !== 'timetable') loadPlanTimetable();
   loadMyTasks();
 }
 

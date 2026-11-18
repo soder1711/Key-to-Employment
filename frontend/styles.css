@@ -337,6 +337,13 @@ button { font-family: inherit; }
 .schedule-mode-switch { gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap; }
 .schedule-tools { margin: 0.75rem 0; }
 .schedule-tools summary { cursor: pointer; color: var(--muted); margin-bottom: 0.5rem; }
+.nav-jump { position: relative; display: inline-block; }
+.nav-jump > summary { list-style: none; cursor: pointer; }
+.nav-jump > summary::-webkit-details-marker { display: none; }
+.nav-jump-panel { position: absolute; z-index: 5; top: calc(100% + 4px); left: 0; display: none; gap: 0.4rem;
+  min-width: 180px; padding: 0.65rem; border: 1px solid var(--line); border-radius: 8px; background: #fff; box-shadow: 0 8px 20px #0f172a22; }
+.nav-jump[open] .nav-jump-panel { display: grid; }
+.nav-jump-panel input[type="date"] { min-width: 0; width: 100%; padding: 0.4rem; border: 1px solid var(--line); border-radius: 6px; font: inherit; }
 .change-dialog { border: 1px solid var(--line); max-height: 90vh; overflow-y: auto; }
 .change-dialog::backdrop { background: rgba(15, 23, 42, 0.5); }
 .change-dialog .modal-context { white-space: pre-line; }

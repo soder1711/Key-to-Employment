@@ -228,6 +228,34 @@ function translateRuleModal() {
     : t('schedule.ruleContext');
 }
 
+async function confirmRecurringRuleConflict(candidate, excludedSeriesId = null) {
+  if (candidate.employeeId == null && candidate.employee_id == null) return true;
+  await loadRecurringEntries();
+  const employeeId = Number(candidate.employeeId ?? candidate.employee_id);
+  const weekday = Number(candidate.weekday);
+  const candidateStart = candidate.occurrenceDate || candidate.effectiveFrom || candidate.startDate || todayISO();
+  const candidateEnd = candidate.occurrenceDate || candidate.endDate || '9999-12-31';
+  const startTime = candidate.startTime ?? candidate.start_time;
+  const endTime = candidate.endTime ?? candidate.end_time;
+  const conflict = recurringEntries.find(entry => {
+    if (Number(entry.series_id) === Number(excludedSeriesId) ||
+        Number(entry.employee_id) !== employeeId || Number(entry.weekday) !== weekday) return false;
+    const entryStart = [entry.start_date, entry.effective_from].filter(Boolean).sort().at(-1);
+    const entryEnd = entry.end_date || '9999-12-31';
+    const datesOverlap = candidateStart <= entryEnd && entryStart <= candidateEnd;
+    if (!datesOverlap) return false;
+    const otherStart = entry.start_time;
+    const otherEnd = entry.end_time;
+    if (!startTime || !endTime || !otherStart || !otherEnd) return startTime === otherStart;
+    return startTime < otherEnd && otherStart < endTime;
+  });
+  if (!conflict) return true;
+  const time = `${fmtTime(conflict.start_time)}${conflict.end_time ? `–${fmtTime(conflict.end_time)}` : ''}`;
+  return window.confirm(t('schedule.overlapWarning', {
+    task: conflict.program_name, time, day: dayName(weekday),
+  }));
+}
+
 async function saveTimetableRule(payload) {
   const body = {
     ...payload, operation: currentRule ? 'edit' : 'create',
@@ -248,6 +276,7 @@ async function saveTimetableRule(payload) {
     Object.assign(body, { seriesId: currentRule.series_id, cutoffDate: change.cutoffDate,
       replaceFutureExceptions: change.replaceFutureExceptions });
   }
+  if (!await confirmRecurringRuleConflict({ ...body, effectiveFrom: body.cutoffDate || body.startDate }, currentRule?.series_id)) return;
   const response = await api('/api/admin/schedule/timetable', { method: 'POST', body: JSON.stringify(body) });
   if (!response.ok) throw new Error(await response.text());
   closeModal();

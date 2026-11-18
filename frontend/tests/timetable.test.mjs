@@ -27,9 +27,10 @@ function fixture() {
     .matchAll(/id="([^"]+)"/g)].map(([, id]) => [id, new Element()]));
   const container = new Element();
   const focus = new Element();
+  const browserWindow = { location: { search: '', hostname: 'localhost' }, confirm: () => false };
   const context = vm.createContext({
     URLSearchParams, Date, console,
-    window: { location: { search: '', hostname: 'localhost' } },
+    window: browserWindow,
     localStorage: { getItem: () => 'en' }, navigator: { language: 'en' },
     document: {
       getElementById: id => {
@@ -40,10 +41,9 @@ function fixture() {
       activeElement: focus,
     },
   });
-  for (const file of ['shared.js', 'schedule.js', 'session-modals.js']) {
+  for (const file of ['shared.js', 'schedule.js', 'session-modals.js', 'plan.js']) {
     vm.runInContext(readFileSync(new URL(`../${file}`, import.meta.url), 'utf8'), context, { filename: file });
   }
-  vm.runInContext('let planPeriod = null;', context);
   return { elements, context, focus, run: source => vm.runInContext(source, context) };
 }
 
@@ -100,6 +100,35 @@ test('shared grid retains dated totals and keeps inactive-person rules visible',
   assert.ok(timetable.includes('data-timetable-edit="7"'));
 });
 
+test('Plan timetable mode renders the shared weekly grid and switches back to dated sessions', async () => {
+  const { elements, context, run } = fixture();
+  context.entries = [{ weekday: 3, employee_id: null, series_id: 8, program_name: 'Weekly task',
+    start_time: '09:00', points: 2, start_date: '2026-11-18', effective_from: '2026-11-18' }];
+  run("currentUser = {isAdmin:true}; adminEmployees = []; api = async () => ({ok:true, json:async () => ({entries})}); setPlanViewMode('timetable')");
+  await new Promise(resolve => setTimeout(resolve, 0));
+  assert.equal(elements.get('plan-sessions-panel').style.display, 'none');
+  assert.equal(elements.get('plan-timetable-panel').style.display, 'block');
+  assert.equal(elements.get('plan-mode-timetable').attributes.get('aria-pressed'), 'true');
+  assert.ok(elements.get('plan-timetable-grid').innerHTML.includes('Weekly task'));
+  run("setPlanViewMode('sessions')");
+  assert.equal(elements.get('plan-sessions-panel').style.display, 'block');
+  assert.equal(elements.get('plan-mode-sessions').attributes.get('aria-pressed'), 'true');
+});
+
+test('recurring rule overlap check warns but allows intentional same-person conflicts', async () => {
+  const { context, run } = fixture();
+  context.existingRules = [{ series_id: 5, employee_id: 7, weekday: 1, start_time: '09:00',
+    end_time: '10:00', start_date: '2026-11-02', effective_from: '2026-11-02',
+    end_date: null, program_name: 'Existing duty' }];
+  run("recurringEntries = existingRules; window.confirm = message => { window.warning = message; return false }");
+  context.api = async () => ({ ok: true, json: async () => ({ entries: context.existingRules }) });
+  const candidate = "{employeeId:7, weekday:1, startTime:'09:30', endTime:'10:30', startDate:'2026-11-16'}";
+  assert.equal(await run(`confirmRecurringRuleConflict(${candidate})`), false);
+  assert.match(context.window.warning, /Existing duty/);
+  assert.equal(await run("confirmRecurringRuleConflict({employeeId:7, weekday:1, startTime:'10:00', endTime:'11:00', startDate:'2026-11-16'})"), true);
+  assert.equal(await run(`confirmRecurringRuleConflict(${candidate}, 5)`), true);
+});
+
 test('rule creation reuses assignment defaults and clears rule mode before one-off creation', () => {
   const { run, elements } = fixture();
   run("adminPrograms = [{program_id:1,default_points:5,default_start:'09:00',default_end:'10:00'}]; openRuleModal(3, 2)");
@@ -124,7 +153,7 @@ test('shared rule save uses series endpoints and validates date ranges without w
   const { run, context, elements } = fixture();
   const writes = [];
   context.record = body => writes.push(JSON.parse(body));
-  run("api = async (path, options) => { record(options.body); return {ok:true}; }; refreshScheduleViews = () => {}; openRuleModal(null, 1)");
+  run("api = async (path, options) => options ? (record(options.body), {ok:true}) : ({ok:true, json:async () => ({entries:[]})}); refreshScheduleViews = () => {}; openRuleModal(null, 1)");
   elements.get('assign-weekday').value = '1';
   elements.get('assign-employee').value = '';
   elements.get('assign-rule-start').value = '2026-11-16';

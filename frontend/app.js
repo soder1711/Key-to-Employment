@@ -36,6 +36,12 @@ document.getElementById('schedule-today').addEventListener('click', () => {
   scheduleWeekStart = mondayOf();
   loadSchedule();
 });
+document.getElementById('schedule-jump-date').addEventListener('change', (event) => {
+  if (!event.target.value) return;
+  scheduleWeekStart = mondayOf(event.target.value);
+  event.target.closest('details').open = false;
+  loadSchedule();
+});
 
 async function updateWeeklyTimetable(enabled, button) {
   if (!currentUser?.isAdmin || !scheduleWeekStart) return;
@@ -125,14 +131,30 @@ document.getElementById('admin-schedule-grid').addEventListener('click', (e) => 
 // ---- Plan board navigation (one day at a time) ----
 document.getElementById('plan-prev').addEventListener('click', () => shiftPlanDay(-1));
 document.getElementById('plan-next').addEventListener('click', () => shiftPlanDay(1));
-document.getElementById('plan-today').addEventListener('click', () => goToPlanDay(todayISO()));
+document.getElementById('plan-jump-today').addEventListener('click', (event) => {
+  event.currentTarget.closest('details').open = false;
+  goToPlanDay(todayISO());
+});
+document.getElementById('plan-jump-week').addEventListener('click', (event) => {
+  event.currentTarget.closest('details').open = false;
+  goToPlanDay(mondayOf());
+});
+document.getElementById('plan-jump-date').addEventListener('change', (event) => {
+  if (!event.target.value) return;
+  event.target.closest('details').open = false;
+  goToPlanDay(event.target.value);
+});
+document.getElementById('plan-mode-sessions').addEventListener('click', () => setPlanViewMode('sessions'));
+document.getElementById('plan-mode-timetable').addEventListener('click', () => setPlanViewMode('timetable'));
 
 // Arrow keys browse days while the plan view is open
 document.addEventListener('keydown', (e) => {
   if (!planLoaded) return;
   if (document.getElementById('plan-section').style.display !== 'block') return;
+  if (planViewMode !== 'sessions') return;
   if (document.getElementById('schedule-change-dialog').open) return;
   if (modal.style.display === 'flex' || programModal.style.display === 'flex') return;
+  if (document.activeElement?.closest?.('.nav-jump')) return;
   const tag = ((document.activeElement && document.activeElement.tagName) || '').toUpperCase();
   if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
   if (e.key === 'ArrowLeft') { e.preventDefault(); shiftPlanDay(-1); }
@@ -149,7 +171,7 @@ document.getElementById('plan-days').addEventListener('click', (e) => {
   if (chip) openDetailsFromElement(chip);
 });
 
-document.getElementById('timetable-grid').addEventListener('click', (event) => {
+function handleTimetableGridClick(event) {
   const editButton = event.target.closest('[data-timetable-edit]');
   if (editButton) {
     const rule = recurringEntries.find(item => Number(item.series_id) === Number(editButton.dataset.timetableEdit));
@@ -158,7 +180,10 @@ document.getElementById('timetable-grid').addEventListener('click', (event) => {
   }
   const cell = event.target.closest('.grid-cell');
   if (cell) openRuleModal(cell.dataset.employeeId ? Number(cell.dataset.employeeId) : null, Number(cell.dataset.weekday));
-});
+}
+
+document.getElementById('timetable-grid').addEventListener('click', handleTimetableGridClick);
+document.getElementById('plan-timetable-grid').addEventListener('click', handleTimetableGridClick);
 
 document.getElementById('assign-rule-stop').addEventListener('click', async (event) => {
   if (!editingTimetable || !currentRule) return;
@@ -249,6 +274,13 @@ document.getElementById('modal-assign-form').addEventListener('submit', async (e
         date: occurrenceDate > todayISO() ? occurrenceDate : todayISO(), occurrenceDate,
         allowOccurrence: true, allowReplace: true });
       if (!change) return;
+      if (!await confirmRecurringRuleConflict({
+        employeeId: currentSession.employee_id, weekday, ...payload,
+        startDate: currentSession.start_date || occurrenceDate,
+        endDate: currentSession.end_date || null,
+        effectiveFrom: change.scope === 'future' ? change.cutoffDate : undefined,
+        occurrenceDate: change.scope === 'occurrence' ? occurrenceDate : undefined,
+      }, seriesId)) return;
       if (change.scope === 'future') {
         endpoint = '/api/admin/schedule/timetable';
         requestBody = {

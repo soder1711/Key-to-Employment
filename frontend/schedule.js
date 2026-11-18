@@ -299,11 +299,11 @@ async function loadTimetableEditor() {
   const error = document.getElementById('timetable-editor-error');
   error.style.display = 'none';
   try {
-    const response = await api('/api/admin/schedule/timetable');
-    if (!response.ok) throw new Error(`Request failed (${response.status})`);
-    const data = await response.json();
-    recurringEntries = data.entries;
+    await loadRecurringEntries();
     renderTimetableEntries();
+    if (typeof planViewMode !== 'undefined' && planViewMode === 'timetable') {
+      renderTimetableEntries('plan-timetable-grid');
+    }
   } catch (err) {
     document.getElementById('timetable-grid').innerHTML = '';
     error.textContent = t('schedule.loadError', { msg: err.message });
@@ -311,8 +311,16 @@ async function loadTimetableEditor() {
   }
 }
 
-function renderTimetableEntries() {
-  document.getElementById('timetable-grid').innerHTML = renderScheduleGrid([1, 2, 3, 4, 5, 6, 0], adminEmployees, recurringEntries, true);
+async function loadRecurringEntries() {
+  const response = await api('/api/admin/schedule/timetable');
+  if (!response.ok) throw new Error(`Request failed (${response.status})`);
+  const data = await response.json();
+  recurringEntries = data.entries;
+  return recurringEntries;
+}
+
+function renderTimetableEntries(targetId = 'timetable-grid') {
+  document.getElementById(targetId).innerHTML = renderScheduleGrid([1, 2, 3, 4, 5, 6, 0], adminEmployees, recurringEntries, true);
 }
 
 function openDetailsFromElement(element) {

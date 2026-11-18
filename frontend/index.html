@@ -65,6 +65,13 @@
           <button id="schedule-prev" class="btn ghost small" data-i18n="schedule.prev">← Prev week</button>
           <button id="schedule-today" class="btn small" data-i18n="schedule.today">Today</button>
           <button id="schedule-next" class="btn ghost small" data-i18n="schedule.next">Next week →</button>
+          <details class="nav-jump">
+            <summary class="btn ghost small" data-i18n="nav.jump">Go to</summary>
+            <div class="nav-jump-panel">
+              <label for="schedule-jump-date" data-i18n="nav.chooseDate">Choose a date</label>
+              <input id="schedule-jump-date" type="date">
+            </div>
+          </details>
           <span id="schedule-week-label" class="week-label"></span>
         </div>
         <details id="schedule-tools" class="schedule-tools" style="display:none;">
@@ -132,11 +139,24 @@
           <span class="admin-tag" data-i18n="plan.adminTag">admin</span>
           <button id="manage-tasks-btn" class="btn ghost small" style="margin-left:auto;" data-i18n="plan.manage">Manage tasks</button>
         </div>
-        <p class="hint" data-i18n="plan.hint">Drag a person from the top onto a task to assign them. A recurring entry updates this and future occurrences from the displayed date after confirmation; a one-off session changes only that session. Earlier and completed sessions stay unchanged. Click a task for options. One day is shown at a time — use the arrows (or ← → keys) to browse. Use “Edit weekly timetable” to manage recurring entries.</p>
+        <div id="plan-mode-switch" class="schedule-mode-switch" aria-label="Plan view" data-i18n-aria-label="plan.view">
+          <button id="plan-mode-sessions" class="btn small" aria-pressed="true" data-i18n="plan.sessions">Dated sessions</button>
+          <button id="plan-mode-timetable" class="btn ghost small" aria-pressed="false" data-i18n="schedule.timetable">Weekly timetable</button>
+        </div>
+        <div id="plan-sessions-panel">
+        <p class="hint" data-i18n="plan.hint">Drag a person onto a task to assign them. For recurring work, choose only this occurrence or this and future occurrences. One-off sessions change only that session. Use the mode switch to view or manage weekly rules. Browse days with the arrows or Go to menu.</p>
         <div class="week-nav">
           <button id="plan-prev" class="btn ghost small" data-i18n="plan.prev">← Previous day</button>
-          <button id="plan-today" class="btn small" data-i18n="plan.today">Today</button>
           <button id="plan-next" class="btn ghost small" data-i18n="plan.next">Next day →</button>
+          <details class="nav-jump">
+            <summary class="btn ghost small" data-i18n="nav.jump">Go to</summary>
+            <div class="nav-jump-panel">
+              <button id="plan-jump-today" type="button" class="btn ghost small" data-i18n="plan.today">Today</button>
+              <button id="plan-jump-week" type="button" class="btn ghost small" data-i18n="nav.thisWeek">This week</button>
+              <label for="plan-jump-date" data-i18n="nav.chooseDate">Choose a date</label>
+              <input id="plan-jump-date" type="date">
+            </div>
+          </details>
           <span id="plan-day-label" class="week-label"></span>
         </div>
         <div class="people-pool">
@@ -144,6 +164,11 @@
           <div id="pool-chips" class="pool-chips"></div>
         </div>
         <div id="plan-days"></div>
+        </div>
+        <div id="plan-timetable-panel" style="display:none;">
+          <p class="hint" data-i18n="plan.timetableHint">Recurring rules for the normal week. Click a cell to add one, or a rule to edit it.</p>
+          <div class="grid-scroll"><table id="plan-timetable-grid" class="sched-grid"></table></div>
+        </div>
         <div id="plan-error" class="error" style="display:none;"></div>
       </section>
 
