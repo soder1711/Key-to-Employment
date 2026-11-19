@@ -39,6 +39,9 @@ const I18N = {
     'summary.empty': 'No active employees.',
     'summary.demoNotice': 'Demo preview: sample data only; no sign-in or live data is used.',
     'summary.demoUser': 'Demo preview',
+    'user.openMenu': 'Open profile menu',
+    'user.signedInAs': 'Signed in as',
+    'user.language': 'Language',
     'user.logout': 'Log out',
     'tasks.title': 'My tasks',
     'tasks.empty': 'No tasks or Plan assignments yet.',
@@ -201,6 +204,9 @@ const I18N = {
     'summary.empty': 'Không có nhân sự đang hoạt động.',
     'summary.demoNotice': 'Bản xem trước: chỉ dùng dữ liệu mẫu; không cần đăng nhập và không dùng dữ liệu trực tiếp.',
     'summary.demoUser': 'Bản xem trước',
+    'user.openMenu': 'Mở menu hồ sơ',
+    'user.signedInAs': 'Đã đăng nhập bằng',
+    'user.language': 'Ngôn ngữ',
     'user.logout': 'Đăng xuất',
     'tasks.title': 'Nhiệm vụ của tôi',
     'tasks.empty': 'Chưa có nhiệm vụ hay phân công Kế hoạch nào.',
@@ -370,7 +376,7 @@ function applyTranslations() {
 function refreshLangButtons() {
   const other = lang === 'en' ? 'VI' : 'EN';
   const title = lang === 'en' ? 'Tiếng Việt' : 'English';
-  document.getElementById('lang-btn').textContent = other;
+  document.getElementById('lang-btn-value').textContent = other;
   document.getElementById('lang-btn').title = title;
   const loginBtn = document.getElementById('lang-btn-login');
   loginBtn.textContent = other;

@@ -1,6 +1,33 @@
 // ================= Event wiring =================
 
 // ---- Language ----
+const profileMenu = document.getElementById('profile-menu-panel');
+const profileMenuToggle = document.getElementById('profile-menu-toggle');
+const profileMenuContainer = document.querySelector('.profile-menu');
+const closeProfileMenu = () => {
+  profileMenu.hidden = true;
+  profileMenuToggle.setAttribute('aria-expanded', 'false');
+};
+
+profileMenuToggle.addEventListener('click', () => {
+  const isOpening = profileMenu.hidden;
+  profileMenu.hidden = !isOpening;
+  profileMenuToggle.setAttribute('aria-expanded', String(isOpening));
+  if (isOpening) profileMenu.querySelector('button:not([hidden])')?.focus();
+});
+document.addEventListener('click', (event) => {
+  if (!profileMenuContainer.contains(event.target)) closeProfileMenu();
+});
+profileMenuContainer.addEventListener('focusout', (event) => {
+  if (!profileMenuContainer.contains(event.relatedTarget)) closeProfileMenu();
+});
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && !profileMenu.hidden) {
+    closeProfileMenu();
+    profileMenuToggle.focus();
+  }
+});
+
 document.getElementById('lang-btn').addEventListener('click', () =>
   setLang(lang === 'en' ? 'vi' : 'en'));
 document.getElementById('lang-btn-login').addEventListener('click', () =>

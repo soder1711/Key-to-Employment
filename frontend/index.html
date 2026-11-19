@@ -22,10 +22,38 @@
         <button id="nav-monthly" class="nav-btn" style="display:none;" data-i18n="nav.monthly">Monthly summary</button>
       </nav>
       <div class="user-area">
-        <span id="user" class="user-chip"></span>
-        <img id="user-avatar" class="user-avatar" style="display:none;" alt="">
-        <button id="lang-btn" class="btn ghost small" title="Tiếng Việt">VI</button>
-        <button id="logout-btn" class="btn ghost" style="display:none;" data-i18n="user.logout">Log out</button>
+        <div class="profile-menu">
+          <button id="profile-menu-toggle" class="profile-trigger" type="button"
+            aria-expanded="false" aria-controls="profile-menu-panel"
+            data-i18n-aria-label="user.openMenu">
+            <img id="user-avatar" class="user-avatar" style="display:none;" alt="" aria-hidden="true">
+            <span id="user-avatar-fallback" class="user-avatar-fallback" aria-hidden="true">U</span>
+            <svg class="profile-chevron" viewBox="0 0 16 16" aria-hidden="true">
+              <path d="m4 6 4 4 4-4"></path>
+            </svg>
+          </button>
+          <div id="profile-menu-panel" class="profile-menu-panel" hidden>
+            <div class="profile-menu-account">
+              <span class="profile-menu-caption" data-i18n="user.signedInAs">Signed in as</span>
+              <span id="user" class="profile-menu-email"></span>
+            </div>
+            <button id="lang-btn" class="profile-menu-item" type="button" title="Tiếng Việt">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="12" cy="12" r="9"></circle>
+                <path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"></path>
+              </svg>
+              <span data-i18n="user.language">Language</span>
+              <span id="lang-btn-value" class="profile-menu-value">VI</span>
+            </button>
+            <button id="logout-btn" class="profile-menu-item profile-menu-logout" type="button"
+              style="display:none;">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M10 17l5-5-5-5M15 12H3M12 3h6a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-6"></path>
+              </svg>
+              <span data-i18n="user.logout">Log out</span>
+            </button>
+          </div>
+        </div>
       </div>
     </header>
 

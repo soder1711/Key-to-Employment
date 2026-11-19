@@ -74,6 +74,8 @@ async function load() {
     document.getElementById('signin-section').style.display = 'none';
     document.getElementById('app').style.display = 'block';
     document.getElementById('user').textContent = t('summary.demoUser');
+    document.getElementById('user-avatar-fallback').textContent =
+      t('summary.demoUser').charAt(0).toUpperCase();
     document.getElementById('nav-tasks').style.display = 'none';
     document.getElementById('nav-schedule').style.display = 'none';
     document.getElementById('nav-plan').style.display = 'none';
@@ -97,18 +99,21 @@ async function load() {
   document.getElementById('user').textContent =
     user.email + (user.isAdmin ? ' (admin)' : '');
 
-  // Google profile picture to the right of the name
   const avatar = document.getElementById('user-avatar');
+  const avatarFallback = document.getElementById('user-avatar-fallback');
   if (user.picture) {
     avatar.src = user.picture;
     avatar.title = user.email;
     avatar.style.display = 'inline-block';
+    avatarFallback.style.display = 'none';
   } else {
     avatar.style.display = 'none';
+    avatarFallback.textContent = (user.email || 'U').trim().charAt(0).toUpperCase();
+    avatarFallback.style.display = 'inline-flex';
   }
 
   const logoutBtn = document.getElementById('logout-btn');
-  logoutBtn.style.display = 'inline-block';
+  logoutBtn.style.display = 'flex';
   logoutBtn.addEventListener('click', () => {
     window.location.href = `${WORKER}/auth/logout`;
   });
