@@ -128,26 +128,26 @@ document.getElementById('admin-schedule-grid').addEventListener('click', (e) => 
   }
 });
 
-// ---- Plan board navigation (one day at a time) ----
-document.getElementById('plan-prev').addEventListener('click', () => shiftPlanDay(-1));
-document.getElementById('plan-next').addEventListener('click', () => shiftPlanDay(1));
+// ---- Plan board navigation (one week at a time) ----
+document.getElementById('plan-prev').addEventListener('click', () => shiftPlanWeek(-1));
+document.getElementById('plan-next').addEventListener('click', () => shiftPlanWeek(1));
 document.getElementById('plan-jump-today').addEventListener('click', (event) => {
   event.currentTarget.closest('details').open = false;
-  goToPlanDay(todayISO());
+  goToPlanWeek(todayISO());
 });
 document.getElementById('plan-jump-week').addEventListener('click', (event) => {
   event.currentTarget.closest('details').open = false;
-  goToPlanDay(mondayOf());
+  goToPlanWeek(mondayOf());
 });
 document.getElementById('plan-jump-date').addEventListener('change', (event) => {
   if (!event.target.value) return;
   event.target.closest('details').open = false;
-  goToPlanDay(event.target.value);
+  goToPlanWeek(event.target.value);
 });
 document.getElementById('plan-mode-sessions').addEventListener('click', () => setPlanViewMode('sessions'));
 document.getElementById('plan-mode-timetable').addEventListener('click', () => setPlanViewMode('timetable'));
 
-// Arrow keys browse days while the plan view is open
+// Arrow keys browse weeks while the plan view is open
 document.addEventListener('keydown', (e) => {
   if (!planLoaded) return;
   if (document.getElementById('plan-section').style.display !== 'block') return;
@@ -157,8 +157,8 @@ document.addEventListener('keydown', (e) => {
   if (document.activeElement?.closest?.('.nav-jump')) return;
   const tag = ((document.activeElement && document.activeElement.tagName) || '').toUpperCase();
   if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
-  if (e.key === 'ArrowLeft') { e.preventDefault(); shiftPlanDay(-1); }
-  else if (e.key === 'ArrowRight') { e.preventDefault(); shiftPlanDay(1); }
+  if (e.key === 'ArrowLeft') { e.preventDefault(); shiftPlanWeek(-1); }
+  else if (e.key === 'ArrowRight') { e.preventDefault(); shiftPlanWeek(1); }
 });
 
 // ---- Plan board clicks ----

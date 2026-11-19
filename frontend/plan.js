@@ -1,7 +1,6 @@
-// ================= Plan board (drag & drop, ONE day at a time) =================
+// ================= Plan board (dated week, drag & drop) =================
 
 let planWeekStart = null;   // Monday of the week currently loaded from the API
-let planDayCursor = null;   // the single day currently displayed
 let planLoaded = false;
 let planDates = [];
 let planSessions = [];
@@ -126,25 +125,21 @@ function renderDayTable(date) {
     </div>`;
 }
 
-// Shows which single day is on screen, e.g. "Mon 2 November 2026"
-function updatePlanDayLabel() {
-  const el = document.getElementById('plan-day-label');
-  if (!el || !planDayCursor) return;
-  const d = new Date(planDayCursor + 'T00:00:00Z');
-  el.textContent =
-    `${dayName(d.getUTCDay())} ${d.getUTCDate()} ` +
-    `${monthName(d.getUTCMonth())} ${d.getUTCFullYear()}`;
+function updatePlanWeekLabel() {
+  const el = document.getElementById('plan-week-label');
+  if (!el || !planDates.length) return;
+  el.textContent = `${fmtCellDate(planDates[0])} – ${fmtCellDate(planDates[planDates.length - 1])}`;
 }
 
-// Renders ONLY the day under planDayCursor (one table at a time)
 function renderPlanBoard() {
   renderPool();
-  let day = planDates.includes(planDayCursor) ? planDayCursor
-    : (planDates.includes(todayISO()) ? todayISO() : planDates[0]);
-  if (!day) return;
-  planDayCursor = day;
-  document.getElementById('plan-days').innerHTML = renderDayTable(day);
-  updatePlanDayLabel();
+  if (!planDates.length) {
+    document.getElementById('plan-days').innerHTML = '';
+    destroyPlanSortables();
+    return;
+  }
+  document.getElementById('plan-days').innerHTML = planDates.map(renderDayTable).join('');
+  updatePlanWeekLabel();
   if (planViewMode === 'sessions') initPlanSortables();
   else destroyPlanSortables();
 }
@@ -176,18 +171,14 @@ async function loadPlanTimetable() {
   }
 }
 
-// Jump to any day; loads that day's week when it crosses a week boundary
-async function goToPlanDay(date) {
+// Jump to the week containing a date.
+async function goToPlanWeek(date) {
   if (!date) return;
-  planDayCursor = date;
   const weekOfDate = mondayOf(date);
+  if (weekOfDate === planWeekStart) return;
+  planWeekStart = weekOfDate;
   try {
-    if (weekOfDate !== planWeekStart) {
-      planWeekStart = weekOfDate;
-      await loadPlanBoard(); // renders after the new week is fetched
-    } else {
-      renderPlanBoard(); // same week, no network needed
-    }
+    await loadPlanBoard();
   } catch (err) {
     const errEl = document.getElementById('plan-error');
     errEl.textContent = t('plan.loadError', { msg: err.message });
@@ -195,9 +186,9 @@ async function goToPlanDay(date) {
   }
 }
 
-function shiftPlanDay(delta) {
-  if (!planDayCursor) return;
-  goToPlanDay(shiftISO(planDayCursor, delta));
+function shiftPlanWeek(delta) {
+  if (!planWeekStart) return;
+  goToPlanWeek(shiftISO(planWeekStart, delta * 7));
 }
 
 function destroyPlanSortables() {
@@ -243,7 +234,7 @@ async function onPersonDropped(evt) {
     const change = await requestScheduleChange({ title: t('schedule.assignee'),
       summary: scheduleChangeSummary(occurrence, { ...occurrence, employeeId }),
       date: occurrenceDate > todayISO() ? occurrenceDate : todayISO(),
-      occurrenceDate, allowOccurrence: true, allowReplace: true });
+      occurrenceDate, scope: 'occurrence' });
     if (!change) return;
     const recurrenceDate = occurrence.recurrence_date || occurrence.session_date;
     const conflictCandidate = {
@@ -316,13 +307,12 @@ async function loadPlanBoard() {
   sessionById = new Map(data.sessions.map(s => [s.session_id, s]));
   sessionByOccurrence = new Map(data.sessions.filter(s => s.is_recurring)
     .map(s => [`${s.recurring_series_id}:${s.recurrence_date || s.session_date}`, s]));
-  renderPlanBoard(); // renders only planDayCursor's table + day label
+  renderPlanBoard();
 }
 
 function initPlan() {
   planLoaded = true;
   planWeekStart = mondayOf();
-  planDayCursor = todayISO(); // start on today
   loadPlanBoard();
 }
 

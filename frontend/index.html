@@ -57,8 +57,8 @@
           <h2 data-i18n="schedule.title">Schedule</h2>
         </div>
         <div id="schedule-mode-switch" class="schedule-mode-switch" style="display:none;" aria-label="Schedule view" data-i18n-aria-label="schedule.view">
-          <button id="schedule-mode-dated" class="btn small" aria-pressed="true" data-i18n="schedule.dated">Dated schedule</button>
-          <button id="schedule-mode-timetable" class="btn ghost small" aria-pressed="false" data-i18n="schedule.timetable">Weekly timetable</button>
+          <button id="schedule-mode-dated" class="btn ghost small" aria-pressed="false" data-i18n="schedule.dated">Dated schedule</button>
+          <button id="schedule-mode-timetable" class="btn small" aria-pressed="true" data-i18n="schedule.timetable">Weekly timetable</button>
         </div>
         <div id="dated-schedule-panel">
         <div class="week-nav">
@@ -132,7 +132,7 @@
         <div id="monthly-summary-error" class="error" style="display:none;" role="alert"></div>
       </section>
 
-      <!-- ===== Admin: weekly plan board (one day at a time) ===== -->
+      <!-- ===== Admin: dated weekly plan board ===== -->
       <section id="plan-section" class="card" style="display:none;">
         <div class="card-head">
           <h2 data-i18n="plan.title">Weekly plan</h2>
@@ -144,10 +144,10 @@
           <button id="plan-mode-timetable" class="btn ghost small" aria-pressed="false" data-i18n="schedule.timetable">Weekly timetable</button>
         </div>
         <div id="plan-sessions-panel">
-        <p class="hint" data-i18n="plan.hint">Drag a person onto a task to assign them. For recurring work, choose only this occurrence or this and future occurrences. One-off sessions change only that session. Use the mode switch to view or manage weekly rules. Browse days with the arrows or Go to menu.</p>
+        <p class="hint" data-i18n="plan.hint">Drag a person onto a dated task to assign them for that date only. Recurring weekly rules stay unchanged. Use the mode switch to view or manage weekly rules.</p>
         <div class="week-nav">
-          <button id="plan-prev" class="btn ghost small" data-i18n="plan.prev">← Previous day</button>
-          <button id="plan-next" class="btn ghost small" data-i18n="plan.next">Next day →</button>
+          <button id="plan-prev" class="btn ghost small" data-i18n="plan.prev">← Previous week</button>
+          <button id="plan-next" class="btn ghost small" data-i18n="plan.next">Next week →</button>
           <details class="nav-jump">
             <summary class="btn ghost small" data-i18n="nav.jump">Go to</summary>
             <div class="nav-jump-panel">
@@ -157,7 +157,7 @@
               <input id="plan-jump-date" type="date">
             </div>
           </details>
-          <span id="plan-day-label" class="week-label"></span>
+          <span id="plan-week-label" class="week-label"></span>
         </div>
         <div class="people-pool">
           <span class="pool-label" data-i18n="plan.people">People</span>

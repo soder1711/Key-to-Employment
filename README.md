@@ -30,14 +30,14 @@ Session rows represent actual dated outcomes, such as completion, credited point
 
 ### Finding and using the timetable
 
-- Admins: open **Schedule** or **Plan** and switch between dated work and the **Weekly timetable**. Employees retain their personal dated schedule.
+- Admins: **Schedule** opens the **Weekly timetable** for recurring assignments; **Plan** opens the dated sessions for all seven days of the selected week. Employees retain their personal dated schedule.
 - **Weekly timetable** reuses the dated schedule's employee-by-weekday grid and assignment form. Click a cell to add a recurring rule for that person and weekday, or click a rule to edit it. The grid shows planned totals and the latest settings' effective dates, including upcoming changes; it is not a historical-week preview. Use **Dated schedule** to inspect occurrences for a particular week.
+- **Plan** shows each dated task under its weekday in the selected week. Dragging a person onto a task changes only that date; the recurring rule remains unchanged. Use **Schedule** to edit recurring assignments. Overlapping recurring assignments for the same person are warned about but can be intentional. Existing future exceptions are preserved unless explicitly replaced. Cancelling a recurring-rule change makes no change.
 - **Dated schedule** is for completion, actual notes, and exceptions. Clicking an empty cell adds a one-off session. **Import and copy tools** contains the optional setup shortcuts; finite repeat copies remain separate one-off sessions.
-- Saving recurring edits or dragging a person onto a recurring task opens a change dialog with a before/after summary. Choose **This and future occurrences** (default) with an effective date, or **Only this occurrence** when editing a dated task. Overlapping recurring assignments for the same person are warned about but can be intentional. Existing future exceptions are preserved unless explicitly replaced. Cancelling the dialog makes no change.
-- Use **Go to** to pick a date; Plan also offers **Today** and **This week** shortcuts.
+- Saving recurring edits opens a change dialog with a before/after summary. Choose **This and future occurrences** (default) with an effective date, or **Only this occurrence** when editing a dated task. Use **Go to** to pick a date; Plan also offers **Today** and **This week** shortcuts.
 - End an individual series from its timetable rule or task details. **Series management** contains **Stop weekly timetable**, which ends all recurring entries from a selected date without affecting one-offs. Completion and actual notes remain occurrence-only.
 
-For a browser smoke test with an authenticated admin, add a recurring entry, inspect it in a future dated week, cancel a pending edit, save an occurrence-only edit, then save a future edit with exceptions preserved. Check the same task as an employee and confirm timetable controls are absent. Also check the Vietnamese labels and the horizontally scrollable grid on mobile. The localhost monthly-summary demo below does not preview the timetable.
+For a browser smoke test with an authenticated admin, confirm Schedule opens the weekly timetable and Plan opens all seven dated days of the current week. Assign an employee to one recurring occurrence from Plan and verify other weeks remain unchanged; then make a recurring-rule change from Schedule and verify its effective date. Check the same task as an employee and confirm timetable controls are absent. Also check the Vietnamese labels and the horizontally scrollable grids on mobile. The localhost monthly-summary demo below does not preview the timetable.
 
 ## Local setup
 

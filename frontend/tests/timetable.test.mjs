@@ -50,6 +50,33 @@ function fixture() {
 const submit = elements => elements.get('schedule-change-form').dispatchEvent(new Event('submit', { cancelable: true }));
 const input = elements => elements.get('schedule-change-form').dispatchEvent(new Event('input'));
 
+test('admin Schedule and Plan open their distinct default assignment views', () => {
+  const { elements, run } = fixture();
+  assert.equal(run('scheduleViewMode'), 'timetable');
+  assert.equal(run('planViewMode'), 'sessions');
+  run('currentUser = {isAdmin:true}; setScheduleMode(scheduleViewMode, false); setPlanViewMode(planViewMode)');
+  assert.equal(elements.get('timetable-editor').style.display, 'block');
+  assert.equal(elements.get('plan-sessions-panel').style.display, 'block');
+  assert.equal(elements.get('plan-timetable-panel').style.display, 'none');
+});
+
+test('Plan renders dated tasks for every weekday in the selected week', () => {
+  const { elements, context, run } = fixture();
+  context.testDates = ['2026-11-16', '2026-11-17', '2026-11-18', '2026-11-19',
+    '2026-11-20', '2026-11-21', '2026-11-22'];
+  context.testSessions = [
+    { session_date: '2026-11-16', program_name: 'Monday task', status: 'scheduled', points: 2 },
+    { session_date: '2026-11-19', program_name: 'Thursday task', status: 'scheduled', points: 3 },
+  ];
+  run("planWeekStart = '2026-11-16'; planDates = testDates; planSessions = testSessions; adminEmployees = []; renderPlanBoard()");
+  const board = elements.get('plan-days').innerHTML;
+  assert.equal((board.match(/class="day-block(?: |")/g) || []).length, 7);
+  assert.ok(board.includes('Monday task'));
+  assert.ok(board.includes('Thursday task'));
+  assert.match(elements.get('plan-week-label').textContent, /^Mon 16 Nov/);
+  assert.match(elements.get('plan-week-label').textContent, /Sun 22 Nov/);
+});
+
 test('mode switch isolates timetable from dated navigation and gates employees', () => {
   const { elements, run } = fixture();
   run("currentUser = { isAdmin: true }; setScheduleMode('timetable', false)");
@@ -113,6 +140,33 @@ test('Plan timetable mode renders the shared weekly grid and switches back to da
   run("setPlanViewMode('sessions')");
   assert.equal(elements.get('plan-sessions-panel').style.display, 'block');
   assert.equal(elements.get('plan-mode-sessions').attributes.get('aria-pressed'), 'true');
+});
+
+test('dragging onto a recurring Plan task changes only that dated occurrence', async () => {
+  const { context, run } = fixture();
+  context.testDates = ['2026-11-16'];
+  context.testSessions = [{ recurring_series_id: 8, recurrence_date: '2026-11-16',
+    session_date: '2026-11-16', employee_id: 1, program_id: 4, program_name: 'Weekly task',
+    start_time: '09:00', end_time: '10:00', points: 2, status: 'scheduled' }];
+  context.testEmployees = [{ employee_id: 1, first_name: 'One', last_name: 'Person' },
+    { employee_id: 2, first_name: 'Two', last_name: 'Person' }];
+  context.testPrograms = [{ program_id: 4, name: 'Weekly task' }];
+  context.requestScheduleChange = async options => {
+    context.changeOptions = options;
+    return { scope: 'occurrence', cutoffDate: '2026-11-16', replaceFutureExceptions: false };
+  };
+  context.confirmRecurringRuleConflict = async () => true;
+  context.api = async (path, options) => {
+    context.assignmentRequest = { path, body: JSON.parse(options.body) };
+    return { ok: true };
+  };
+  context.refreshScheduleViews = () => {};
+  run('planDates = testDates; planSessions = testSessions; adminEmployees = testEmployees; adminPrograms = testPrograms');
+  await run("onPersonDropped({item:{dataset:{employeeId:'2'}},to:{dataset:{seriesId:'8',recurrenceDate:'2026-11-16'}}})");
+  assert.equal(context.changeOptions.scope, 'occurrence');
+  assert.equal(context.changeOptions.allowOccurrence, undefined);
+  assert.equal(context.assignmentRequest.body.operation, 'exception');
+  assert.equal(context.assignmentRequest.body.occurrenceDate, '2026-11-16');
 });
 
 test('recurring rule overlap check warns but allows intentional same-person conflicts', async () => {

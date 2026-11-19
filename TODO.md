@@ -1,9 +1,9 @@
 ~~todo: point calc fix, widen UI, review past materials, many per job (?)~~
 ## Hot patch: enhance weekly timetable v2
 
-- [ ] Add distinct default assignment views for admins:
-  - [ ] **Schedule:** default to a weekly recurring-task grid, grouped by weekday with employees as rows; recurring entries remain single-assignee.
-  - [ ] **Plan:** default to dated sessions and allow dragging employees onto sessions for that date.
+- [x] Add distinct default assignment views for admins:
+  - [x] **Schedule:** default to a weekly recurring-task grid, grouped by weekday with employees as rows; recurring entries remain single-assignee.
+  - [x] **Plan:** default to dated sessions and allow dragging employees onto sessions for that date.
 - [ ] Allow multiple employees only on dated, timed sessions. Additional assignees apply only to that occurrence and do not change the recurring timetable; completion remains session-level/shared.
 - [ ] Award the full session points to each assignee. Show estimated points per employee as a separate projection assuming all assigned sessions are completed; keep it distinct from actual earned points.
 - [ ] Update schedule storage/API and employee-specific views for occurrence-level assignees; migrate existing sessions without changing their current assignee.
