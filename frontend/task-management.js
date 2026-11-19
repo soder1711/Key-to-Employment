@@ -32,12 +32,12 @@ function renderProgramList() {
       ? `<button type="button" class="btn small danger pm-del" data-program-id="${p.program_id}">${escapeHtml(t('programs.deleteBtn'))}</button>`
       : `<span class="mini-tag pm-deleted-tag">${escapeHtml(t('programs.deletedTag'))}</span>`;
     return `<tr${p.is_active ? '' : ' class="cancelled-row"'}>
-      <td class="pm-code">${escapeHtml(p.code)}</td>
-      <td>${escapeHtml(p.name)}</td>
-      <td><span class="cat-tag ${escapeHtml(p.category)}">${escapeHtml(p.category)}</span></td>
-      <td class="pts">${Number(p.default_points || 0).toFixed(1)}</td>
-      <td>${time}</td>
-      <td class="pm-action">${action}</td>
+      <td class="pm-code" data-label="${escapeHtml(t('pth.code'))}">${escapeHtml(p.code)}</td>
+      <td data-label="${escapeHtml(t('pth.task'))}">${escapeHtml(p.name)}</td>
+      <td data-label="${escapeHtml(t('pth.category'))}"><span class="cat-tag ${escapeHtml(p.category)}">${escapeHtml(p.category)}</span></td>
+      <td class="pts" data-label="${escapeHtml(t('pth.pts'))}">${Number(p.default_points || 0).toFixed(1)}</td>
+      <td data-label="${escapeHtml(t('pth.time'))}">${time}</td>
+      <td class="pm-action" data-label="${escapeHtml(t('pth.action'))}">${action}</td>
     </tr>`;
   }).join('');
 }

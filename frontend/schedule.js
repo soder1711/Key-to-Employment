@@ -69,7 +69,9 @@ function switchView(view) {
     showPlan && currentUser?.isAdmin ? 'block' : 'none';
   document.getElementById('monthly-summary-section').style.display =
     showMonthlySummary ? 'block' : 'none';
-  document.querySelector('.container').classList.toggle('schedule-workspace', showSchedule);
+  const container = document.querySelector('.container');
+  container.classList.toggle('schedule-workspace', showSchedule);
+  container.classList.toggle('monthly-summary-workspace', showMonthlySummary);
 
   if (showPlan && !planLoaded) initPlan();
   if (showMonthlySummary) {
@@ -126,12 +128,12 @@ async function loadMySchedule() {
       empty.style.display = 'none';
       tbody.innerHTML = data.sessions.map(s => `
         <tr${s.status === 'cancelled' ? ' class="cancelled-row"' : ''}>
-          <td>${fmtCellDate(s.session_date)}</td>
-          <td>${escapeHtml(s.program_name)}${scheduleBadge(s)}${s.is_sudden ? ` <span class="mini-tag sudden">${escapeHtml(t('tag.sudden'))}</span>` : ''}</td>
-          <td><span class="cat-tag ${escapeHtml(s.category)}">${escapeHtml(s.category)}</span></td>
-          <td>${s.start_time ? fmtTime(s.start_time) : '—'}${s.end_time ? '–' + fmtTime(s.end_time) : ''}</td>
-          <td class="pts">${Number(s.points).toFixed(1)}</td>
-          <td>${statusPill(s.status)}</td>
+          <td data-label="${escapeHtml(t('sth.date'))}">${fmtCellDate(s.session_date)}</td>
+          <td data-label="${escapeHtml(t('sth.program'))}">${escapeHtml(s.program_name)}${scheduleBadge(s)}${s.is_sudden ? ` <span class="mini-tag sudden">${escapeHtml(t('tag.sudden'))}</span>` : ''}</td>
+          <td data-label="${escapeHtml(t('sth.category'))}"><span class="cat-tag ${escapeHtml(s.category)}">${escapeHtml(s.category)}</span></td>
+          <td data-label="${escapeHtml(t('sth.time'))}">${s.start_time ? fmtTime(s.start_time) : '—'}${s.end_time ? '–' + fmtTime(s.end_time) : ''}</td>
+          <td class="pts" data-label="${escapeHtml(t('sth.points'))}">${Number(s.points).toFixed(1)}</td>
+          <td data-label="${escapeHtml(t('sth.status'))}">${statusPill(s.status)}</td>
         </tr>`).join('');
     }
 
@@ -270,14 +272,16 @@ function renderScheduleGrid(columns, employees, entries, timetable = false) {
     let points = 0;
     for (const column of columns) {
       const list = byEmployee.get(employeeId)?.get(column) || [];
+      const columnLabel = timetable ? dayName(column) : fmtShort(column);
       if (timetable) list.sort((a, b) => (a.start_time || '').localeCompare(b.start_time || '') || a.series_id - b.series_id);
       points += list.filter(entry => timetable || entry.status === 'completed').reduce((sum, entry) => sum + Number(entry.points), 0);
       html += `<td class="grid-cell${list.length ? ' has' : ''}${!timetable && column === todayISO() ? ' today' : ''}"
+        data-label="${escapeHtml(columnLabel)}"
         ${employeeId === null ? '' : `data-employee-id="${employeeId}"`} ${timetable ? `data-weekday="${column}"` : `data-date="${column}"`}>
         ${list.map(timetable ? timetableChipHtml : slotChipHtml).join('')}
         ${timetable ? `<button type="button" class="add-task-btn" data-timetable-add="${column}">${escapeHtml(t('schedule.createEntry'))}</button>` : ''}</td>`;
     }
-    html += `<td class="pts-cell">${timetable || points ? points.toFixed(1) : ''}</td></tr>`;
+    html += `<td class="pts-cell" data-label="${escapeHtml(t(timetable ? 'plan.pointsTotal' : 'grid.pts'))}">${timetable || points ? points.toFixed(1) : ''}</td></tr>`;
   }
   return html + '</tbody>';
 }
@@ -383,7 +387,7 @@ function renderScheduleAssignmentMatrix() {
     html += `<tr><td class="sticky-col ${employeeId === null ? 'unassigned' : 'emp-cell'}" title="${escapeHtml(employee.email || '')}">${escapeHtml(name)}</td>`;
     for (const day of days) {
       if (!day.occurrences.length) {
-        html += '<td class="assignment-cell empty-slot"></td>';
+        html += `<td class="assignment-cell empty-slot" data-label="${escapeHtml(dayName(day.weekday))} ${day.date}"></td>`;
         continue;
       }
       for (const occurrence of day.occurrences) {
@@ -393,7 +397,9 @@ function renderScheduleAssignmentMatrix() {
         if (isAssigned && occurrence.status !== 'cancelled') points += Number(occurrence.points || 0);
         const label = occurrence.status === 'cancelled' ? t('status.cancelled') :
           isAssigned ? employeeId === null ? t('schedule.unassigned') : t('schedule.assigned') : t('schedule.notAssigned');
-        html += `<td class="assignment-cell${isAssigned ? ' assigned' : ''}${occurrence.status === 'cancelled' ? ' cancelled' : ''}" aria-label="${escapeHtml(label)}">
+        const cellLabel = `${dayName(day.weekday)} ${day.date} · ${occurrence.program_name} ${fmtTime(occurrence.start_time)}`;
+        html += `<td class="assignment-cell${isAssigned ? ' assigned' : ''}${occurrence.status === 'cancelled' ? ' cancelled' : ''}"
+          data-label="${escapeHtml(cellLabel)}" aria-label="${escapeHtml(label)}">
           ${occurrence.status === 'cancelled' ? '—' : isAssigned ? employeeId === null ? `<span class="unassigned-mark">${escapeHtml(t('schedule.unassigned'))}</span>` : '<span class="assignment-mark" aria-hidden="true">✓</span>' : '<span class="assignment-empty" aria-hidden="true">—</span>'}
         </td>`;
       }

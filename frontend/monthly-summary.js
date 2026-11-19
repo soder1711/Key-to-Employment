@@ -90,20 +90,20 @@ function renderMonthlySummary(rows) {
       </div>
       <span class="summary-cell-sub">${t(hasOverride ? 'summary.individualOverride' : 'summary.sharedDefault')}</span>
     </div>`;
-    const periodCells = periods.map(([pointsKey, countKey]) => {
+    const periodCells = periods.map(([pointsKey, countKey, label]) => {
       const count = Math.max(0, Number(row[countKey]) || 0);
-      return `<td>${summaryPoints(row[pointsKey])} ${t('unit.pts')}` +
+      return `<td data-label="${escapeHtml(t(label))}">${summaryPoints(row[pointsKey])} ${t('unit.pts')}` +
         `<span class="summary-cell-sub">${t('summary.tasksCount', { count })}</span></td>`;
     }).join('');
     return `<tr>
-      <td class="summary-person">${escapeHtml(personName)}</td>
+      <td class="summary-person" data-label="${escapeHtml(t('summary.employee'))}">${escapeHtml(personName)}</td>
       ${periodCells}
-      <td class="pts">${summaryPoints(row.completed_points)} ${t('unit.pts')}</td>
-      <td>${summaryPoints(row.estimated_points)} ${t('unit.pts')}</td>
-      <td>${goalEditor}</td>
-      <td class="${varianceClass}">${varianceText} ${targetSet ? t('unit.pts') : ''}</td>
-      <td>${aboveGoal}${targetSet ? ` ${t('unit.pts')}` : ''}</td>
-      <td>${Math.max(0, Number(row.completed_sessions) || 0)}</td>
+      <td class="pts" data-label="${escapeHtml(t('summary.points'))}">${summaryPoints(row.completed_points)} ${t('unit.pts')}</td>
+      <td data-label="${escapeHtml(t('summary.estimated'))}">${summaryPoints(row.estimated_points)} ${t('unit.pts')}</td>
+      <td data-label="${escapeHtml(t('summary.goal'))}">${goalEditor}</td>
+      <td class="${varianceClass}" data-label="${escapeHtml(t('summary.variance'))}">${varianceText} ${targetSet ? t('unit.pts') : ''}</td>
+      <td data-label="${escapeHtml(t('summary.aboveGoal'))}">${aboveGoal}${targetSet ? ` ${t('unit.pts')}` : ''}</td>
+      <td data-label="${escapeHtml(t('summary.completedTasks'))}">${Math.max(0, Number(row.completed_sessions) || 0)}</td>
     </tr>`;
   }).join('');
 

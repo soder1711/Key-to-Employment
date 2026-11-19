@@ -51,15 +51,18 @@ function renderPool() {
   }).join('') || `<span class="empty">${t('plan.emptyPeople')}</span>`;
 }
 
-function planCells(s) {
+function planCells(s, period) {
   if (!s) return '<td></td><td></td><td></td>';
+  const taskLabel = escapeHtml(`${period} · ${t('th.task')}`);
+  const pointsLabel = escapeHtml(`${period} · ${t('sth.points')}`);
+  const peopleLabel = escapeHtml(`${period} · ${t('plan.people')}`);
   const assignees = planAssignees(s);
   const person = assignees.length
     ? assignees.map(assignee => `<span class="person-chip assigned" data-employee-id="${assignee.employee_id}"
               title="${escapeHtml(t('plan.clickOptions'))}">${escapeHtml(planEmployeeName(assignee.employee_id))}</span>`).join('')
     : `<span class="drop-here">${escapeHtml(t('plan.dropHere'))}</span>`;
   return `
-    <td class="cell-task">
+    <td class="cell-task" data-label="${taskLabel}">
       <button type="button" class="task-link" data-session-id="${s.session_id ?? ''}"
               data-series-id="${s.recurring_series_id ?? ''}"
               data-occurrence-date="${s.recurrence_date || s.session_date}"
@@ -68,8 +71,8 @@ function planCells(s) {
       ${s.is_sudden ? `<span class="mini-tag sudden">${escapeHtml(t('tag.sudden'))}</span>` : ''}
       <span class="task-sub">${fmtTime(s.start_time)}${s.end_time ? '–' + fmtTime(s.end_time) : ''}</span>
     </td>
-    <td class="cell-pts">${Number(s.points || 0).toFixed(1)}</td>
-    <td class="cell-person-slot" data-session-id="${s.session_id ?? ''}"
+    <td class="cell-pts" data-label="${pointsLabel}">${Number(s.points || 0).toFixed(1)}</td>
+    <td class="cell-person-slot" data-label="${peopleLabel}" data-session-id="${s.session_id ?? ''}"
         data-series-id="${s.recurring_series_id ?? ''}"
         data-occurrence-date="${s.recurrence_date || s.session_date}"
         data-display-date="${s.session_date}" data-recurrence-date="${s.recurrence_date || s.session_date}">${person}</td>`;
@@ -96,7 +99,7 @@ function renderDayTable(date) {
   } else {
     const rows = Math.max(morning.length, afternoon.length);
     for (let i = 0; i < rows; i++) {
-      body += `<tr>${planCells(morning[i])}${planCells(afternoon[i])}</tr>`;
+      body += `<tr>${planCells(morning[i], t('plan.morning'))}${planCells(afternoon[i], t('plan.afternoon'))}</tr>`;
     }
   }
   body += `

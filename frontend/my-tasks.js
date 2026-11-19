@@ -3,11 +3,11 @@
 function renderMyTaskRow(task) {
   return `
     <tr>
-      <td class="cell-task"><span class="task-name">${escapeHtml(task.title)}</span></td>
-      <td>${priorityBadge(task.priority)}</td>
-      <td>${statusPill(task.assignment_status)}</td>
-      <td class="cell-due">${fmtDue(task.deadline)}</td>
-      <td class="cell-progress">${progressBar(task.completion_percentage)}</td>
+      <td class="cell-task" data-label="${escapeHtml(t('th.task'))}"><span class="task-name">${escapeHtml(task.title)}</span></td>
+      <td data-label="${escapeHtml(t('th.priority'))}">${priorityBadge(task.priority)}</td>
+      <td data-label="${escapeHtml(t('th.status'))}">${statusPill(task.assignment_status)}</td>
+      <td class="cell-due" data-label="${escapeHtml(t('th.date'))}">${fmtDue(task.deadline)}</td>
+      <td class="cell-progress" data-label="${escapeHtml(t('th.progress'))}">${progressBar(task.completion_percentage)}</td>
     </tr>`;
 }
 
@@ -48,11 +48,11 @@ async function loadMyTasks() {
     ...tasks.map(renderMyTaskRow),
     ...planSessions.map(s => `
       <tr>
-        <td class="cell-task"><span class="task-name">${escapeHtml(s.program_name)}${scheduleBadge(s)}</span></td>
-        <td><span class="cat-tag ${escapeHtml(s.category)}">${escapeHtml(s.category)}</span></td>
-        <td>${statusPill(s.status)}</td>
-        <td class="cell-due">${fmtCellDate(s.session_date)} · ${fmtTime(s.start_time)}${s.end_time ? '–' + fmtTime(s.end_time) : ''}</td>
-        <td class="cell-progress">${Number(s.points || 0).toFixed(1)} ${t('unit.pts')}</td>
+        <td class="cell-task" data-label="${escapeHtml(t('th.task'))}"><span class="task-name">${escapeHtml(s.program_name)}${scheduleBadge(s)}</span></td>
+        <td data-label="${escapeHtml(t('th.priority'))}"><span class="cat-tag ${escapeHtml(s.category)}">${escapeHtml(s.category)}</span></td>
+        <td data-label="${escapeHtml(t('th.status'))}">${statusPill(s.status)}</td>
+        <td class="cell-due" data-label="${escapeHtml(t('th.date'))}">${fmtCellDate(s.session_date)} · ${fmtTime(s.start_time)}${s.end_time ? '–' + fmtTime(s.end_time) : ''}</td>
+        <td class="cell-progress" data-label="${escapeHtml(t('th.progress'))}">${Number(s.points || 0).toFixed(1)} ${t('unit.pts')}</td>
       </tr>`),
   ];
   if (!rows.length && tasksResult.ok && planResult.ok) {
