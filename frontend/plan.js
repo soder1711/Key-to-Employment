@@ -13,12 +13,24 @@ function planEmployeeName(id) {
   return e ? `${e.first_name} ${e.last_name}`.trim() : t('person.unknown');
 }
 
+function planAssignees(session) {
+  if (Array.isArray(session.assignees)) return session.assignees;
+  return session.employee_id == null ? [] : [{
+    employee_id: session.employee_id,
+    first_name: session.first_name,
+    last_name: session.last_name,
+  }];
+}
+
+function planSessionsForDate(date) {
+  return planSessions.filter(session => session.session_date === date && session.status !== 'cancelled');
+}
+
 function renderPool() {
   const points = new Map();
   for (const s of planSessions) {
     if (s.status === 'cancelled') continue;
-    const assignees = s.assignees || (s.employee_id == null ? [] : [{ employee_id: s.employee_id }]);
-    for (const { employee_id: employeeId } of assignees) {
+    for (const { employee_id: employeeId } of planAssignees(s)) {
       const total = points.get(employeeId) || { estimated: 0, earned: 0 };
       total.estimated += Number(s.points || 0);
       if (s.status === 'completed') total.earned += Number(s.points || 0);
@@ -41,7 +53,7 @@ function renderPool() {
 
 function planCells(s) {
   if (!s) return '<td></td><td></td><td></td>';
-  const assignees = s.assignees || (s.employee_id == null ? [] : [{ employee_id: s.employee_id }]);
+  const assignees = planAssignees(s);
   const person = assignees.length
     ? assignees.map(assignee => `<span class="person-chip assigned" data-employee-id="${assignee.employee_id}"
               title="${escapeHtml(t('plan.clickOptions'))}">${escapeHtml(planEmployeeName(assignee.employee_id))}</span>`).join('')
@@ -64,8 +76,7 @@ function planCells(s) {
 }
 
 function renderDayTable(date) {
-  const daySessions = planSessions
-    .filter(s => s.session_date === date && s.status !== 'cancelled');
+  const daySessions = planSessionsForDate(date);
   // Automatic allocation: a task belongs to Morning or Afternoon and evening
   // purely based on its start time (< 12:00 = morning). No stored period.
   const morning = daySessions.filter(s => (s.start_time || '09:00') < '12:00');
@@ -239,9 +250,7 @@ async function onPersonDropped(evt) {
     renderPlanBoard();
     return;
   }
-  const assignees = occurrence.assignees || (occurrence.employee_id == null ? [] : [{
-    employee_id: occurrence.employee_id,
-  }]);
+  const assignees = planAssignees(occurrence);
   const assigned = !assignees.some(person => Number(person.employee_id) === employeeId);
   renderPlanBoard();
   try {

@@ -172,6 +172,11 @@ document.getElementById('plan-days').addEventListener('click', (e) => {
 });
 
 function handleTimetableGridClick(event) {
+  const addButton = event.target.closest('[data-timetable-add]');
+  if (addButton) {
+    openRuleModal(Number(addButton.dataset.timetableAdd));
+    return;
+  }
   const editButton = event.target.closest('[data-timetable-edit]');
   if (editButton) {
     const rule = recurringEntries.find(item => Number(item.series_id) === Number(editButton.dataset.timetableEdit));

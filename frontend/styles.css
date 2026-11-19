@@ -410,6 +410,21 @@ button { font-family: inherit; }
 .slot-chip.sudden { outline: 2px dashed #b45309; outline-offset: -2px; }
 .slot-chip:hover { filter: brightness(1.1); }
 
+.assignment-matrix { min-width: 1100px; }
+.assignment-day-head { min-width: 150px; padding: 0.45rem; text-align: center; background: #f8fafc; }
+.assignment-day-head > span { display: block; margin-bottom: 0.35rem; color: var(--blue-700); }
+.assignment-day-head .add-task-btn { font-size: 0.72rem; padding: 3px 5px; }
+.assignment-slot-head { min-width: 145px; padding: 0.45rem; vertical-align: top; background: #fff; }
+.assignment-slot-head > span { display: block; margin-top: 0.2rem; color: var(--muted); font-size: 0.72rem; font-weight: 500; }
+.assignment-slot-head.cancelled, .assignment-cell.cancelled { opacity: 0.55; }
+.assignment-task { border: 0; background: none; padding: 0; color: var(--ink); font: inherit; font-weight: 700; text-align: left; cursor: pointer; }
+.assignment-task:hover { color: var(--blue-700); text-decoration: underline; }
+.assignment-cell { min-width: 145px; height: 42px; text-align: center; vertical-align: middle; }
+.assignment-mark { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: #dcfce7; color: #15803d; font-weight: 800; }
+.assignment-empty { color: #cbd5e1; }
+.unassigned-mark { color: var(--muted); font-size: 0.75rem; font-style: italic; }
+.empty-slot { color: #94a3b8; font-size: 0.75rem; font-style: italic; }
+
 /* ---------- Month summary table ---------- */
 .month-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
 .month-table th {

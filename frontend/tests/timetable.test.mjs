@@ -94,8 +94,8 @@ test('timetable groups rules by weekday, sorts entries, and escapes task names',
   const entry = { weekday: 1, employee_id: null, series_id: 1, program_name: '<img onerror=bad>',
     start_time: '10:00', end_time: '11:00', points: 5, start_date: '2026-11-01', effective_from: '2099-01-01' };
   context.entries = [entry, { ...entry, series_id: 2, start_time: '09:00', program_name: 'Earlier' }];
-  run('recurringEntries = entries; renderTimetableEntries()');
-  const html = elements.get('timetable-grid').innerHTML;
+  run("recurringEntries = entries; renderTimetableEntries('plan-timetable-grid')");
+  const html = elements.get('plan-timetable-grid').innerHTML;
   assert.equal((html.match(/class="day-head/g) || []).length, 7);
   assert.ok(html.indexOf('>Mon</th>') < html.indexOf('>Sun</th>'));
   assert.ok(html.indexOf('Earlier') < html.indexOf('&lt;img'));
@@ -106,6 +106,38 @@ test('timetable groups rules by weekday, sorts entries, and escapes task names',
   assert.ok(html.includes('Planned points'));
   assert.ok(html.includes('10.0</td>'));
   assert.ok(!html.includes('data-session-id'));
+});
+
+test('Schedule matrix groups this week\'s timetable occurrences by date and marks assignees', () => {
+  const { elements, context, run } = fixture();
+  context.matrixEmployees = [
+    { employee_id: 1, first_name: 'Ava', last_name: 'Nguyen', email: 'ava@example.test' },
+    { employee_id: 2, first_name: 'Ben', last_name: 'Tran' },
+  ];
+  context.matrixOccurrences = [
+    { recurring_series_id: 8, recurrence_date: '2026-11-16', session_date: '2026-11-16',
+      program_name: 'Morning task', start_time: '09:00', end_time: '10:00', points: 3,
+      status: 'scheduled', is_recurring: true,
+      assignees: [{ employee_id: 1, first_name: 'Ava', last_name: 'Nguyen' }] },
+    { recurring_series_id: 9, recurrence_date: '2026-11-17', session_date: '2026-11-17',
+      program_name: 'Unassigned task', start_time: '14:00', end_time: '15:00', points: 4,
+      status: 'scheduled', is_recurring: true, assignees: [] },
+  ];
+  run("scheduleWeekStart = '2026-11-16'; adminEmployees = matrixEmployees; sessionByOccurrence = new Map(matrixOccurrences.map(s => [`${s.recurring_series_id}:${s.recurrence_date}`, s])); renderTimetableEntries()");
+  const html = elements.get('timetable-grid').innerHTML;
+  assert.ok(html.includes('Mon 16 Nov'));
+  assert.ok(html.includes('Tue 17 Nov'));
+  assert.ok(html.includes('Morning task'));
+  assert.ok(html.includes('09:00–10:00 · 3.0 pts'));
+  assert.ok(html.includes('data-timetable-edit="8"'));
+  assert.ok(html.includes('Ava Nguyen'));
+  assert.ok(html.includes('Unassigned task'));
+  assert.ok(html.includes('Unassigned'));
+  assert.ok(html.includes('data-timetable-add="1"'));
+  assert.ok(html.includes('data-timetable-add="2"'));
+  assert.ok(html.includes('3.0</td>'));
+  assert.ok(html.includes('4.0</td>'));
+  assert.equal((html.match(/class="assignment-cell assigned/g) || []).length, 2);
 });
 
 test('shared grid retains dated totals and puts recurring definitions under unassigned', () => {
@@ -246,6 +278,27 @@ test('Plan shows multiple assignees and separates estimated from earned points',
   const board = elements.get('plan-days').innerHTML;
   assert.ok(board.includes('One Person'));
   assert.ok(board.includes('Two Person'));
+});
+
+test('Plan renders timetable occurrences using their dated assignment links', () => {
+  const { context, elements, run } = fixture();
+  context.testEmployees = [
+    { employee_id: 1, first_name: 'One', last_name: 'Person' },
+    { employee_id: 2, first_name: 'Two', last_name: 'Person' },
+  ];
+  context.testSessions = [{ recurring_series_id: 8, recurrence_date: '2026-11-16',
+    session_date: '2026-11-16', employee_id: 99, program_name: 'Weekly task',
+    status: 'scheduled', points: 2, start_time: '09:00', end_time: '10:00', is_recurring: true,
+    assignees: [{ employee_id: 1 }, { employee_id: 2 }] }];
+  run("planDates = ['2026-11-16']; planSessions = testSessions; adminEmployees = testEmployees; renderPlanBoard()");
+  const board = elements.get('plan-days').innerHTML;
+  assert.ok(board.includes('Weekly task'));
+  assert.ok(board.includes('Weekly'));
+  assert.ok(board.includes('One Person'));
+  assert.ok(board.includes('Two Person'));
+  assert.ok(board.includes('data-series-id="8"'));
+  assert.ok(board.includes('data-recurrence-date="2026-11-16"'));
+  assert.ok(!board.includes('Unknown'));
 });
 
 test('dropping an assigned employee removes only that one-off occurrence link', async () => {

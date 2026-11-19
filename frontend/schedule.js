@@ -206,10 +206,10 @@ async function loadAdminSchedule() {
       weeklyTimetableEnabled ? 'inline-block' : 'none';
     adminPrograms = data.programs;
     adminEmployees = data.employees;
-    if (scheduleViewMode === 'timetable') await loadTimetableEditor();
     sessionById = new Map(data.sessions.map(s => [s.session_id, s]));
     sessionByOccurrence = new Map(data.sessions.filter(s => s.is_recurring)
       .map(s => [`${s.recurring_series_id}:${s.recurrence_date || s.session_date}`, s]));
+    if (scheduleViewMode === 'timetable') await loadTimetableEditor();
 
     document.getElementById('schedule-week-label').textContent =
       `${fmtShort(data.dates[0])} – ${fmtShort(data.dates[6])}`;
@@ -323,7 +323,85 @@ async function loadRecurringEntries() {
 }
 
 function renderTimetableEntries(targetId = 'timetable-grid') {
-  document.getElementById(targetId).innerHTML = renderScheduleGrid([1, 2, 3, 4, 5, 6, 0], adminEmployees, recurringEntries, true);
+  const grid = document.getElementById(targetId);
+  if (targetId !== 'timetable-grid') {
+    grid.innerHTML = renderScheduleGrid([1, 2, 3, 4, 5, 6, 0], adminEmployees, recurringEntries, true);
+    return;
+  }
+  grid.innerHTML = renderScheduleAssignmentMatrix();
+}
+
+function renderScheduleAssignmentMatrix() {
+  const dates = Array.from({ length: 7 }, (_, index) => shiftISO(scheduleWeekStart, index));
+  const occurrences = [...sessionByOccurrence.values()]
+    .filter(session => session.session_date >= dates[0] && session.session_date <= dates[6])
+    .sort((a, b) => a.session_date.localeCompare(b.session_date) ||
+      String(a.start_time || '').localeCompare(String(b.start_time || '')) ||
+      Number(a.recurring_series_id) - Number(b.recurring_series_id));
+  const byDate = new Map(dates.map(date => [date, []]));
+  for (const occurrence of occurrences) byDate.get(occurrence.session_date)?.push(occurrence);
+  const days = dates.map(date => ({
+    date,
+    weekday: new Date(`${date}T00:00:00Z`).getUTCDay(),
+    occurrences: byDate.get(date),
+  }));
+  const rows = [...adminEmployees];
+  if (occurrences.some(occurrence => !occurrence.assignees?.length)) {
+    rows.push({ employee_id: null });
+  }
+  const colspan = day => Math.max(1, day.occurrences.length);
+  let html = '<thead><tr><th class="sticky-col" rowspan="2">' +
+    escapeHtml(t('grid.employee')) + '</th>';
+  for (const day of days) {
+    const date = new Date(`${day.date}T00:00:00Z`);
+    html += `<th class="assignment-day-head${day.weekday === 0 || day.weekday === 6 ? ' weekend' : ''}" colspan="${colspan(day)}">
+      <span>${escapeHtml(dayName(day.weekday))} ${date.getUTCDate()} ${escapeHtml(monthName(date.getUTCMonth()))}</span>
+      <button type="button" class="add-task-btn" data-timetable-add="${day.weekday}">${escapeHtml(t('schedule.createEntry'))}</button>
+    </th>`;
+  }
+  html += `<th class="pts-head" rowspan="2">${escapeHtml(t('plan.pointsTotal'))}</th></tr><tr>`;
+  for (const day of days) {
+    if (!day.occurrences.length) {
+      html += `<th class="assignment-slot-head empty-slot">${escapeHtml(t('schedule.noTaskOnDay'))}</th>`;
+      continue;
+    }
+    for (const occurrence of day.occurrences) {
+      const statusClass = occurrence.status === 'cancelled' ? ' cancelled' : '';
+      html += `<th class="assignment-slot-head${statusClass}" title="${escapeHtml(occurrence.program_name)} · ${fmtTime(occurrence.start_time)} · ${Number(occurrence.points).toFixed(1)} ${t('unit.pts')}">
+        <button type="button" class="assignment-task" data-timetable-edit="${occurrence.recurring_series_id}" title="${escapeHtml(t('schedule.timetableEdit'))}">${escapeHtml(occurrence.program_name)}</button>
+        <span>${escapeHtml(fmtTime(occurrence.start_time))}${occurrence.end_time ? `–${escapeHtml(fmtTime(occurrence.end_time))}` : ''} · ${Number(occurrence.points).toFixed(1)} ${escapeHtml(t('unit.pts'))}</span>
+        ${scheduleBadge(occurrence)}
+      </th>`;
+    }
+  }
+  html += '</tr></thead><tbody>';
+  for (const employee of rows) {
+    const employeeId = employee.employee_id;
+    const name = employeeId === null ? t('person.unassigned') :
+      `${employee.first_name || ''} ${employee.last_name || ''}`.trim() || t('modal.employee', { id: employeeId });
+    let points = 0;
+    html += `<tr><td class="sticky-col ${employeeId === null ? 'unassigned' : 'emp-cell'}" title="${escapeHtml(employee.email || '')}">${escapeHtml(name)}</td>`;
+    for (const day of days) {
+      if (!day.occurrences.length) {
+        html += '<td class="assignment-cell empty-slot"></td>';
+        continue;
+      }
+      for (const occurrence of day.occurrences) {
+        const assigned = occurrence.assignees || [];
+        const isAssigned = employeeId === null ? assigned.length === 0 :
+          assigned.some(person => Number(person.employee_id) === Number(employeeId));
+        if (isAssigned && occurrence.status !== 'cancelled') points += Number(occurrence.points || 0);
+        const label = occurrence.status === 'cancelled' ? t('status.cancelled') :
+          isAssigned ? employeeId === null ? t('schedule.unassigned') : t('schedule.assigned') : t('schedule.notAssigned');
+        html += `<td class="assignment-cell${isAssigned ? ' assigned' : ''}${occurrence.status === 'cancelled' ? ' cancelled' : ''}" aria-label="${escapeHtml(label)}">
+          ${occurrence.status === 'cancelled' ? '—' : isAssigned ? employeeId === null ? `<span class="unassigned-mark">${escapeHtml(t('schedule.unassigned'))}</span>` : '<span class="assignment-mark" aria-hidden="true">✓</span>' : '<span class="assignment-empty" aria-hidden="true">—</span>'}
+        </td>`;
+      }
+    }
+    html += `<td class="pts-cell">${points.toFixed(1)}</td></tr>`;
+  }
+  if (!rows.length) html += `<tr><td class="empty" colspan="${days.reduce((sum, day) => sum + colspan(day), 2)}">${escapeHtml(t('plan.emptyPeople'))}</td></tr>`;
+  return html + '</tbody>';
 }
 
 function openDetailsFromElement(element) {

@@ -4,6 +4,9 @@
 - [x] Add distinct default assignment views for admins:
   - [x] **Schedule:** default to a weekly grid of fixed recurring task definitions (weekday, task, time, points); new rules have no default assignee.
   - [x] **Plan:** default to the selected week's dated occurrences. Dragging employees assigns them to that occurrence's timetable task, not to the recurring rule.
+- [x] Implement the distinct visual layouts (the default routing/assignment behavior above is already in place):
+  - [x] **Schedule:** render the attached mockup as a weekly assignment matrix: fixed timetable task slots grouped by weekday as columns, employees as rows, with occurrence assignments visible in the corresponding cells.
+  - [x] **Plan:** retain the dated-sessions look, but build each day's fixed task list from the timetable and show/edit assignees from the occurrence-assignment data. Changes in Plan apply to that date only; do not edit the recurring timetable.
 - [x] Store assignments as employee-to-occurrence links: no rows means unassigned; one or more rows means the occurrence's assignees. Reuse the timetable task/occurrence rather than creating duplicate task or session records per employee. Support one-off timed sessions as well as projected recurring occurrences.
 - [x] Keep completion/status shared on the single dated occurrence. Award the full session points to each assignee when completed; show estimated points per employee as a separate projection assuming all assigned sessions are completed. Combined employee points may exceed the session's points.
 - [x] Make Plan drag/drop add or remove an employee's assignment for that date only; do not modify the recurring task definition or assignments on other dates. Update employee-specific schedule/task reads to use these links.
