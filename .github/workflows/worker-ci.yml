@@ -48,3 +48,9 @@ jobs:
         run: |
           npx --yes wrangler@4 d1 execute task-portal-ci --local --config ../wrangler.d1-test.toml --persist-to "$RUNNER_TEMP/wrangler-d1" --file ../migrations/007_legacy_weekly_copies_are_one_offs.sql
           npx --yes wrangler@4 d1 execute task-portal-ci --local --config ../wrangler.d1-test.toml --persist-to "$RUNNER_TEMP/wrangler-d1" --file ../.github/test-fixtures/legacy-weekly-copies-assertions.sql
+
+      - name: Test occurrence-assignment migration against local D1
+        run: |
+          npx --yes wrangler@4 d1 execute task-portal-ci --local --config ../wrangler.d1-test.toml --persist-to "$RUNNER_TEMP/wrangler-d1" --file ../.github/test-fixtures/occurrence-assignments.sql
+          npx --yes wrangler@4 d1 execute task-portal-ci --local --config ../wrangler.d1-test.toml --persist-to "$RUNNER_TEMP/wrangler-d1" --file ../migrations/008_occurrence_assignments.sql
+          npx --yes wrangler@4 d1 execute task-portal-ci --local --config ../wrangler.d1-test.toml --persist-to "$RUNNER_TEMP/wrangler-d1" --file ../.github/test-fixtures/occurrence-assignments-assertions.sql

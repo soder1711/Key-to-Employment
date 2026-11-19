@@ -160,6 +160,7 @@ async function loadMySchedule() {
 function renderMonthProgress(summary, label) {
   if (!summary) return '';
   const earned = Number(summary.completed_points || 0);
+  const estimated = Number(summary.estimated_points || 0);
   const target = Number(summary.target_points || 0);
   const pct = target > 0 ? Math.min(100, (earned / target) * 100) : 0;
   const excess = target > 0 ? Math.max(0, earned - target) : 0;
@@ -173,6 +174,7 @@ function renderMonthProgress(summary, label) {
     <div class="month-progress">
       <div class="mp-label">${labelTxt}<strong>${earned.toFixed(1)}</strong> / ${target.toFixed(1)} ${t('mp.credited')} ·
         ${t('mp.sessionsDone', { done: summary.completed_sessions || 0, total: summary.total_sessions || 0 })}</div>
+      <div class="summary-cell-sub">${t('summary.estimated')}: ${estimated.toFixed(1)} ${t('unit.pts')}</div>
       ${progressBar(pct)}
       ${footer}
     </div>`;
@@ -234,22 +236,23 @@ function timetableChipHtml(entry) {
 function renderScheduleGrid(columns, employees, entries, timetable = false) {
   const byEmployee = new Map();
   for (const entry of entries) {
-    const employeeId = entry.employee_id ?? null;
-    if (!byEmployee.has(employeeId)) byEmployee.set(employeeId, new Map());
-    const column = timetable ? Number(entry.weekday) : entry.session_date;
-    const days = byEmployee.get(employeeId);
-    if (!days.has(column)) days.set(column, []);
-    days.get(column).push(entry);
+    const employeeIds = timetable ? [null] : (entry.employee_ids?.length
+      ? entry.employee_ids : entry.employee_id == null ? [null] : [entry.employee_id]);
+    for (const employeeId of employeeIds) {
+      if (!byEmployee.has(employeeId)) byEmployee.set(employeeId, new Map());
+      const column = timetable ? Number(entry.weekday) : entry.session_date;
+      const days = byEmployee.get(employeeId);
+      if (!days.has(column)) days.set(column, []);
+      days.get(column).push(entry);
+    }
   }
-  const rows = [...employees];
+  const rows = timetable ? [] : [...employees];
   if (timetable || byEmployee.has(null)) rows.push({ employee_id: null });
-  // A rule assigned to an inactive person must remain visible and editable.
-  if (timetable) {
-    for (const [employeeId] of byEmployee) {
-      if (employeeId !== null && !rows.some(employee => employee.employee_id === employeeId)) {
-        const entry = entries.find(item => item.employee_id === employeeId);
-        rows.push({ employee_id: employeeId, first_name: entry.first_name, last_name: entry.last_name });
-      }
+  for (const [employeeId] of byEmployee) {
+    if (employeeId !== null && !rows.some(employee => employee.employee_id === employeeId)) {
+      const person = entries.flatMap(item => item.assignees || [])
+        .find(item => item.employee_id === employeeId);
+      rows.push({ employee_id: employeeId, first_name: person?.first_name, last_name: person?.last_name });
     }
   }
   let html = `<thead><tr><th class="sticky-col">${escapeHtml(t('grid.employee'))}</th>`;
@@ -351,7 +354,7 @@ async function loadAdminMonth() {
   }
   wrap.innerHTML = `<table class="month-table">
     <thead><tr>
-      <th>${t('grid.employee')}</th><th>${t('sth.program')}</th><th>${t('totals.completed')}</th><th>${t('sth.points')}</th>
+      <th>${t('grid.employee')}</th><th>${t('sth.program')}</th><th>${t('totals.completed')}</th><th>${t('totals.earned')}</th><th>${t('summary.estimated')}</th>
       <th>${t('mp.target')}</th><th>${t('th.progress')}</th><th>${t('mp.excessShort', { p: '' })}</th>
     </tr></thead>
     <tbody>${rows.map(r => {
@@ -364,6 +367,7 @@ async function loadAdminMonth() {
         <td>${r.scheduled_sessions}</td>
         <td>${r.completed_sessions}</td>
         <td class="pts">${earned.toFixed(1)}</td>
+        <td>${Number(r.estimated_points || 0).toFixed(1)}</td>
         <td><input type="number" min="0" step="1" class="target-input"
                    data-employee-id="${r.employee_id}" value="${target}"></td>
         <td style="min-width:150px">${progressBar(pct)}</td>

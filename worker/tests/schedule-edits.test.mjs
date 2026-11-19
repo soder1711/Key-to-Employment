@@ -35,7 +35,12 @@ function mockDb(initialSessions = [makeSession()]) {
             return { first: async () => program.program_id === values[0] ? program : null };
           }
           if (sql.includes('WHERE s.session_id = ? LIMIT 1')) {
-            return { first: async () => sessions.find(row => row.session_id === values[0]) ?? null };
+            return { first: async () => {
+              const row = sessions.find(item => item.session_id === values[0]);
+              if (!row) return null;
+              const ids = row.employee_ids || (row.employee_id == null ? [] : [row.employee_id]);
+              return { ...row, assignees_json: JSON.stringify(ids.map(employee_id => ({ employee_id }))) };
+            } };
           }
           if (sql.includes('WHERE s.session_date >= ? AND s.session_date <= ?')) {
             return {
@@ -45,17 +50,20 @@ function mockDb(initialSessions = [makeSession()]) {
           }
           if (sql.includes('INSERT INTO schedule_sessions')) {
             return { run: async () => {
-              const [sessionDate, programId, employeeId, startTime, endTime,
+              const [sessionDate, programId, startTime, endTime,
                 points, isSudden, notes, createdBy] = values;
               const inserted = makeSession({
                 session_id: nextId++, session_date: sessionDate, program_id: programId,
-                employee_id: employeeId, start_time: startTime, end_time: endTime,
+                employee_id: null, employee_ids: [], start_time: startTime, end_time: endTime,
                 status: 'scheduled', points, is_sudden: isSudden, notes,
                 created_by: createdBy,
               });
               sessions.push(inserted);
               return { meta: { last_row_id: inserted.session_id, changes: 1 } };
             } };
+          }
+          if (sql.includes('INSERT INTO schedule_occurrence_assignments')) {
+            return { statement: { sql, values } };
           }
           if (sql.includes('UPDATE schedule_sessions')) {
             return { run: async () => {
@@ -75,6 +83,13 @@ function mockDb(initialSessions = [makeSession()]) {
           throw new Error(`Unexpected SQL: ${sql}`);
         },
       };
+    },
+    async batch(statements) {
+      for (const statement of statements) {
+        const [sessionId, employeeId] = statement.statement.values;
+        const target = sessions.find(row => row.session_id === sessionId);
+        if (target && !target.employee_ids.includes(employeeId)) target.employee_ids.push(employeeId);
+      }
     },
   };
   return { db, sessions, history };
@@ -115,7 +130,7 @@ test('weekday clone keeps task settings and assignee but starts scheduled', asyn
   assert.equal(response.status, 200);
   assert.equal(payload.clonedCount, 2);
   assert.deepEqual(sessions.slice(1).map(row => row.session_date), ['2026-10-21', '2026-10-23']);
-  assert.ok(sessions.slice(1).every(row => row.employee_id === 7 && row.points === 2 &&
+  assert.ok(sessions.slice(1).every(row => row.employee_id == null && row.employee_ids.includes(7) && row.points === 2 &&
     row.notes === 'original' && row.status === 'scheduled'));
 });
 

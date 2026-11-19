@@ -112,7 +112,7 @@ The assignment is updated only when it belongs to the authenticated employee. In
 GET /api/schedule?start=2026-10-19
 ```
 
-`start` is optional. The Worker normalizes it to the Monday of the requested week. Recurring timetable entries are projected into the requested range; reading a schedule does not create session rows. `year` and `month` are optional and control the monthly progress summary. Completed recurring occurrences are stored as dated sessions; planned future occurrences are not.
+`start` is optional. The Worker normalizes it to the Monday of the requested week. Recurring timetable entries are projected into the requested range; reading a schedule does not create session rows. `year` and `month` are optional and control the monthly progress summary. Completed recurring occurrences are stored as dated sessions; planned future occurrences are not. Each session has an `assignees` array; empty means unassigned. The occurrence is returned once regardless of assignee count.
 
 Response:
 
@@ -194,7 +194,7 @@ Recurring occurrences are projected for the requested week, without creating ses
 GET /api/admin/schedule/timetable
 ```
 
-Returns `{ "entries": [ ... ] }` with the open effective version for each series, including its stable `series_id`, weekday, task, assignee, planned points, start date, and optional end date.
+Returns `{ "entries": [ ... ] }` with the open effective version for each series, including its stable `series_id`, weekday, task, planned points, start date, and optional end date. Recurring definitions have no default assignee; assign employees to dated occurrences instead.
 
 ### Create or edit a recurring entry
 
@@ -210,7 +210,7 @@ Create an entry directly:
   "operation": "create",
   "weekday": 1,
   "programId": 1,
-  "employeeId": 2,
+  "employeeId": null,
   "startTime": "09:00",
   "endTime": "10:00",
   "points": 2.5,
@@ -221,7 +221,7 @@ Create an entry directly:
 }
 ```
 
-`weekday` uses JavaScript numbering (Sunday `0` through Saturday `6`). An edit creates a new effective-dated version from the explicit cutoff and preserves prior settings:
+New recurring definitions are unassigned. `weekday` uses JavaScript numbering (Sunday `0` through Saturday `6`). An edit creates a new effective-dated version from the explicit cutoff and preserves prior settings:
 
 ```json
 {
@@ -230,7 +230,7 @@ Create an entry directly:
   "cutoffDate": "2026-11-23",
   "weekday": 1,
   "programId": 1,
-  "employeeId": 3,
+  "employeeId": null,
   "startTime": "10:00",
   "endTime": "11:00",
   "points": 2.5,
@@ -244,7 +244,7 @@ Future occurrence exceptions are preserved unless `replaceFutureExceptions` is e
 
 ### Modify or cancel one occurrence; end a series
 
-Use the same `POST /api/admin/schedule/timetable` route with an `operation` of `exception` to store an occurrence override (`action: "modify"`) or cancellation (`action: "cancel"`). Modified exceptions may set `movedDate`, task, assignee, times, points, and notes; they appear with `is_modified: true`. Completion and occurrence notes remain on the dated session, not in the recurring definition. Completed occurrences cannot be moved, modified, or cancelled.
+Use the same `POST /api/admin/schedule/timetable` route with an `operation` of `exception` to store an occurrence override (`action: "modify"`) or cancellation (`action: "cancel"`). Modified exceptions may set `movedDate`, task, times, points, and notes; they appear with `is_modified: true`. Assignments are changed separately using the occurrence-assignment endpoint. Completion and occurrence notes remain on the dated session, not in the recurring definition. Completed occurrences cannot be moved, modified, or cancelled.
 
 To stop one recurring series from a date onward, send `{ "operation": "end", "seriesId": 12, "cutoffDate": "2026-11-23" }`. Earlier versions and completed session records are retained. Ending the whole timetable uses the legacy endpoint below with `enabled: false` and an explicit `cutoffDate`.
 
@@ -295,7 +295,22 @@ Request:
 
 Response: `{ "success": true, "session": { ... } }`.
 
-`employeeId`, `programId`, and `date` are required. Times are optional. Points must be between `0` and `100`. `repeatWeeks` optionally creates independent one-off sessions on the same weekday (maximum 53 weeks); omit it or use `1` for only this date. Ongoing repetition uses a recurring timetable series.
+`programId` and `date` are required. `employeeId` is optional; when provided, it creates an occurrence assignment link. Times are optional. Points must be between `0` and `100`. `repeatWeeks` optionally creates independent one-off sessions on the same weekday (maximum 53 weeks); omit it or use `1` for only this date. Ongoing repetition uses a recurring timetable series.
+
+### Add or remove an occurrence assignee
+
+```http
+POST /api/admin/schedule/reassign
+Content-Type: application/json
+```
+
+Add an employee to, or remove them from, one dated occurrence. Use either a one-off `sessionId` or the recurring `seriesId` and `occurrenceDate`:
+
+```json
+{ "seriesId": 12, "occurrenceDate": "2026-11-17", "employeeId": 2, "assigned": true }
+```
+
+Set `assigned` to `false` to remove the employee. It defaults to `true`. Multiple employees may be linked to one occurrence; duplicate links are ignored. This never changes the recurring definition or another date. Completion and status remain shared by the occurrence.
 
 ### Edit a schedule session
 
@@ -364,7 +379,7 @@ Response: `{ "success": true }`.
 GET /api/admin/schedule/monthly?year=2026&month=10
 ```
 
-`year` and `month` default to the current UTC year and month. The admin-only response is `{ "year": 2026, "month": 10, "rows": [ ... ] }`. Projected recurring occurrences contribute scheduled/potential points without creating session rows; completed points and counts come from dated session records. Each row retains the monthly totals and includes points and completed-session counts for days 1–10, 11–20, and 21–month-end, plus target status and goal variance. The shared default goal is 170 points; `target_is_override` indicates whether that employee has a month-specific override:
+`year` and `month` default to the current UTC year and month. The admin-only response is `{ "year": 2026, "month": 10, "rows": [ ... ] }`. Projected recurring occurrences contribute estimated points without creating session rows; completed points and counts come from dated session records. Each assigned employee receives the full points for a completed occurrence. `estimated_points` sums all assigned, non-cancelled sessions assuming completion and is separate from `completed_points`. Each row also includes points and completed-session counts for days 1–10, 11–20, and 21–month-end, plus target status and goal variance. The shared default goal is 170 points; `target_is_override` indicates whether that employee has a month-specific override:
 
 ```json
 {
@@ -372,6 +387,7 @@ GET /api/admin/schedule/monthly?year=2026&month=10
   "first_name": "Example",
   "last_name": "Employee",
   "completed_points": 28,
+  "estimated_points": 40,
   "completed_sessions": 12,
   "target_points": 24,
   "target_set": true,

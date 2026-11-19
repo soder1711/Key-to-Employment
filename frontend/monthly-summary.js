@@ -4,21 +4,21 @@ const DEMO_MONTHLY_ROWS = [
     days_1_10_points: 12.5, days_1_10_completed_sessions: 5,
     days_11_20_points: 9.5, days_11_20_completed_sessions: 4,
     days_21_end_points: 6, days_21_end_completed_sessions: 3,
-    completed_points: 28, completed_sessions: 12,
+    completed_points: 28, estimated_points: 40, completed_sessions: 12,
   },
   {
     employee_id: 2, first_name: 'Minh', last_name: 'Tran',
     days_1_10_points: 5, days_1_10_completed_sessions: 2,
     days_11_20_points: 8, days_11_20_completed_sessions: 4,
     days_21_end_points: 3, days_21_end_completed_sessions: 2,
-    completed_points: 16, completed_sessions: 8,
+    completed_points: 16, estimated_points: 25, completed_sessions: 8,
   },
   {
     employee_id: 3, first_name: 'Alex', last_name: 'Morgan',
     days_1_10_points: 0, days_1_10_completed_sessions: 0,
     days_11_20_points: 0, days_11_20_completed_sessions: 0,
     days_21_end_points: 0, days_21_end_completed_sessions: 0,
-    completed_points: 0, completed_sessions: 0,
+    completed_points: 0, estimated_points: 0, completed_sessions: 0,
   },
 ];
 const demoGoalOverrides = new Map([[
@@ -99,6 +99,7 @@ function renderMonthlySummary(rows) {
       <td class="summary-person">${escapeHtml(personName)}</td>
       ${periodCells}
       <td class="pts">${summaryPoints(row.completed_points)} ${t('unit.pts')}</td>
+      <td>${summaryPoints(row.estimated_points)} ${t('unit.pts')}</td>
       <td>${goalEditor}</td>
       <td class="${varianceClass}">${varianceText} ${targetSet ? t('unit.pts') : ''}</td>
       <td>${aboveGoal}${targetSet ? ` ${t('unit.pts')}` : ''}</td>
@@ -108,7 +109,7 @@ function renderMonthlySummary(rows) {
 
   return `<table class="monthly-summary-table">
     <thead><tr><th>${t('summary.employee')}</th>${periodHeaders}
-      <th>${t('summary.points')}</th><th>${t('summary.goal')}</th>
+      <th>${t('summary.points')}</th><th>${t('summary.estimated')}</th><th>${t('summary.goal')}</th>
       <th>${t('summary.variance')}</th><th>${t('summary.aboveGoal')}</th>
       <th>${t('summary.completedTasks')}</th>
     </tr></thead><tbody>${body}</tbody>

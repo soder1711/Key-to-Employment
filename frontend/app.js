@@ -175,11 +175,11 @@ function handleTimetableGridClick(event) {
   const editButton = event.target.closest('[data-timetable-edit]');
   if (editButton) {
     const rule = recurringEntries.find(item => Number(item.series_id) === Number(editButton.dataset.timetableEdit));
-    if (rule) openRuleModal(rule.employee_id, rule.weekday, rule);
+    if (rule) openRuleModal(rule.weekday, rule);
     return;
   }
   const cell = event.target.closest('.grid-cell');
-  if (cell) openRuleModal(cell.dataset.employeeId ? Number(cell.dataset.employeeId) : null, Number(cell.dataset.weekday));
+  if (cell) openRuleModal(Number(cell.dataset.weekday));
 }
 
 document.getElementById('timetable-grid').addEventListener('click', handleTimetableGridClick);

@@ -80,6 +80,19 @@ test('aggregateMonthlyRows applies the shared default when there is no override'
   assert.equal(summary.points_above_goal, 0);
 });
 
+test('each assignee gets full credited points and a separate all-complete estimate', () => {
+  const rows = [1, 2].flatMap(employeeId => [
+    { ...session('recurring:12:2026-11-02', '2026-11-02', 'completed', 4), employee_id: employeeId },
+    { ...session('recurring:12:2026-11-09', '2026-11-09', 'scheduled', 3), employee_id: employeeId },
+  ]);
+  const summaries = aggregateMonthlyRows(rows);
+
+  assert.equal(summaries.length, 2);
+  assert.ok(summaries.every(row => row.completed_points === 4));
+  assert.ok(summaries.every(row => row.estimated_points === 7));
+  assert.ok(summaries.every(row => row.completed_sessions === 1));
+});
+
 test('aggregateMonthlyRows reports negative variance and zero excess below goal', () => {
   const [summary] = aggregateMonthlyRows([
     { ...session(1, '2026-02-28', 'completed', 5), target_points: 10 },

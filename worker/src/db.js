@@ -234,6 +234,16 @@ const SESSION_SELECT = `
   SELECT s.session_id, s.program_id, s.session_date, s.start_time, s.end_time, s.status,
          s.points, s.is_sudden, s.notes, s.occurrence_notes, s.employee_id,
          s.template_id, s.template_date, s.recurring_series_id, s.recurrence_date,
+         (SELECT json_group_array(json_object(
+            'employee_id', oa.employee_id, 'first_name', ae.first_name,
+            'last_name', ae.last_name, 'email', ae.email))
+          FROM schedule_occurrence_assignments oa
+          JOIN employees ae ON ae.employee_id = oa.employee_id
+          WHERE (s.recurring_series_id IS NOT NULL
+                 AND oa.recurring_series_id = s.recurring_series_id
+                 AND oa.occurrence_date = s.recurrence_date)
+             OR (s.recurring_series_id IS NULL AND oa.session_id = s.session_id)
+         ) AS assignees_json,
          rs.ended_from AS series_ended_from,
          p.code AS program_code, p.name AS program_name, p.category,
          e.first_name, e.last_name, e.email AS employee_email
@@ -242,20 +252,90 @@ const SESSION_SELECT = `
   LEFT JOIN employees e ON e.employee_id = s.employee_id
   LEFT JOIN recurring_schedule_series rs ON rs.series_id = s.recurring_series_id`;
 
+function addSessionAssignees(row) {
+  const explicit = JSON.parse(row.assignees_json || '[]')
+    .filter(person => person.employee_id != null);
+  const assignees = explicit.length ? explicit : row.employee_id == null ? [] : [{
+    employee_id: row.employee_id, first_name: row.first_name,
+    last_name: row.last_name, email: row.employee_email,
+  }];
+  return {
+    ...row,
+    assignees,
+    employee_ids: assignees.map(person => Number(person.employee_id)),
+    ...(assignees.length === 1 ? assignees[0] : {
+      employee_id: null, first_name: null, last_name: null, employee_email: null,
+    }),
+  };
+}
+
 export async function getSessionsBetween(db, startDate, endDate, employeeId = null) {
   const sql = SESSION_SELECT + `
     WHERE s.session_date >= ? AND s.session_date <= ?
-    ${employeeId ? 'AND s.employee_id = ?' : ''}
+    ${employeeId ? `AND (s.employee_id = ? OR EXISTS (
+      SELECT 1 FROM schedule_occurrence_assignments oa
+      WHERE oa.employee_id = ? AND (
+        oa.session_id = s.session_id OR
+        (s.recurring_series_id IS NOT NULL
+         AND oa.recurring_series_id = s.recurring_series_id
+         AND oa.occurrence_date = s.recurrence_date)
+      )
+    ))` : ''}
     ORDER BY s.session_date, s.start_time, s.session_id`;
   const stmt = db.prepare(sql);
   const { results } = employeeId
-    ? await stmt.bind(startDate, endDate, employeeId).all()
+    ? await stmt.bind(startDate, endDate, employeeId, employeeId).all()
     : await stmt.bind(startDate, endDate).all();
-  return results;
+  return results.map(addSessionAssignees);
+}
+
+async function getRecurringAssignmentMap(db, startDate, endDate) {
+  const { results } = await db.prepare(`
+    SELECT oa.recurring_series_id, oa.occurrence_date, oa.employee_id,
+           e.first_name, e.last_name, e.email AS employee_email
+    FROM schedule_occurrence_assignments oa
+    JOIN employees e ON e.employee_id = oa.employee_id
+    WHERE oa.recurring_series_id IS NOT NULL
+      AND ((oa.occurrence_date >= ? AND oa.occurrence_date <= ?)
+        OR EXISTS (
+          SELECT 1 FROM recurring_schedule_exceptions x
+          WHERE x.series_id = oa.recurring_series_id
+            AND x.occurrence_date = oa.occurrence_date
+            AND x.moved_date >= ? AND x.moved_date <= ?
+        ))
+    ORDER BY e.first_name, e.last_name
+  `).bind(startDate, endDate, startDate, endDate).all();
+  const assignments = new Map();
+  for (const row of results) {
+    const key = `${row.recurring_series_id}:${row.occurrence_date}`;
+    const list = assignments.get(key) || [];
+    list.push({ employee_id: row.employee_id, first_name: row.first_name,
+      last_name: row.last_name, email: row.employee_email });
+    assignments.set(key, list);
+  }
+  return assignments;
+}
+
+function attachRecurringAssignees(occurrences, assignments) {
+  return occurrences.map(row => {
+    const assignees = assignments.get(`${row.recurring_series_id}:${row.recurrence_date}`)
+      || row.assignees || (row.employee_id == null ? [] : [{
+        employee_id: row.employee_id, first_name: row.first_name,
+        last_name: row.last_name, email: row.employee_email,
+      }]);
+    return {
+      ...row,
+      assignees,
+      employee_ids: assignees.map(person => Number(person.employee_id)),
+      ...(assignees.length === 1 ? assignees[0] : {
+        employee_id: null, first_name: null, last_name: null, employee_email: null,
+      }),
+    };
+  });
 }
 
 export async function getRecurringOccurrencesBetween(db, startDate, endDate, employeeId = null) {
-  const [versions, exceptions, sessions] = await Promise.all([
+  const [versions, exceptions, sessions, assignments] = await Promise.all([
     db.prepare(`
       SELECT v.*, v.series_id, rs.ended_from, p.code AS program_code, p.name AS program_name,
              p.category, e.first_name, e.last_name, e.email AS employee_email
@@ -284,14 +364,15 @@ export async function getRecurringOccurrencesBetween(db, startDate, endDate, emp
       SESSION_SELECT + ` WHERE (s.recurrence_date >= ? AND s.recurrence_date <= ?)
         OR (s.session_date >= ? AND s.session_date <= ?)`
     ).bind(startDate, endDate, startDate, endDate).all(),
+    getRecurringAssignmentMap(db, startDate, endDate),
   ]);
-  return expandRecurringOccurrences(
+  return attachRecurringAssignees(expandRecurringOccurrences(
     versions.results, startDate, endDate, exceptions.results, sessions.results,
-  ).filter(row => employeeId == null || row.employee_id === employeeId);
+  ), assignments).filter(row => employeeId == null || row.employee_ids.includes(employeeId));
 }
 
 export async function getRecurringOccurrenceByKey(db, seriesId, occurrenceDate) {
-  const [versions, exceptions, sessions] = await Promise.all([
+  const [versions, exceptions, sessions, assignments] = await Promise.all([
     db.prepare(`
       SELECT v.*, rs.ended_from, p.code AS program_code, p.name AS program_name,
              p.category, e.first_name, e.last_name, e.email AS employee_email
@@ -318,14 +399,15 @@ export async function getRecurringOccurrenceByKey(db, seriesId, occurrenceDate) 
     db.prepare(
       SESSION_SELECT + ` WHERE s.recurring_series_id = ? AND s.recurrence_date = ?`
     ).bind(seriesId, occurrenceDate).all(),
+    getRecurringAssignmentMap(db, occurrenceDate, occurrenceDate),
   ]);
-  const [occurrence] = expandRecurringOccurrences(
+  const [occurrence] = attachRecurringAssignees(expandRecurringOccurrences(
     versions.results, occurrenceDate, occurrenceDate, exceptions.results, sessions.results,
     { includeMovedOutsideRange: true },
-  );
+  ), assignments);
   if (occurrence) return occurrence;
   const session = sessions.results[0];
-  return session ? { ...session, is_recurring: true, is_projected: false } : null;
+  return session ? { ...addSessionAssignees(session), is_recurring: true, is_projected: false } : null;
 }
 
 export async function getScheduleBetween(db, startDate, endDate, employeeId = null) {
@@ -351,9 +433,10 @@ export async function getScheduleBetween(db, startDate, endDate, employeeId = nu
 }
 
 export async function getSessionById(db, sessionId) {
-  return await db.prepare(
+  const session = await db.prepare(
     SESSION_SELECT + ` WHERE s.session_id = ? LIMIT 1`
   ).bind(sessionId).first();
+  return session ? addSessionAssignees(session) : null;
 }
 
 export async function getRecurringTimetable(db) {
@@ -553,21 +636,31 @@ export async function saveRecurringOccurrence(db, occurrence, status, occurrence
     ON CONFLICT(recurring_series_id, recurrence_date) DO UPDATE SET
       status = excluded.status,
       occurrence_notes = COALESCE(excluded.occurrence_notes, schedule_sessions.occurrence_notes)
-  `).bind(occurrence.session_date, occurrence.program_id, occurrence.employee_id,
+  `).bind(occurrence.session_date, occurrence.program_id, null,
     occurrence.start_time, occurrence.end_time, status, occurrence.points,
     occurrence.is_sudden ? 1 : 0, occurrenceNotes ?? null,
     occurrence.recurring_series_id, occurrence.recurrence_date || occurrence.session_date).run();
 }
 
 export async function createSession(db, s) {
-  return await db.prepare(
+  const result = await db.prepare(
     `INSERT INTO schedule_sessions
        (session_date, program_id, employee_id, start_time, end_time,
         status, points, is_sudden, notes, created_by)
-     VALUES (?, ?, ?, ?, ?, 'scheduled', ?, ?, ?, ?)`
-  ).bind(s.sessionDate, s.programId, s.employeeId, s.startTime || null,
+     VALUES (?, ?, NULL, ?, ?, 'scheduled', ?, ?, ?, ?)`
+  ).bind(s.sessionDate, s.programId, s.startTime || null,
          s.endTime || null, s.points, s.isSudden ? 1 : 0, s.notes || null,
          s.createdBy || null).run();
+  const sessionId = result.meta.last_row_id;
+  const employeeIds = [...new Set([...(s.employeeIds || []), s.employeeId]
+    .filter(id => id != null).map(Number))];
+  if (employeeIds.length) {
+    await db.batch(employeeIds.map(employeeId => db.prepare(`
+      INSERT INTO schedule_occurrence_assignments (session_id, employee_id, assigned_by)
+      VALUES (?, ?, ?) ON CONFLICT DO NOTHING
+    `).bind(sessionId, employeeId, s.createdBy || null)));
+  }
+  return result;
 }
 
 export async function updateSession(db, sessionId, s) {
@@ -580,10 +673,29 @@ export async function updateSession(db, sessionId, s) {
          s.points, s.isSudden ? 1 : 0, s.notes || null, sessionId).run();
 }
 
-export async function reassignSession(db, sessionId, employeeId) {
-  return await db.prepare(
-    `UPDATE schedule_sessions SET employee_id = ? WHERE session_id = ?`
-  ).bind(employeeId, sessionId).run();
+export async function setOccurrenceAssignment(db, {
+  sessionId = null, seriesId = null, occurrenceDate = null, employeeId, assigned, assignedBy,
+}) {
+  const statements = [];
+  if (sessionId != null) {
+    statements.push(db.prepare(`UPDATE schedule_sessions SET employee_id = NULL WHERE session_id = ?`)
+      .bind(sessionId));
+    statements.push(assigned
+      ? db.prepare(`INSERT INTO schedule_occurrence_assignments (session_id, employee_id, assigned_by)
+          VALUES (?, ?, ?) ON CONFLICT DO NOTHING`).bind(sessionId, employeeId, assignedBy)
+      : db.prepare(`DELETE FROM schedule_occurrence_assignments
+          WHERE session_id = ? AND employee_id = ?`).bind(sessionId, employeeId));
+  } else {
+    statements.push(assigned
+      ? db.prepare(`INSERT INTO schedule_occurrence_assignments
+          (recurring_series_id, occurrence_date, employee_id, assigned_by)
+          VALUES (?, ?, ?, ?) ON CONFLICT DO NOTHING`)
+        .bind(seriesId, occurrenceDate, employeeId, assignedBy)
+      : db.prepare(`DELETE FROM schedule_occurrence_assignments
+          WHERE recurring_series_id = ? AND occurrence_date = ? AND employee_id = ?`)
+        .bind(seriesId, occurrenceDate, employeeId));
+  }
+  await db.batch(statements);
 }
 
 export async function setSessionStatus(db, sessionId, status) {
@@ -614,11 +726,15 @@ export async function getMonthlySummary(db, year, month, employeeId = null) {
            s.session_id, s.session_date, s.status, s.points
     FROM employees e
     LEFT JOIN schedule_sessions s
-      ON s.employee_id = e.employee_id AND s.session_date >= ? AND s.session_date <= ?
-     AND s.recurring_series_id IS NULL
+      ON s.session_date >= ? AND s.session_date <= ? AND s.recurring_series_id IS NULL
+     AND (s.employee_id = e.employee_id OR EXISTS (
+       SELECT 1 FROM schedule_occurrence_assignments oa
+       WHERE oa.session_id = s.session_id AND oa.employee_id = e.employee_id
+     ))
     LEFT JOIN monthly_targets mt
       ON mt.employee_id = e.employee_id AND mt.year = ? AND mt.month = ?
-    WHERE e.is_active = 1 ${employeeId ? 'AND e.employee_id = ?' : ''}
+    WHERE e.is_active = 1
+      ${employeeId ? 'AND e.employee_id = ?' : ''}
     ORDER BY e.first_name, e.last_name, s.session_date`;
   const params = employeeId
     ? [start, end, year, month, employeeId]
@@ -630,15 +746,18 @@ export async function getMonthlySummary(db, year, month, employeeId = null) {
   for (const row of results) {
     if (!targetRows.has(row.employee_id)) targetRows.set(row.employee_id, row);
   }
-  const occurrenceRows = occurrences.filter(row => row.employee_id != null).map(row => {
-    const target = targetRows.get(row.employee_id);
+  const occurrenceRows = occurrences.flatMap(row => row.assignees.map(person => {
+    const target = targetRows.get(person.employee_id);
     return {
       ...row,
-      email: row.employee_email,
+      employee_id: person.employee_id,
+      first_name: person.first_name,
+      last_name: person.last_name,
+      email: person.email,
       target_points: target?.target_points ?? null,
       target_is_override: target?.target_is_override ?? 0,
     };
-  });
+  }));
   return aggregateMonthlyRows([...results, ...occurrenceRows]);
 }
 

@@ -136,6 +136,31 @@ CREATE UNIQUE INDEX IF NOT EXISTS uniq_template_session_date
 CREATE UNIQUE INDEX IF NOT EXISTS uniq_recurring_session_date
     ON schedule_sessions(recurring_series_id, recurrence_date);
 
+-- Assignments belong to a dated occurrence, never to the recurring definition.
+CREATE TABLE IF NOT EXISTS schedule_occurrence_assignments (
+    assignment_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id INTEGER,
+    recurring_series_id INTEGER,
+    occurrence_date DATE,
+    employee_id INTEGER NOT NULL,
+    assigned_by INTEGER,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (session_id) REFERENCES schedule_sessions(session_id) ON DELETE CASCADE,
+    FOREIGN KEY (recurring_series_id) REFERENCES recurring_schedule_series(series_id),
+    FOREIGN KEY (employee_id) REFERENCES employees(employee_id),
+    FOREIGN KEY (assigned_by) REFERENCES employees(employee_id),
+    CHECK ((session_id IS NOT NULL AND recurring_series_id IS NULL AND occurrence_date IS NULL) OR
+           (session_id IS NULL AND recurring_series_id IS NOT NULL AND occurrence_date IS NOT NULL))
+);
+CREATE UNIQUE INDEX IF NOT EXISTS uniq_occurrence_assignment_session
+    ON schedule_occurrence_assignments(session_id, employee_id)
+    WHERE session_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uniq_occurrence_assignment_recurring
+    ON schedule_occurrence_assignments(recurring_series_id, occurrence_date, employee_id)
+    WHERE recurring_series_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_occurrence_assignments_employee
+    ON schedule_occurrence_assignments(employee_id);
+
 -- Tombstones prevent deleted generated occurrences from returning on later reads.
 CREATE TABLE IF NOT EXISTS weekly_schedule_exceptions (
     template_id  INTEGER NOT NULL,

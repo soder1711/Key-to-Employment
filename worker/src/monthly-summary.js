@@ -69,6 +69,7 @@ export function aggregateMonthlyRows(rows) {
     const goalVariance = summary.completed_points - summary.target_points;
     return {
       ...summary,
+      estimated_points: summary.potential_points,
       goal_variance: goalVariance,
       points_above_goal: Math.max(0, goalVariance),
     };

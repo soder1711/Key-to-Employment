@@ -2,12 +2,13 @@
 ## Hot patch: enhance weekly timetable v2
 
 - [x] Add distinct default assignment views for admins:
-  - [x] **Schedule:** default to a weekly recurring-task grid, grouped by weekday with employees as rows; recurring entries remain single-assignee.
-  - [x] **Plan:** default to dated sessions and allow dragging employees onto sessions for that date.
-- [ ] Allow multiple employees only on dated, timed sessions. Additional assignees apply only to that occurrence and do not change the recurring timetable; completion remains session-level/shared.
-- [ ] Award the full session points to each assignee. Show estimated points per employee as a separate projection assuming all assigned sessions are completed; keep it distinct from actual earned points.
-- [ ] Update schedule storage/API and employee-specific views for occurrence-level assignees; migrate existing sessions without changing their current assignee.
-- [ ] Add focused tests for multi-assignee dated sessions, recurring-assignment isolation, and estimated/credited point totals; update README guidance.
+  - [x] **Schedule:** default to a weekly grid of fixed recurring task definitions (weekday, task, time, points); new rules have no default assignee.
+  - [x] **Plan:** default to the selected week's dated occurrences. Dragging employees assigns them to that occurrence's timetable task, not to the recurring rule.
+- [x] Store assignments as employee-to-occurrence links: no rows means unassigned; one or more rows means the occurrence's assignees. Reuse the timetable task/occurrence rather than creating duplicate task or session records per employee. Support one-off timed sessions as well as projected recurring occurrences.
+- [x] Keep completion/status shared on the single dated occurrence. Award the full session points to each assignee when completed; show estimated points per employee as a separate projection assuming all assigned sessions are completed. Combined employee points may exceed the session's points.
+- [x] Make Plan drag/drop add or remove an employee's assignment for that date only; do not modify the recurring task definition or assignments on other dates. Update employee-specific schedule/task reads to use these links.
+- [x] Add minimal schema/API support for occurrence assignment links and migrate existing employee assignments without changing who is assigned to existing occurrences. New recurring task definitions remain unassigned by default.
+- [x] Add focused tests for unassigned/single/multiple assignees, dated-vs-recurring isolation, migration preservation, and estimated/credited point totals; update README guidance.
 
 ## Refactor
 - [x] Split frontend into multiple modules

@@ -22,22 +22,22 @@ The Worker restricts CORS to `FRONTEND_URL`, and authorization is enforced by th
 
 ## Weekly timetable
 
-The admin weekly timetable is the source of truth for recurring work. Admins can add recurring entries directly for a weekday, task type, assigned person, time, planned points, and explicit start and optional end dates. Importing a displayed week is also available as a setup shortcut; it imports one-off sessions and leaves existing recurring series alone.
+The admin weekly timetable is the source of truth for recurring work. Admins can add recurring entries directly for a weekday, task type, time, planned points, and explicit start and optional end dates. Rules define fixed occurrences and have no default assignee. Importing a displayed week is also available as a setup shortcut; it imports one-off sessions and leaves existing recurring series alone.
 
 Each recurring entry has a stable series ID. Schedule and monthly-summary reads expand the effective-dated series into dated occurrences without creating database session rows. “This and future occurrences” edits take an explicit cutoff date and preserve earlier versions and future one-off exceptions by default. Admins can explicitly replace exceptions, modify or move a single occurrence, cancel an occurrence, or end a series from a date onward. The “Weekly” and “Weekly - Modified” text badges identify recurring and overridden occurrences.
 
-Session rows represent actual dated outcomes, such as completion, credited points, and occurrence-only notes. Completing a projected occurrence creates its session record; merely viewing a week does not. Copied/manual sessions remain one-offs. When upgrading legacy weekly templates, dated copies before the migrated rule's effective date stay one-offs; only occurrences linked to the active rule are marked weekly.
+Session rows represent one actual dated occurrence, including its shared status, credited points, and occurrence-only notes. Employee assignments are separate links to that occurrence: no links means unassigned, and multiple links allow multiple employees without duplicating the task/session. Each assignee receives the full session points when it is completed. Estimated points assume all assigned sessions are completed and are shown separately from points earned. Completing a projected occurrence creates its session record; merely viewing a week does not. Copied/manual sessions remain one-offs. When upgrading legacy weekly templates, dated copies before the migrated rule's effective date stay one-offs; only occurrences linked to the active rule are marked weekly.
 
 ### Finding and using the timetable
 
-- Admins: **Schedule** opens the **Weekly timetable** for recurring assignments; **Plan** opens the dated sessions for all seven days of the selected week. Employees retain their personal dated schedule.
-- **Weekly timetable** reuses the dated schedule's employee-by-weekday grid and assignment form. Click a cell to add a recurring rule for that person and weekday, or click a rule to edit it. The grid shows planned totals and the latest settings' effective dates, including upcoming changes; it is not a historical-week preview. Use **Dated schedule** to inspect occurrences for a particular week.
-- **Plan** shows each dated task under its weekday in the selected week. Dragging a person onto a task changes only that date; the recurring rule remains unchanged. Use **Schedule** to edit recurring assignments. Overlapping recurring assignments for the same person are warned about but can be intentional. Existing future exceptions are preserved unless explicitly replaced. Cancelling a recurring-rule change makes no change.
+- Admins: **Schedule** opens the **Weekly timetable** for recurring task definitions; **Plan** opens the dated sessions for all seven days of the selected week. Employees retain their personal dated schedule.
+- **Weekly timetable** shows fixed recurring task definitions by weekday, with no assignee. Click a cell to add a task definition or click a rule to edit it. The grid shows current settings and effective dates, including upcoming changes; it is not a historical-week preview. Use **Dated schedule** or **Plan** to inspect occurrences for a particular week.
+- **Plan** shows each dated task under its weekday in the selected week. Dragging a person onto a task adds them for that date; dragging them onto it again removes them. Multiple people can share one occurrence. Assignment changes never affect the recurring definition or another date. Completion remains shared on the occurrence. Existing future exceptions are preserved unless explicitly replaced. Cancelling a recurring-rule change makes no change.
 - **Dated schedule** is for completion, actual notes, and exceptions. Clicking an empty cell adds a one-off session. **Import and copy tools** contains the optional setup shortcuts; finite repeat copies remain separate one-off sessions.
 - Saving recurring edits opens a change dialog with a before/after summary. Choose **This and future occurrences** (default) with an effective date, or **Only this occurrence** when editing a dated task. Use **Go to** to pick a date; Plan also offers **Today** and **This week** shortcuts.
 - End an individual series from its timetable rule or task details. **Series management** contains **Stop weekly timetable**, which ends all recurring entries from a selected date without affecting one-offs. Completion and actual notes remain occurrence-only.
 
-For a browser smoke test with an authenticated admin, confirm Schedule opens the weekly timetable and Plan opens all seven dated days of the current week. Assign an employee to one recurring occurrence from Plan and verify other weeks remain unchanged; then make a recurring-rule change from Schedule and verify its effective date. Check the same task as an employee and confirm timetable controls are absent. Also check the Vietnamese labels and the horizontally scrollable grids on mobile. The localhost monthly-summary demo below does not preview the timetable.
+For a browser smoke test with an authenticated admin, confirm Schedule opens the unassigned weekly timetable and Plan opens all seven dated days of the current week. Assign two employees to one recurring occurrence from Plan, remove one, and verify other weeks remain unchanged. Complete the occurrence and confirm both assigned employees receive its full points; estimated points should remain distinct from actual points earned. Then make a recurring-rule change from Schedule and verify its effective date. Check the same task as an employee and confirm timetable controls are absent. Also check the Vietnamese labels and the horizontally scrollable grids on mobile. The localhost monthly-summary demo below does not preview the timetable.
 
 ## Local setup
 
@@ -77,7 +77,10 @@ database still needs, in numeric order, and never rerun a table-rebuild or
 `ALTER TABLE` migration. In particular, apply migration `003` before `005` if
 both are needed; apply migration `006_recurring_schedule_series.sql` after `005`
 when upgrading an existing weekly-timetable database, then apply
-`007_legacy_weekly_copies_are_one_offs.sql` to correct legacy copied sessions.
+`007_legacy_weekly_copies_are_one_offs.sql` to correct legacy copied sessions,
+followed by `008_occurrence_assignments.sql` to move existing dated assignments to
+occurrence links. It preserves assignments on stored sessions and modified exceptions;
+recurring definitions become unassigned.
 The current canonical schema already includes the changes from these
 migrations, so a fresh database does not need them. Verify the target database's
 existing schema before applying any migration, and do not use `--remote` unless
@@ -106,8 +109,8 @@ For a manual Worker deployment, run `wrangler deploy --config wrangler.toml` fro
 There is no package manifest, build step, or linter. The monthly-summary aggregation tests use Node's built-in test runner. Before submitting changes:
 
 - Run `node --experimental-default-type=module --test worker/tests/monthly-summary.test.mjs`.
-- Run `node --experimental-default-type=module --test worker/tests/recurrence.test.mjs worker/tests/schedule-edits.test.mjs` for recurrence/API regressions.
-- Worker CI initializes an isolated Wrangler local D1, seeds legacy-template session fixtures, applies migration 007, and asserts that historical one-off copies are detached without changing active recurring occurrences. The Worker deployment waits for these tests to pass.
+- Run `node --experimental-default-type=module --test worker/tests/recurrence.test.mjs worker/tests/schedule-edits.test.mjs worker/tests/occurrence-assignments.test.mjs` for recurrence and assignment regressions.
+- Worker CI initializes an isolated Wrangler local D1, verifies legacy migration 007, then applies migration 008 and asserts that stored session and exception assignments are preserved as occurrence links. The Worker deployment waits for these tests to pass.
 - Run `node --test frontend/tests/timetable.test.mjs` for timetable grouping, mode gating, and change-dialog behavior.
 - Run `node --check` on changed JavaScript files.
 - Review API routes and database bindings manually.

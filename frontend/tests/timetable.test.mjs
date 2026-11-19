@@ -89,7 +89,7 @@ test('mode switch isolates timetable from dated navigation and gates employees',
   assert.equal(elements.get('schedule-mode-switch').style.display, 'none');
 });
 
-test('timetable reuses the people-by-weekday grid, sorts rules, and escapes task names', () => {
+test('timetable groups rules by weekday, sorts entries, and escapes task names', () => {
   const { elements, context, run } = fixture();
   const entry = { weekday: 1, employee_id: null, series_id: 1, program_name: '<img onerror=bad>',
     start_time: '10:00', end_time: '11:00', points: 5, start_date: '2026-11-01', effective_from: '2099-01-01' };
@@ -108,7 +108,7 @@ test('timetable reuses the people-by-weekday grid, sorts rules, and escapes task
   assert.ok(!html.includes('data-session-id'));
 });
 
-test('shared grid retains dated totals and keeps inactive-person rules visible', () => {
+test('shared grid retains dated totals and puts recurring definitions under unassigned', () => {
   const { run, context } = fixture();
   context.employees = [{ employee_id: 1, first_name: 'Active', last_name: 'Person' }];
   context.entries = [
@@ -122,8 +122,9 @@ test('shared grid retains dated totals and keeps inactive-person rules visible',
   context.entries = [{ employee_id: 2, weekday: 1, series_id: 7, points: 4,
     first_name: 'Inactive', last_name: 'Person', program_name: 'Rule', start_date: '2026-11-01', effective_from: '2026-11-01' }];
   const timetable = run('renderScheduleGrid([1], employees, entries, true)');
-  assert.ok(timetable.includes('Inactive Person'));
-  assert.ok(timetable.includes('data-employee-id="2"'));
+  assert.ok(!timetable.includes('Inactive Person'));
+  assert.ok(!timetable.includes('data-employee-id="2"'));
+  assert.ok(timetable.includes('Unassigned'));
   assert.ok(timetable.includes('data-timetable-edit="7"'));
 });
 
@@ -146,27 +147,25 @@ test('dragging onto a recurring Plan task changes only that dated occurrence', a
   const { context, run } = fixture();
   context.testDates = ['2026-11-16'];
   context.testSessions = [{ recurring_series_id: 8, recurrence_date: '2026-11-16',
-    session_date: '2026-11-16', employee_id: 1, program_id: 4, program_name: 'Weekly task',
+    session_date: '2026-11-16', employee_id: null,
+    assignees: [{ employee_id: 1, first_name: 'One', last_name: 'Person' }],
+    employee_ids: [1], program_id: 4, program_name: 'Weekly task',
     start_time: '09:00', end_time: '10:00', points: 2, status: 'scheduled' }];
   context.testEmployees = [{ employee_id: 1, first_name: 'One', last_name: 'Person' },
     { employee_id: 2, first_name: 'Two', last_name: 'Person' }];
   context.testPrograms = [{ program_id: 4, name: 'Weekly task' }];
-  context.requestScheduleChange = async options => {
-    context.changeOptions = options;
-    return { scope: 'occurrence', cutoffDate: '2026-11-16', replaceFutureExceptions: false };
-  };
-  context.confirmRecurringRuleConflict = async () => true;
   context.api = async (path, options) => {
     context.assignmentRequest = { path, body: JSON.parse(options.body) };
     return { ok: true };
   };
-  context.refreshScheduleViews = () => {};
+  context.loadPlanBoard = async () => {};
+  context.loadMyTasks = async () => {};
   run('planDates = testDates; planSessions = testSessions; adminEmployees = testEmployees; adminPrograms = testPrograms');
   await run("onPersonDropped({item:{dataset:{employeeId:'2'}},to:{dataset:{seriesId:'8',recurrenceDate:'2026-11-16'}}})");
-  assert.equal(context.changeOptions.scope, 'occurrence');
-  assert.equal(context.changeOptions.allowOccurrence, undefined);
-  assert.equal(context.assignmentRequest.body.operation, 'exception');
+  assert.equal(context.assignmentRequest.path, '/api/admin/schedule/reassign');
+  assert.equal(context.assignmentRequest.body.seriesId, 8);
   assert.equal(context.assignmentRequest.body.occurrenceDate, '2026-11-16');
+  assert.equal(context.assignmentRequest.body.assigned, true);
 });
 
 test('recurring rule overlap check warns but allows intentional same-person conflicts', async () => {
@@ -183,14 +182,13 @@ test('recurring rule overlap check warns but allows intentional same-person conf
   assert.equal(await run(`confirmRecurringRuleConflict(${candidate}, 5)`), true);
 });
 
-test('rule creation reuses assignment defaults and clears rule mode before one-off creation', () => {
+test('new recurring rules remain unassigned and clear rule mode before one-off creation', () => {
   const { run, elements } = fixture();
-  run("adminPrograms = [{program_id:1,default_points:5,default_start:'09:00',default_end:'10:00'}]; openRuleModal(3, 2)");
+  run("adminPrograms = [{program_id:1,default_points:5,default_start:'09:00',default_end:'10:00'}]; openRuleModal(2)");
   // A real select selects its first option automatically.
   elements.get('assign-program').value = '1';
   run('refreshAssignDefaults()');
   assert.equal(elements.get('assign-weekday').value, '2');
-  assert.equal(elements.get('assign-employee').value, 3);
   assert.equal(elements.get('assign-start').value, '09:00');
   assert.equal(elements.get('assign-points').value, 5);
   assert.equal(elements.get('assign-points').readOnly, false);
@@ -207,9 +205,8 @@ test('shared rule save uses series endpoints and validates date ranges without w
   const { run, context, elements } = fixture();
   const writes = [];
   context.record = body => writes.push(JSON.parse(body));
-  run("api = async (path, options) => options ? (record(options.body), {ok:true}) : ({ok:true, json:async () => ({entries:[]})}); refreshScheduleViews = () => {}; openRuleModal(null, 1)");
+  run("api = async (path, options) => options ? (record(options.body), {ok:true}) : ({ok:true, json:async () => ({entries:[]})}); refreshScheduleViews = () => {}; openRuleModal(1)");
   elements.get('assign-weekday').value = '1';
-  elements.get('assign-employee').value = '';
   elements.get('assign-rule-start').value = '2026-11-16';
   elements.get('assign-rule-end').value = '2026-11-01';
   await run('saveTimetableRule({programId:1,points:5})');
@@ -220,9 +217,8 @@ test('shared rule save uses series endpoints and validates date ranges without w
   assert.deepEqual(writes[0], { operation: 'create', programId: 1, points: 5,
     weekday: 1, employeeId: null, startDate: '2026-11-16', endDate: null });
   context.rule = {series_id:7,weekday:1,program_id:1,points:5,start_date:'2026-11-16',effective_from:'2099-01-01'};
-  run('openRuleModal(null, 1, rule)');
+  run('openRuleModal(1, rule)');
   elements.get('assign-weekday').value = '2';
-  elements.get('assign-employee').value = '3';
   const pending = run('saveTimetableRule({programId:1,points:8})');
   submit(elements);
   await pending;
@@ -230,7 +226,43 @@ test('shared rule save uses series endpoints and validates date ranges without w
   assert.equal(writes[1].seriesId, 7);
   assert.equal(writes[1].cutoffDate, '2099-01-01');
   assert.equal(writes[1].replaceFutureExceptions, false);
-  assert.equal(writes[1].employeeId, 3);
+  assert.equal(writes[1].employeeId, null);
+});
+
+test('Plan shows multiple assignees and separates estimated from earned points', () => {
+  const { context, elements, run } = fixture();
+  context.testEmployees = [
+    { employee_id: 1, first_name: 'One', last_name: 'Person' },
+    { employee_id: 2, first_name: 'Two', last_name: 'Person' },
+  ];
+  context.testSessions = [{ session_date: '2026-11-16', program_name: 'Shared task',
+    status: 'completed', points: 4, assignees: [{ employee_id: 1 }, { employee_id: 2 }] }];
+  run('adminEmployees = testEmployees; planSessions = testSessions; renderPool()');
+  const pool = elements.get('pool-chips').innerHTML;
+  assert.equal((pool.match(/class="person-chip pool"/g) || []).length, 2);
+  assert.equal((pool.match(/class="chip-pts">Est\. 4\.0/g) || []).length, 2);
+  assert.equal((pool.match(/class="chip-earned">Earned 4\.0/g) || []).length, 2);
+  run("planDates = ['2026-11-16']; planSessions = testSessions; renderPlanBoard()");
+  const board = elements.get('plan-days').innerHTML;
+  assert.ok(board.includes('One Person'));
+  assert.ok(board.includes('Two Person'));
+});
+
+test('dropping an assigned employee removes only that one-off occurrence link', async () => {
+  const { context, run } = fixture();
+  context.testSessions = [{ session_id: 42, session_date: '2026-11-16', employee_id: null,
+    assignees: [{ employee_id: 3 }], employee_ids: [3], program_name: 'One-off', status: 'scheduled' }];
+  context.api = async (path, options) => {
+    context.assignmentRequest = { path, body: JSON.parse(options.body) };
+    return { ok: true };
+  };
+  context.loadPlanBoard = async () => {};
+  context.loadMyTasks = async () => {};
+  run('planSessions = testSessions; adminEmployees = []; adminPrograms = []');
+  await run("onPersonDropped({item:{dataset:{employeeId:'3'}},to:{dataset:{sessionId:'42'}}})");
+  assert.deepEqual(JSON.parse(JSON.stringify(context.assignmentRequest.body)), {
+    sessionId: 42, employeeId: 3, assigned: false,
+  });
 });
 
 test('future changes preserve exceptions unless explicitly replaced', async () => {

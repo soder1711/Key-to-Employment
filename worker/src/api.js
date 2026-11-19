@@ -10,7 +10,7 @@ import {
   createRecurringSeriesBatch,
   updateRecurringSeriesFrom, endRecurringSeriesFrom, endRecurringTimetableFrom,
   setRecurringException, saveRecurringOccurrence,
-  reassignSession, getAllPrograms, getProgramById, getProgramByCode,
+  setOccurrenceAssignment, getAllPrograms, getProgramById, getProgramByCode,
   createProgram, deactivateProgram, hardDeleteProgram, countProgramReferences,
 } from './db.js';
 import { monthlyDateRange } from './monthly-summary.js';
@@ -290,7 +290,7 @@ function addDaysISO(iso, days) {
  * @apiQuery {Number} [month] Summary month from 1 to 12.
  * @apiSuccess {String} weekStart Monday for the requested week.
  * @apiSuccess {String[]} dates Seven dates in the week.
- * @apiSuccess {Object[]} sessions Sessions assigned to the employee.
+ * @apiSuccess {Object[]} sessions Occurrences assigned to the employee, each returned once with an `assignees` array.
  * @apiSuccess {Object} summary Monthly progress summary, or null.
  */
 export async function handleGetMySchedule(env, session, url) {
@@ -325,9 +325,7 @@ export async function handleGetMySchedule(env, session, url) {
  * @apiQuery {String} [start] Any date in the requested week; normalized to Monday.
  * @apiSuccess {String} weekStart Monday for the requested week.
  * @apiSuccess {String[]} dates Seven dates in the week.
- * @apiSuccess {Object[]} sessions All sessions in the week, including ones
- *   without a person yet (employee_id null) so the frontend can show them
- *   in an Unassigned row.
+ * @apiSuccess {Object[]} sessions All occurrences in the week, including unassigned ones.
  * @apiSuccess {Object[]} employees Active employees.
  * @apiSuccess {Object[]} programs Available programs.
  * @apiError 403 Admin access required.
@@ -388,7 +386,7 @@ export async function handleAdminSetWeeklyTimetable(env, session, body) {
   const versions = sourceSessions.map(occurrence => {
     const weekday = new Date(`${occurrence.session_date}T00:00:00Z`).getUTCDay();
     return {
-      weekday, programId: occurrence.program_id, employeeId: occurrence.employee_id,
+      weekday, programId: occurrence.program_id, employeeId: null,
       startTime: occurrence.start_time, endTime: occurrence.end_time,
       points: Number(occurrence.points), isSudden: !!occurrence.is_sudden,
       notes: occurrence.notes || null, startDate: weekStart, endDate: null,
@@ -413,8 +411,7 @@ function recurringInput(body, current = null, effectiveFrom = null) {
   const version = {
     weekday: Number(field('weekday', 'weekday')),
     programId: Number(field('programId', 'program_id')),
-    employeeId: field('employeeId', 'employee_id') == null
-      ? null : Number(field('employeeId', 'employee_id')),
+    employeeId: null,
     startTime: field('startTime', 'start_time') || null,
     endTime: field('endTime', 'end_time') || null,
     points: Number(field('points', 'points')),
@@ -430,7 +427,6 @@ function recurringInput(body, current = null, effectiveFrom = null) {
       Number(value.slice(0, 2)) <= 23 && Number(value.slice(3, 5)) <= 59);
   if (!Number.isInteger(version.weekday) || version.weekday < 0 || version.weekday > 6 ||
       !Number.isSafeInteger(version.programId) || version.programId < 1 ||
-      (version.employeeId !== null && (!Number.isSafeInteger(version.employeeId) || version.employeeId < 1)) ||
       !Number.isFinite(version.points) || version.points < 0 || version.points > 100 ||
       typeof version.isSudden !== 'boolean' || !validTime(version.startTime) ||
       !validTime(version.endTime) ||
@@ -445,12 +441,6 @@ function recurringInput(body, current = null, effectiveFrom = null) {
 async function validateRecurringAssignment(env, version) {
   const program = await getProgramById(env.DB, version.programId);
   if (!program || !program.is_active) return 'Unknown or inactive task type';
-  if (version.employeeId !== null) {
-    const employee = await env.DB.prepare(
-      'SELECT employee_id FROM employees WHERE employee_id = ? AND is_active = 1'
-    ).bind(version.employeeId).first();
-    if (!employee) return 'Unknown or inactive employee';
-  }
   return null;
 }
 
@@ -559,7 +549,7 @@ export async function handleAdminRecurringTimetable(env, session, body) {
  * @apiName AdminAssignSession
  * @apiGroup AdminSchedule
  * @apiHeader {String} Cookie Encrypted admin session cookie.
- * @apiBody {Number} [employeeId] Employee identifier, or null for an unassigned task.
+ * @apiBody {Number} [employeeId] Optional initial assignee for the dated occurrence.
  * @apiBody {String} date Session date in YYYY-MM-DD format.
  * @apiBody {Number} programId Program identifier.
  * @apiBody {String} [startTime] Start time in HH:MM format.
@@ -751,7 +741,7 @@ export async function handleAdminCloneSession(env, session, body) {
     const result = await createSession(env.DB, {
       sessionDate: date,
       programId: source.program_id,
-      employeeId: source.employee_id,
+      employeeIds: source.employee_ids,
       startTime: source.start_time,
       endTime: source.end_time,
       points: source.points,
@@ -799,7 +789,8 @@ export async function handleAdminCopyScheduleWeek(env, session, body) {
   ]);
   const eligible = sourceSessions.filter(s => s.status !== 'cancelled');
   const sessionKey = (s, date) => JSON.stringify([
-    date, s.program_id, s.employee_id, s.start_time?.slice(0, 5) ?? null,
+    date, s.program_id, [...(s.employee_ids || (s.employee_id == null ? [] : [s.employee_id]))]
+      .map(Number).sort((a, b) => a - b), s.start_time?.slice(0, 5) ?? null,
     s.end_time?.slice(0, 5) ?? null, Number(s.points), !!s.is_sudden, s.notes ?? null,
   ]);
   const desired = new Map();
@@ -824,7 +815,7 @@ export async function handleAdminCopyScheduleWeek(env, session, body) {
       await createSession(env.DB, {
         sessionDate: addDaysISO(source.session_date, 7),
         programId: source.program_id,
-        employeeId: source.employee_id,
+        employeeIds: source.employee_ids,
         startTime: source.start_time,
         endTime: source.end_time,
         points: source.points,
@@ -852,11 +843,14 @@ export async function handleAdminCopyScheduleWeek(env, session, body) {
  * @api {post} /api/admin/schedule/reassign Change the person of a session
  * @apiName AdminReassignSession
  * @apiGroup AdminSchedule
- * @apiDescription Reassigns one one-off session. Recurring entries are updated
- *   through the effective-dated timetable endpoint, which targets a stable series ID.
+ * @apiDescription Adds or removes one employee from a dated occurrence. Recurring
+ *   occurrences are addressed by series ID and occurrence date; one-offs use session ID.
  * @apiHeader {String} Cookie Encrypted admin session cookie.
- * @apiBody {Number} sessionId Session identifier.
- * @apiBody {Number} employeeId New employee identifier.
+ * @apiBody {Number} [sessionId] One-off session identifier.
+ * @apiBody {Number} [seriesId] Recurring series identifier.
+ * @apiBody {String} [occurrenceDate] Recurring occurrence date.
+ * @apiBody {Number} employeeId Employee identifier to add or remove.
+ * @apiBody {Boolean} [assigned=true] Whether to assign or unassign that employee.
  * @apiSuccess {Boolean} success Always true when updated.
  * @apiError 400 Invalid payload or unknown employee.
  * @apiError 403 Admin access required.
@@ -866,38 +860,44 @@ export async function handleAdminReassignSession(env, session, body) {
   const denied = requireAdmin(session);
   if (denied) return denied;
 
-  const { sessionId, employeeId, applyFollowing } = body;
-  if (!Number.isInteger(sessionId) || !Number.isInteger(employeeId)) {
+  const sessionId = Number.isSafeInteger(body?.sessionId) ? body.sessionId : null;
+  const seriesId = Number.isSafeInteger(body?.seriesId) ? body.seriesId : null;
+  const occurrenceDate = body?.occurrenceDate;
+  const employeeId = Number(body?.employeeId);
+  const assigned = body?.assigned === undefined ? true : body.assigned;
+  const recurringKey = seriesId !== null && typeof occurrenceDate === 'string' &&
+    isValidISODate(occurrenceDate);
+  if ((!Number.isSafeInteger(employeeId) || employeeId < 1) || typeof assigned !== 'boolean' ||
+      (sessionId !== null && sessionId < 1) || (seriesId !== null && seriesId < 1) ||
+      (sessionId === null && !recurringKey) || (sessionId !== null && recurringKey) ||
+      body?.applyFollowing === true) {
     return new Response('Invalid reassign payload', { status: 400 });
   }
   const employee = await env.DB.prepare(
     `SELECT employee_id, is_active, first_name, last_name
      FROM employees WHERE employee_id = ?`
   ).bind(employeeId).first();
-  if (!employee || !employee.is_active) {
+  if (!employee || (assigned && !employee.is_active)) {
     return new Response('Unknown or inactive employee', { status: 400 });
   }
-  const before = await getSessionById(env.DB, sessionId);
+  const before = recurringKey
+    ? await getRecurringOccurrenceByKey(env.DB, seriesId, occurrenceDate)
+    : await getSessionById(env.DB, sessionId);
   if (!before) return new Response('Session not found', { status: 404 });
-  if (before.recurring_series_id != null) {
-    return new Response('Edit recurring assignments through the timetable endpoint', { status: 400 });
+  if (!recurringKey && before.recurring_series_id != null) {
+    return new Response('Use seriesId and occurrenceDate for a recurring occurrence', { status: 400 });
   }
-  if (applyFollowing === true) {
-    return new Response('Bulk reassignment requires a recurring timetable series', { status: 400 });
-  }
-
-  // The clicked session itself is always reassigned
-  const result = await reassignSession(env.DB, sessionId, employeeId);
-  if (result.meta.changes === 0) return new Response('Session not found', { status: 404 });
-
-  const person = `${employee.first_name} ${employee.last_name}`;
+  await setOccurrenceAssignment(env.DB, {
+    sessionId, seriesId, occurrenceDate, employeeId, assigned, assignedBy: session.employeeId,
+  });
   await logScheduleHistory(
-    env.DB, session.email, 'reassign', 'session', sessionId,
-    `"${before.program_name}" ${before.session_date}: ` +
-    `${before.first_name ? before.first_name + ' ' + before.last_name : 'unassigned'}` +
-    ` -> ${person}`
+    env.DB, session.email, assigned ? 'assign' : 'unassign',
+    recurringKey ? 'recurring-occurrence' : 'session',
+    recurringKey ? seriesId : sessionId,
+    `"${before.program_name}" ${before.session_date}: employee ${employeeId} ` +
+    `${assigned ? 'assigned to' : 'unassigned from'} this occurrence`
   );
-  return Response.json({ success: true });
+  return Response.json({ success: true, assigned });
 }
 
 /**
@@ -1046,7 +1046,7 @@ export async function handleAdminDeleteSession(env, session, body) {
  * @apiQuery {Number} [month] Summary month from 1 to 12; defaults to the current month.
  * @apiSuccess {Number} year Summary year.
  * @apiSuccess {Number} month Summary month.
- * @apiSuccess {Object[]} rows Employee summary rows with completed points and task counts
+ * @apiSuccess {Object[]} rows Employee summary rows with completed and estimated points and task counts
  *   for days 1–10, 11–20, and 21–month-end, monthly totals, shared default/override target,
  *   target_is_override, variance, and points above goal.
  * @apiError 400 Invalid year or month.

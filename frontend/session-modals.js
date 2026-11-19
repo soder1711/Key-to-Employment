@@ -174,22 +174,13 @@ function refreshAssignDefaults() {
 
 function populateRulePickers() {
   const weekday = document.getElementById('assign-weekday');
-  const employee = document.getElementById('assign-employee');
   const dayValue = weekday.value;
-  const employeeValue = employee.value;
   weekday.innerHTML = [1, 2, 3, 4, 5, 6, 0].map(day =>
     `<option value="${day}">${escapeHtml(dayName(day))}</option>`).join('');
-  const employees = [...adminEmployees];
-  if (currentRule?.employee_id != null && !employees.some(item => item.employee_id === currentRule.employee_id)) {
-    employees.push({ employee_id: currentRule.employee_id, first_name: currentRule.first_name, last_name: currentRule.last_name });
-  }
-  employee.innerHTML = `<option value="">${escapeHtml(t('person.unassigned'))}</option>` + employees.map(item =>
-    `<option value="${item.employee_id}">${escapeHtml(`${item.first_name || ''} ${item.last_name || ''}`.trim() || t('modal.employee', { id: item.employee_id }))}</option>`).join('');
   if (dayValue) weekday.value = dayValue;
-  employee.value = employeeValue;
 }
 
-function openRuleModal(employeeId, weekday, rule = null) {
+function openRuleModal(weekday, rule = null) {
   currentSession = null;
   currentRule = rule;
   editingSession = false;
@@ -197,7 +188,6 @@ function openRuleModal(employeeId, weekday, rule = null) {
   openModal('rule');
   populateRulePickers();
   document.getElementById('assign-weekday').value = String(rule?.weekday ?? weekday);
-  document.getElementById('assign-employee').value = rule?.employee_id ?? employeeId ?? '';
   document.getElementById('assign-rule-start').value = rule?.start_date || todayISO();
   document.getElementById('assign-rule-end').value = rule?.end_date || '';
   document.getElementById('assign-date-row').style.display = 'none';
@@ -260,7 +250,7 @@ async function saveTimetableRule(payload) {
   const body = {
     ...payload, operation: currentRule ? 'edit' : 'create',
     weekday: Number(document.getElementById('assign-weekday').value),
-    employeeId: document.getElementById('assign-employee').value ? Number(document.getElementById('assign-employee').value) : null,
+    employeeId: null,
     startDate: document.getElementById('assign-rule-start').value,
     endDate: document.getElementById('assign-rule-end').value || null,
   };
@@ -323,13 +313,16 @@ function openDetailsModal(sessionId, seriesId = null, occurrenceDate = null) {
     : sessionById.get(sessionId);
   if (!s) return;
   currentSession = s;
-  const person = s.first_name
-    ? `${escapeHtml(s.first_name)} ${escapeHtml(s.last_name)}`
+  const assignees = s.assignees || (s.employee_id == null ? [] : [{
+    first_name: s.first_name, last_name: s.last_name,
+  }]);
+  const people = assignees.length
+    ? assignees.map(person => `${escapeHtml(person.first_name)} ${escapeHtml(person.last_name)}`).join(', ')
     : `<em>${escapeHtml(t('person.unassigned'))}</em>`;
   document.getElementById('modal-title').textContent = t('modal.detailsTitle');
   document.getElementById('detail-info').innerHTML = `
     <strong>${escapeHtml(s.program_name)}</strong>${scheduleBadge(s)} (${escapeHtml(s.category)})<br>
-    ${person} · ${fmtCellDate(s.session_date)}<br>
+    ${people} · ${fmtCellDate(s.session_date)}<br>
     ${fmtTime(s.start_time)}${s.end_time ? '–' + fmtTime(s.end_time) : ''} ·
     ${Number(s.points).toFixed(1)} ${t('unit.pts')}${s.is_sudden ? ` · ${escapeHtml(t('tag.sudden'))}` : ''} ·
     <span class="status-pill ${escapeHtml(s.status)}">${escapeHtml(t('status.' + s.status))}</span>

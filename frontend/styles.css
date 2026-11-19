@@ -488,6 +488,7 @@ button { font-family: inherit; }
   background: rgba(255, 255, 255, 0.25); border-radius: 999px;
   padding: 0 7px; font-size: 0.72rem;
 }
+.person-chip .chip-earned { font-size: 0.7rem; opacity: 0.8; }
 .person-chip.assigned {
   background: #fff; color: var(--blue-700);
   border: 2px solid var(--blue-600); box-shadow: none;

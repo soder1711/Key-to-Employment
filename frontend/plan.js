@@ -14,31 +14,37 @@ function planEmployeeName(id) {
 }
 
 function renderPool() {
-  const pts = new Map();
+  const points = new Map();
   for (const s of planSessions) {
-    if (s.status === 'cancelled' || s.employee_id == null) continue;
-    pts.set(s.employee_id, (pts.get(s.employee_id) || 0) + Number(s.points || 0));
+    if (s.status === 'cancelled') continue;
+    const assignees = s.assignees || (s.employee_id == null ? [] : [{ employee_id: s.employee_id }]);
+    for (const { employee_id: employeeId } of assignees) {
+      const total = points.get(employeeId) || { estimated: 0, earned: 0 };
+      total.estimated += Number(s.points || 0);
+      if (s.status === 'completed') total.earned += Number(s.points || 0);
+      points.set(employeeId, total);
+    }
   }
   document.getElementById('pool-chips').innerHTML = adminEmployees.map(e => {
     const name = `${e.first_name} ${e.last_name}`.trim();
-    const p = (pts.get(e.employee_id) || 0).toFixed(1);
+    const total = points.get(e.employee_id) || { estimated: 0, earned: 0 };
+    const estimated = total.estimated.toFixed(1);
+    const earned = total.earned.toFixed(1);
     return `
       <span class="person-chip pool" data-employee-id="${e.employee_id}"
-            title="${escapeHtml(name)} — ${p} ${t('unit.pts')}">
-        ${escapeHtml(name)}<span class="chip-pts">${p}</span>
+            title="${escapeHtml(name)} — ${escapeHtml(t('summary.estimated'))}: ${estimated} ${t('unit.pts')} · ${escapeHtml(t('totals.earned'))} ${earned} ${t('unit.pts')}">
+        ${escapeHtml(name)}<span class="chip-pts">${t('plan.estimateShort')} ${estimated}</span>
+        <span class="chip-earned">${t('plan.earnedShort')} ${earned}</span>
       </span>`;
   }).join('') || `<span class="empty">${t('plan.emptyPeople')}</span>`;
 }
 
 function planCells(s) {
   if (!s) return '<td></td><td></td><td></td>';
-  const person = s.employee_id != null
-    ? `<span class="person-chip assigned" data-employee-id="${s.employee_id}"
-              data-session-id="${s.session_id ?? ''}" data-series-id="${s.recurring_series_id ?? ''}"
-              data-occurrence-date="${s.recurrence_date || s.session_date}"
-              data-display-date="${s.session_date}" data-recurrence-date="${s.recurrence_date || s.session_date}"
-              title="${escapeHtml(t('plan.clickOptions'))}">
-         ${escapeHtml(planEmployeeName(s.employee_id))}</span>`
+  const assignees = s.assignees || (s.employee_id == null ? [] : [{ employee_id: s.employee_id }]);
+  const person = assignees.length
+    ? assignees.map(assignee => `<span class="person-chip assigned" data-employee-id="${assignee.employee_id}"
+              title="${escapeHtml(t('plan.clickOptions'))}">${escapeHtml(planEmployeeName(assignee.employee_id))}</span>`).join('')
     : `<span class="drop-here">${escapeHtml(t('plan.dropHere'))}</span>`;
   return `
     <td class="cell-task">
@@ -223,62 +229,28 @@ async function onPersonDropped(evt) {
   const employeeId = Number(evt.item.dataset.employeeId);
   const seriesId = Number(evt.to.dataset.seriesId);
   const occurrenceDate = evt.to.dataset.recurrenceDate || evt.to.dataset.occurrenceDate;
-  if (Number.isSafeInteger(seriesId) && seriesId > 0 && occurrenceDate) {
-    const occurrence = planSessions.find(item => item.recurring_series_id === seriesId &&
-      item.recurrence_date === occurrenceDate);
-    if (!occurrence) {
-      renderPlanBoard();
-      return;
-    }
-    renderPlanBoard();
-    const change = await requestScheduleChange({ title: t('schedule.assignee'),
-      summary: scheduleChangeSummary(occurrence, { ...occurrence, employeeId }),
-      date: occurrenceDate > todayISO() ? occurrenceDate : todayISO(),
-      occurrenceDate, scope: 'occurrence' });
-    if (!change) return;
-    const recurrenceDate = occurrence.recurrence_date || occurrence.session_date;
-    const conflictCandidate = {
-      employeeId,
-      weekday: new Date(`${recurrenceDate}T00:00:00Z`).getUTCDay(),
-      startTime: occurrence.start_time,
-      endTime: occurrence.end_time,
-      startDate: occurrence.start_date || recurrenceDate,
-      endDate: occurrence.end_date || null,
-      effectiveFrom: change.scope === 'future' ? change.cutoffDate : undefined,
-      occurrenceDate: change.scope === 'occurrence' ? recurrenceDate : undefined,
-    };
-    try {
-      if (!await confirmRecurringRuleConflict(conflictCandidate, seriesId)) return;
-      const res = await api('/api/admin/schedule/timetable', {
-        method: 'POST',
-        body: JSON.stringify({
-          ...(change.scope === 'future'
-            ? { operation: 'edit', seriesId, cutoffDate: change.cutoffDate,
-                employeeId, replaceFutureExceptions: change.replaceFutureExceptions }
-            : { operation: 'exception', action: 'modify', seriesId, cutoffDate: occurrenceDate,
-                occurrenceDate, movedDate: occurrence.session_date, employeeId,
-                programId: occurrence.program_id, startTime: occurrence.start_time,
-                endTime: occurrence.end_time, points: Number(occurrence.points),
-                isSudden: !!occurrence.is_sudden, notes: occurrence.notes || null }),
-        }),
-      });
-      if (!res.ok) alert(t('err.assignFailed') + (await res.text()));
-    } catch (err) {
-      alert(t('err.network') + err.message);
-    }
-    refreshScheduleViews();
-    return;
-  }
   const sessionId = Number(evt.to.dataset.sessionId);
-  if (!Number.isSafeInteger(employeeId) || employeeId < 1 ||
-      !Number.isSafeInteger(sessionId) || sessionId < 1) {
+  const recurring = Number.isSafeInteger(seriesId) && seriesId > 0 && occurrenceDate;
+  const occurrence = planSessions.find(item => recurring
+    ? Number(item.recurring_series_id) === seriesId && item.recurrence_date === occurrenceDate
+    : Number(item.session_id) === sessionId);
+  if (!Number.isSafeInteger(employeeId) || employeeId < 1 || !occurrence ||
+      (!recurring && (!Number.isSafeInteger(sessionId) || sessionId < 1))) {
     renderPlanBoard();
     return;
   }
+  const assignees = occurrence.assignees || (occurrence.employee_id == null ? [] : [{
+    employee_id: occurrence.employee_id,
+  }]);
+  const assigned = !assignees.some(person => Number(person.employee_id) === employeeId);
+  renderPlanBoard();
   try {
     const res = await api('/api/admin/schedule/reassign', {
       method: 'POST',
-      body: JSON.stringify({ sessionId, employeeId }),
+      body: JSON.stringify({
+        ...(recurring ? { seriesId, occurrenceDate } : { sessionId }),
+        employeeId, assigned,
+      }),
     });
     if (!res.ok) alert(t('err.assignFailed') + (await res.text()));
   } catch (err) {
