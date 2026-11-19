@@ -58,8 +58,14 @@ function planCells(s, period) {
   const peopleLabel = escapeHtml(`${period} · ${t('plan.people')}`);
   const assignees = planAssignees(s);
   const person = assignees.length
-    ? assignees.map(assignee => `<span class="person-chip assigned" data-employee-id="${assignee.employee_id}"
-              title="${escapeHtml(t('plan.clickOptions'))}">${escapeHtml(planEmployeeName(assignee.employee_id))}</span>`).join('')
+    ? assignees.map(assignee => {
+      const name = planEmployeeName(assignee.employee_id);
+      return `<span class="person-chip assigned" data-employee-id="${assignee.employee_id}"
+                title="${escapeHtml(t('plan.clickOptions'))}">${escapeHtml(name)}
+                <button type="button" class="assigned-remove" data-employee-id="${assignee.employee_id}"
+                        aria-label="${escapeHtml(t('plan.removeAssignee', { name }))}"
+                        title="${escapeHtml(t('plan.removeAssignee', { name }))}">×</button></span>`;
+    }).join('')
     : `<span class="drop-here">${escapeHtml(t('plan.dropHere'))}</span>`;
   return `
     <td class="cell-task" data-label="${taskLabel}">
@@ -234,33 +240,38 @@ function initPlanSortables() {
       group: { name: 'people', pull: false, put: true },
       sort: false,
       draggable: '.person-chip',
+      filter: '.assigned-remove',
+      preventOnFilter: false,
       onAdd: onPersonDropped,
     }));
   });
 }
 
-async function onPersonDropped(evt) {
-  const employeeId = Number(evt.item.dataset.employeeId);
-  const seriesId = Number(evt.to.dataset.seriesId);
-  const occurrenceDate = evt.to.dataset.recurrenceDate || evt.to.dataset.occurrenceDate;
-  const sessionId = Number(evt.to.dataset.sessionId);
+function planAssignmentTarget(cell) {
+  const seriesId = Number(cell.dataset.seriesId);
+  const occurrenceDate = cell.dataset.recurrenceDate || cell.dataset.occurrenceDate;
+  const sessionId = Number(cell.dataset.sessionId);
   const recurring = Number.isSafeInteger(seriesId) && seriesId > 0 && occurrenceDate;
   const occurrence = planSessions.find(item => recurring
     ? Number(item.recurring_series_id) === seriesId && item.recurrence_date === occurrenceDate
     : Number(item.session_id) === sessionId);
-  if (!Number.isSafeInteger(employeeId) || employeeId < 1 || !occurrence ||
-      (!recurring && (!Number.isSafeInteger(sessionId) || sessionId < 1))) {
+  if (!occurrence || (!recurring && (!Number.isSafeInteger(sessionId) || sessionId < 1))) return null;
+  return { seriesId, occurrenceDate, sessionId, recurring, occurrence };
+}
+
+async function savePlanAssignment(cell, employeeId, assigned, target = planAssignmentTarget(cell)) {
+  if (!Number.isSafeInteger(employeeId) || employeeId < 1 || !target) {
     renderPlanBoard();
     return;
   }
-  const assignees = planAssignees(occurrence);
-  const assigned = !assignees.some(person => Number(person.employee_id) === employeeId);
   renderPlanBoard();
   try {
     const res = await api('/api/admin/schedule/reassign', {
       method: 'POST',
       body: JSON.stringify({
-        ...(recurring ? { seriesId, occurrenceDate } : { sessionId }),
+        ...(target.recurring
+          ? { seriesId: target.seriesId, occurrenceDate: target.occurrenceDate }
+          : { sessionId: target.sessionId }),
         employeeId, assigned,
       }),
     });
@@ -269,8 +280,24 @@ async function onPersonDropped(evt) {
     alert(t('err.network') + err.message);
   }
 
-  await loadPlanBoard(); // always re-render from saved data
+  await loadPlanBoard();
   await loadMyTasks();
+}
+
+async function removePlanAssignee(cell, employeeId) {
+  await savePlanAssignment(cell, Number(employeeId), false);
+}
+
+async function onPersonDropped(evt) {
+  const employeeId = Number(evt.item.dataset.employeeId);
+  const target = planAssignmentTarget(evt.to);
+  if (!Number.isSafeInteger(employeeId) || employeeId < 1 || !target) {
+    renderPlanBoard();
+    return;
+  }
+  const assignees = planAssignees(target.occurrence);
+  const assigned = !assignees.some(person => Number(person.employee_id) === employeeId);
+  await savePlanAssignment(evt.to, employeeId, assigned, target);
 }
 
 async function loadPlanBoard() {

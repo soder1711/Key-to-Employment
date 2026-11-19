@@ -572,6 +572,15 @@ button { font-family: inherit; }
   background: #fff; color: var(--blue-700);
   border: 2px solid var(--blue-600); box-shadow: none;
 }
+.assigned-remove {
+  display: inline-grid; flex: 0 0 18px; place-items: center;
+  width: 18px; height: 18px; padding: 0;
+  border: 0; border-radius: 50%; background: var(--blue-100);
+  color: var(--blue-700); font-size: 0.9rem; line-height: 1;
+  cursor: pointer;
+}
+.assigned-remove:hover { background: var(--blue-600); color: #fff; }
+.assigned-remove:focus-visible { outline: 2px solid var(--blue-600); outline-offset: 2px; }
 .sortable-ghost { opacity: 0.4; }
 .sortable-drag { opacity: 0.9; }
 

@@ -278,6 +278,8 @@ test('Plan shows multiple assignees and separates estimated from earned points',
   const board = elements.get('plan-days').innerHTML;
   assert.ok(board.includes('One Person'));
   assert.ok(board.includes('Two Person'));
+  assert.equal((board.match(/class="assigned-remove"/g) || []).length, 2);
+  assert.ok(board.includes('aria-label="Remove One Person from this task"'));
 });
 
 test('Plan renders timetable occurrences using their dated assignment links', () => {
@@ -315,6 +317,27 @@ test('dropping an assigned employee removes only that one-off occurrence link', 
   await run("onPersonDropped({item:{dataset:{employeeId:'3'}},to:{dataset:{sessionId:'42'}}})");
   assert.deepEqual(JSON.parse(JSON.stringify(context.assignmentRequest.body)), {
     sessionId: 42, employeeId: 3, assigned: false,
+  });
+});
+
+test('removing an assignee unassigns only that employee from the recurring occurrence', async () => {
+  const { context, run } = fixture();
+  context.testSessions = [{ recurring_series_id: 8, recurrence_date: '2026-11-16',
+    session_date: '2026-11-16', assignees: [{ employee_id: 1 }, { employee_id: 2 }] }];
+  context.testCell = { dataset: {
+    seriesId: '8', recurrenceDate: '2026-11-16', sessionId: '',
+  } };
+  context.api = async (path, options) => {
+    context.assignmentRequest = { path, body: JSON.parse(options.body) };
+    return { ok: true };
+  };
+  context.loadPlanBoard = async () => {};
+  context.loadMyTasks = async () => {};
+  run('planSessions = testSessions');
+  await run("removePlanAssignee(testCell, '2')");
+  assert.equal(context.assignmentRequest.path, '/api/admin/schedule/reassign');
+  assert.deepEqual(JSON.parse(JSON.stringify(context.assignmentRequest.body)), {
+    seriesId: 8, occurrenceDate: '2026-11-16', employeeId: 2, assigned: false,
   });
 });
 

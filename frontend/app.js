@@ -192,6 +192,14 @@ document.addEventListener('keydown', (e) => {
 document.getElementById('plan-days').addEventListener('click', (e) => {
   const addBtn = e.target.closest('.add-task-btn');
   if (addBtn) { openPlanAddModal(addBtn.dataset.date, addBtn.dataset.period); return; }
+  const removeBtn = e.target.closest('.assigned-remove');
+  if (removeBtn) {
+    e.preventDefault();
+    e.stopPropagation();
+    const cell = removeBtn.closest('.cell-person-slot');
+    if (cell) removePlanAssignee(cell, removeBtn.dataset.employeeId);
+    return;
+  }
   const taskLink = e.target.closest('.task-link');
   if (taskLink) { openDetailsFromElement(taskLink); return; }
   const chip = e.target.closest('.person-chip.assigned');
