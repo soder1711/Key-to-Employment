@@ -189,11 +189,16 @@
           </details>
           <span id="plan-week-label" class="week-label"></span>
         </div>
-        <div class="people-pool">
-          <span class="pool-label" data-i18n="plan.people">People</span>
-          <div id="pool-chips" class="pool-chips"></div>
+        <div class="plan-workspace">
+          <div class="people-pool">
+            <span class="pool-label" data-i18n="plan.people">People</span>
+            <div id="pool-chips" class="pool-chips"></div>
+          </div>
+          <div id="plan-board-scroll" class="plan-board-scroll" role="region" tabindex="0"
+            data-i18n-aria-label="plan.board">
+            <div id="plan-days"></div>
+          </div>
         </div>
-        <div id="plan-days"></div>
         </div>
         <div id="plan-timetable-panel" style="display:none;">
           <p class="hint" data-i18n="plan.timetableHint">Fixed recurring task occurrences with no default assignee. Click a cell to add one, or a rule to edit it.</p>

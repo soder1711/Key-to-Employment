@@ -523,16 +523,33 @@ button { font-family: inherit; }
 .unassigned { color: var(--muted); }
 
 /* ---------- Plan board ---------- */
+.plan-workspace {
+  display: grid; grid-template-columns: minmax(210px, 260px) minmax(0, 1fr);
+  gap: 1rem; align-items: stretch;
+}
 .people-pool {
-  display: flex; align-items: flex-start; gap: 0.6rem;
+  display: flex; flex-direction: column; gap: 0.55rem;
+  height: min(68vh, 720px); min-height: 280px; overflow: hidden;
   background: var(--blue-50); border: 1px solid var(--blue-100);
-  border-radius: 10px; padding: 0.6rem 0.8rem; margin-bottom: 1rem;
+  border-radius: 10px; padding: 0.65rem;
 }
 .pool-label {
   font-weight: 700; color: var(--blue-700);
-  font-size: 0.85rem; padding-top: 6px; white-space: nowrap;
+  font-size: 0.85rem; white-space: nowrap;
 }
-.pool-chips { display: flex; flex-wrap: wrap; gap: 0.45rem; }
+.pool-chips {
+  display: flex; flex: 1; flex-direction: column; align-items: stretch; gap: 0.45rem;
+  min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+}
+.person-chip.pool { max-width: 100%; flex-wrap: wrap; border-radius: 10px; }
+.plan-board-scroll {
+  height: min(68vh, 720px); min-height: 280px; overflow: auto;
+  overscroll-behavior: contain; scrollbar-gutter: stable; border-radius: 12px;
+}
+.plan-board-scroll:focus-visible {
+  outline: 3px solid var(--blue-100); outline-offset: 2px;
+}
+.day-block:last-child { margin-bottom: 0; }
 
 .person-chip {
   display: inline-flex; align-items: center; gap: 6px;
@@ -675,4 +692,10 @@ button { font-family: inherit; }
 @media (max-width: 640px) {
   .view-nav { order: 3; width: 100%; justify-content: center; }
   .topbar { flex-wrap: wrap; }
+}
+
+@media (max-width: 760px) {
+  .plan-workspace { grid-template-columns: minmax(0, 1fr); gap: 0.75rem; }
+  .people-pool { height: 190px; min-height: 0; }
+  .plan-board-scroll { height: min(58vh, 540px); min-height: 280px; }
 }
