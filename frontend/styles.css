@@ -562,6 +562,10 @@ button { font-family: inherit; }
   padding: 6px 12px; font-size: 0.85rem; font-weight: 700;
   cursor: grab; user-select: none; box-shadow: 0 1px 3px rgba(15, 23, 42, 0.2);
 }
+.chip-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
 .person-chip:active { cursor: grabbing; }
 .person-chip .chip-pts {
   background: rgba(255, 255, 255, 0.25); border-radius: 999px;
@@ -571,7 +575,11 @@ button { font-family: inherit; }
 .person-chip.assigned {
   background: #fff; color: var(--blue-700);
   border: 2px solid var(--blue-600); box-shadow: none;
+  border-radius: 10px;
+  align-items: flex-start;
+  line-height: 1.25;
 }
+.person-chip.assigned .chip-name { flex: 1 1 0; }
 .assigned-remove {
   display: inline-grid; flex: 0 0 18px; place-items: center;
   width: 18px; height: 18px; padding: 0;

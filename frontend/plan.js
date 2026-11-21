@@ -45,7 +45,7 @@ function renderPool() {
     return `
       <span class="person-chip pool" data-employee-id="${e.employee_id}"
             title="${escapeHtml(name)} — ${escapeHtml(t('summary.estimated'))}: ${estimated} ${t('unit.pts')} · ${escapeHtml(t('totals.earned'))} ${earned} ${t('unit.pts')}">
-        ${escapeHtml(name)}<span class="chip-pts">${t('plan.estimateShort')} ${estimated}</span>
+        <span class="chip-name">${escapeHtml(name)}</span><span class="chip-pts">${t('plan.estimateShort')} ${estimated}</span>
         <span class="chip-earned">${t('plan.earnedShort')} ${earned}</span>
       </span>`;
   }).join('') || `<span class="empty">${t('plan.emptyPeople')}</span>`;
@@ -61,7 +61,7 @@ function planCells(s, period) {
     ? assignees.map(assignee => {
       const name = planEmployeeName(assignee.employee_id);
       return `<span class="person-chip assigned" data-employee-id="${assignee.employee_id}"
-                title="${escapeHtml(t('plan.clickOptions'))}">${escapeHtml(name)}
+                title="${escapeHtml(t('plan.clickOptions'))}"><span class="chip-name">${escapeHtml(name)}</span>
                 <button type="button" class="assigned-remove" data-employee-id="${assignee.employee_id}"
                         aria-label="${escapeHtml(t('plan.removeAssignee', { name }))}"
                         title="${escapeHtml(t('plan.removeAssignee', { name }))}">×</button></span>`;
