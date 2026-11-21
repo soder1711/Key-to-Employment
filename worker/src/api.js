@@ -12,8 +12,11 @@ import {
   setRecurringException, saveRecurringOccurrence,
   setOccurrenceAssignment, getAllPrograms, getProgramById, getProgramByCode,
   createProgram, deactivateProgram, hardDeleteProgram, countProgramReferences,
+  getEmployeeDirectory, findEmployeeByCodeOrEmail, createEmployee,
+  getManagedEmployee, deactivateEmployee, getScheduleHistory,
 } from './db.js';
 import { monthlyDateRange } from './monthly-summary.js';
+import { vietnamDateISO, vietnamDateParts } from './date.js';
 
 /**
  * @api {get} /api/me/tasks List my tasks
@@ -45,18 +48,21 @@ export async function handleGetTask(env, session, taskId) {
 }
 
 /**
- * @api {post} /api/progress Update my task progress
+ * @api {post} /api/progress Update task progress
  * @apiName UpdateMyProgress
  * @apiGroup Tasks
- * @apiHeader {String} Cookie Encrypted session cookie.
+ * @apiHeader {String} Cookie Encrypted administrator session cookie.
  * @apiBody {Number} assignmentId Assignment identifier.
  * @apiBody {Number} percentage Completion percentage from 0 to 100.
  * @apiBody {String} [notes] Optional progress notes.
  * @apiSuccess {Boolean} success Always true when the update succeeds.
  * @apiError 400 Invalid percentage.
- * @apiError 404 Assignment not found or not owned by the employee.
+ * @apiError 403 Administrator access required.
+ * @apiError 404 Assignment not found.
  */
 export async function handleUpdateProgress(env, session, body) {
+  const denied = requireAdmin(session);
+  if (denied) return denied;
   const { assignmentId, percentage, notes } = body;
 
   if (typeof percentage !== 'number' || percentage < 0 || percentage > 100) {
@@ -88,16 +94,13 @@ function requireAdmin(session) {
  * @api {get} /api/admin/tasks List all tasks
  * @apiName AdminGetTasks
  * @apiGroup AdminTasks
- * @apiHeader {String} Cookie Encrypted admin session cookie.
+ * @apiHeader {String} Cookie Encrypted session cookie.
  * @apiQuery {String} [status] Filter by task status.
  * @apiQuery {Number} [employeeId] Filter by assigned employee.
  * @apiSuccess {Object[]} tasks All matching tasks and assignments.
- * @apiError 403 Admin access required.
+ * @apiDescription Read-only workforce workload data available to all active employees.
  */
 export async function handleAdminGetAllTasks(env, session, url) {
-  const denied = requireAdmin(session);
-  if (denied) return denied;
-
   const status = url.searchParams.get('status');
   const employeeIdParam = url.searchParams.get('employeeId');
   const employeeId = employeeIdParam ? parseInt(employeeIdParam, 10) : null;
@@ -110,16 +113,13 @@ export async function handleAdminGetAllTasks(env, session, url) {
  * @api {get} /api/admin/tasks/:taskId Get any task
  * @apiName AdminGetTask
  * @apiGroup AdminTasks
- * @apiHeader {String} Cookie Encrypted admin session cookie.
+ * @apiHeader {String} Cookie Encrypted session cookie.
  * @apiParam {Number} taskId Task identifier.
  * @apiSuccess {Object} task Task details and assignment data.
- * @apiError 403 Admin access required.
+ * @apiDescription Read-only workforce workload data available to all active employees.
  * @apiError 404 Task not found.
  */
 export async function handleAdminGetTask(env, session, taskId) {
-  const denied = requireAdmin(session);
-  if (denied) return denied;
-
   const task = await getAnyTaskDetail(env.DB, taskId);
   if (!task) return new Response('Not found', { status: 404 });
   return Response.json({ task });
@@ -129,9 +129,9 @@ export async function handleAdminGetTask(env, session, taskId) {
  * @api {get} /api/admin/programs List all task types
  * @apiName AdminListPrograms
  * @apiGroup AdminTasks
- * @apiHeader {String} Cookie Encrypted admin session cookie.
+ * @apiHeader {String} Cookie Encrypted administrator session cookie.
  * @apiSuccess {Object[]} programs All task types, including deleted ones.
- * @apiError 403 Admin access required.
+ * @apiError 403 Administrator access required.
  */
 export async function handleAdminListPrograms(env, session) {
   const denied = requireAdmin(session);
@@ -319,22 +319,19 @@ export async function handleGetMySchedule(env, session, url) {
 }
 
 /**
- * @api {get} /api/admin/schedule Get admin weekly schedule
+ * @api {get} /api/admin/schedule Get all-staff weekly schedule
  * @apiName AdminGetSchedule
  * @apiGroup AdminSchedule
- * @apiHeader {String} Cookie Encrypted admin session cookie.
+ * @apiHeader {String} Cookie Encrypted session cookie.
  * @apiQuery {String} [start] Any date in the requested week; normalized to Monday.
  * @apiSuccess {String} weekStart Monday for the requested week.
  * @apiSuccess {String[]} dates Seven dates in the week.
  * @apiSuccess {Object[]} sessions All occurrences in the week, including unassigned ones.
  * @apiSuccess {Object[]} employees Active employees.
  * @apiSuccess {Object[]} programs Available programs.
- * @apiError 403 Admin access required.
+ * @apiDescription Read-only workforce schedule available to all active employees.
  */
 export async function handleAdminGetSchedule(env, session, url) {
-  const denied = requireAdmin(session);
-  if (denied) return denied;
-
   const start = weekStartFrom(url.searchParams.get('start'));
   const dates = weekDates(start);
   const [sessions, employees, programs, timetable] = await Promise.all([
@@ -370,7 +367,7 @@ export async function handleAdminSetWeeklyTimetable(env, session, body) {
   }
 
   if (!body.enabled) {
-    const cutoffDate = body.cutoffDate || new Date().toISOString().slice(0, 10);
+    const cutoffDate = body.cutoffDate || vietnamDateISO();
     if (!isValidISODate(cutoffDate)) return new Response('Invalid cutoff date', { status: 400 });
     await endRecurringTimetableFrom(env.DB, cutoffDate, session.email);
     return Response.json({ success: true, enabled: false, cutoffDate });
@@ -486,7 +483,7 @@ export async function handleAdminRecurringTimetable(env, session, body) {
   const current = await getRecurringVersionAt(env.DB, seriesId, cutoffDate);
   if (!current) return new Response('Recurring entry not found for cutoff date', { status: 404 });
   if (operation === 'edit') {
-    if (cutoffDate < new Date().toISOString().slice(0, 10)) {
+    if (cutoffDate < vietnamDateISO()) {
       return new Response('Recurring schedule edits must start today or later', { status: 400 });
     }
     const version = recurringInput(body, current, cutoffDate);
@@ -1042,8 +1039,8 @@ export async function handleAdminDeleteSession(env, session, body) {
  * @api {get} /api/admin/schedule/monthly Get monthly schedule summary
  * @apiName AdminMonthlySummary
  * @apiGroup AdminSchedule
- * @apiHeader {String} Cookie Encrypted admin session cookie.
- * @apiQuery {Number} [year] UTC summary year; defaults to the current year.
+ * @apiHeader {String} Cookie Encrypted session cookie.
+ * @apiQuery {Number} [year] Vietnam summary year; defaults to the current year.
  * @apiQuery {Number} [month] Summary month from 1 to 12; defaults to the current month.
  * @apiSuccess {Number} year Summary year.
  * @apiSuccess {Number} month Summary month.
@@ -1051,20 +1048,99 @@ export async function handleAdminDeleteSession(env, session, body) {
  *   for days 1–10, 11–20, and 21–month-end, monthly totals, shared default/override target,
  *   target_is_override, variance, and points above goal.
  * @apiError 400 Invalid year or month.
- * @apiError 403 Admin access required.
+ * @apiDescription Read-only report available to all active employees.
  */
 export async function handleAdminMonthlySummary(env, session, url) {
-  const denied = requireAdmin(session);
-  if (denied) return denied;
-
-  const now = new Date();
-  const year = parseInt(url.searchParams.get('year'), 10) || now.getUTCFullYear();
-  const month = parseInt(url.searchParams.get('month'), 10) || now.getUTCMonth() + 1;
+  const today = vietnamDateParts();
+  const year = parseInt(url.searchParams.get('year'), 10) || today.year;
+  const month = parseInt(url.searchParams.get('month'), 10) || today.month;
   if (!Number.isInteger(year) || year < 1 || year > 9999 || month < 1 || month > 12) {
     return new Response('Invalid year or month', { status: 400 });
   }
   const rows = await getMonthlySummary(env.DB, year, month);
   return Response.json({ year, month, rows });
+}
+
+export async function handleAdminListEmployees(env, session) {
+  const denied = requireAdmin(session);
+  if (denied) return denied;
+  const employees = await getEmployeeDirectory(env.DB);
+  return Response.json({ employees });
+}
+
+export async function handleAdminCreateEmployee(env, session, body) {
+  const denied = requireAdmin(session);
+  if (denied) return denied;
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return new Response('Invalid employee', { status: 400 });
+  }
+  const employeeCode = typeof body.employeeCode === 'string' ? body.employeeCode.trim() : '';
+  const firstName = typeof body.firstName === 'string' ? body.firstName.trim() : '';
+  const lastName = typeof body.lastName === 'string' ? body.lastName.trim() : '';
+  const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
+  if (!employeeCode || employeeCode.length > 32 ||
+      !firstName || firstName.length > 100 ||
+      !lastName || lastName.length > 100 ||
+      email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return new Response('Invalid employee', { status: 400 });
+  }
+  if (await findEmployeeByCodeOrEmail(env.DB, employeeCode, email)) {
+    return new Response('Employee code or email already exists', { status: 409 });
+  }
+
+  const result = await createEmployee(env.DB, { employeeCode, firstName, lastName, email });
+  const employee = await getManagedEmployee(env.DB, result.meta.last_row_id);
+  await logScheduleHistory(
+    env.DB, session.email, 'create', 'employee', employee.employee_id,
+    `Added ${employee.first_name} ${employee.last_name} (${employee.employee_code})`
+  );
+  return Response.json({ employee }, { status: 201 });
+}
+
+export async function handleAdminDeactivateEmployee(env, session, body) {
+  const denied = requireAdmin(session);
+  if (denied) return denied;
+  const employeeId = Number(body?.employeeId);
+  if (!Number.isSafeInteger(employeeId) || employeeId < 1) {
+    return new Response('Invalid employee identifier', { status: 400 });
+  }
+  const employee = await getManagedEmployee(env.DB, employeeId);
+  if (!employee) return new Response('Employee not found', { status: 404 });
+  if (employee.is_admin === 1) {
+    return new Response('Administrator accounts cannot be deactivated', { status: 409 });
+  }
+  if (!employee.is_active) return new Response('Employee is already inactive', { status: 409 });
+
+  const result = await deactivateEmployee(env.DB, employeeId);
+  if (result.meta.changes === 0) {
+    const current = await getManagedEmployee(env.DB, employeeId);
+    if (!current) return new Response('Employee not found', { status: 404 });
+    if (current.is_admin === 1) {
+      return new Response('Administrator accounts cannot be deactivated', { status: 409 });
+    }
+    return new Response('Employee is already inactive', { status: 409 });
+  }
+  await logScheduleHistory(
+    env.DB, session.email, 'deactivate', 'employee', employeeId,
+    `Deactivated ${employee.first_name} ${employee.last_name} (${employee.employee_code}); work records retained`
+  );
+  return Response.json({ success: true });
+}
+
+export async function handleGetScheduleHistory(env, url) {
+  const before = url.searchParams.has('before')
+    ? Number(url.searchParams.get('before'))
+    : null;
+  const limit = url.searchParams.has('limit') ? Number(url.searchParams.get('limit')) : 50;
+  if ((before !== null && (!Number.isSafeInteger(before) || before < 1)) ||
+      !Number.isSafeInteger(limit) || limit < 1 || limit > 100) {
+    return new Response('Invalid history pagination', { status: 400 });
+  }
+  const entries = await getScheduleHistory(env.DB, before, limit + 1);
+  return Response.json({
+    entries: entries.slice(0, limit),
+    hasMore: entries.length > limit,
+  });
 }
 
 /**

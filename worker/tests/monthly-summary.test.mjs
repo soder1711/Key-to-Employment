@@ -182,6 +182,37 @@ test('getMonthlySummary binds exact dates and employee scope', async () => {
   assert.equal(summary.days_21_end_points, 2.5);
 });
 
+test('monthly reports retain inactive employees and their past session totals', async () => {
+  const inactiveEmployeeSession = {
+    ...session(3, '2026-03-12', 'completed', 6),
+    employee_id: 12,
+    first_name: 'Former',
+    last_name: 'Staff',
+  };
+  let summaryQuery = '';
+  const db = {
+    prepare(sql) {
+      return {
+        bind() {
+          if (sql.includes('LEFT JOIN monthly_targets')) summaryQuery = sql;
+          return {
+            all: async () => ({
+              results: sql.includes('LEFT JOIN monthly_targets') ? [inactiveEmployeeSession] : [],
+            }),
+          };
+        },
+      };
+    },
+  };
+
+  const [summary] = await getMonthlySummary(db, 2026, 3);
+  assert.match(summaryQuery, /WHERE 1 = 1/);
+  assert.doesNotMatch(summaryQuery, /e\.is_active\s*=\s*1/);
+  assert.equal(summary.employee_id, 12);
+  assert.equal(summary.completed_points, 6);
+  assert.equal(summary.completed_sessions, 1);
+});
+
 test('monthly summary counts projected recurring work without inserting sessions', async () => {
   let writeCount = 0;
   const db = {

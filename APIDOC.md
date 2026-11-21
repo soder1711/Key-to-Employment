@@ -1,4 +1,4 @@
-# Task Portal API
+# Staff Scheduler API
 
 The API is served by the Cloudflare Worker. The deployed frontend uses:
 
@@ -24,20 +24,20 @@ GET /auth/logout
 
 Clears the session cookie and redirects to `FRONTEND_URL`.
 
-All `/api/*` routes require the session cookie. Browser clients must send credentials, for example:
+All `/api/*` routes require a valid session for an active employee. Non-admin staff have read-only access to workforce schedules, reports, and history. Every write request requires an administrator; staff and administrator status is rechecked against the directory on each request. Browser clients must send credentials, for example:
 
 ```js
 fetch(`${WORKER}/api/me`, { credentials: 'include' });
 ```
 
-Unauthenticated requests return `401 Unauthorized`. Admin routes return `403 Forbidden` when the signed-in user is not an administrator.
+Unauthenticated or inactive users return `401 Unauthorized`. Non-admin write requests and administrator-only directory-management requests return `403 Forbidden`.
 
 ## Common behavior
 
 - API responses are JSON on successful requests.
 - `POST` request bodies must use `Content-Type: application/json`.
 - CORS allows only the configured `FRONTEND_URL` origin and supports credentials.
-- Dates use `YYYY-MM-DD`.
+- Dates use `YYYY-MM-DD` in the `Asia/Ho_Chi_Minh` timezone.
 - Times use `HH:MM`.
 - Progress and points are numeric values; progress is limited to `0–100`.
 
@@ -79,7 +79,7 @@ GET /api/tasks/{taskId}
 
 Returns `{ "task": { ... } }`. The task must belong to the authenticated employee. Returns `404` if it does not exist or is not assigned to the user.
 
-### Update my task progress
+### Update task progress (administrator only)
 
 ```http
 POST /api/progress
@@ -102,7 +102,7 @@ Response:
 { "success": true }
 ```
 
-The assignment is updated only when it belongs to the authenticated employee. Invalid percentages return `400`; an unknown or unauthorized assignment returns `404`.
+Only administrators can update progress. Invalid percentages return `400`; an unknown assignment returns `404`.
 
 ## Schedule endpoints
 
@@ -130,15 +130,15 @@ Projected occurrences include `is_recurring: true`, `is_projected: true`, `recur
 
 ## Admin endpoints
 
-Admin endpoints require `isAdmin: true` in the authenticated session.
+Write endpoints require `isAdmin: true`. Read-only workforce endpoints are available to all authenticated active staff, despite retaining the `/api/admin/` route prefix for compatibility.
 
-### List tasks
+### List all staff tasks
 
 ```http
 GET /api/admin/tasks?status=in_progress&employeeId=2
 ```
 
-Both query parameters are optional. Returns `{ "tasks": [ ... ] }`.
+Both query parameters are optional. Returns `{ "tasks": [ ... ] }`. This read-only workload view is available to all authenticated staff.
 
 ### Get any task
 
@@ -146,7 +146,7 @@ Both query parameters are optional. Returns `{ "tasks": [ ... ] }`.
 GET /api/admin/tasks/{taskId}
 ```
 
-Returns `{ "task": { ... } }`, or `404` when the task does not exist.
+Returns `{ "task": { ... } }`, or `404` when the task does not exist. This read-only workload view is available to all authenticated staff.
 
 ### Update any task assignment
 
@@ -167,7 +167,7 @@ Request:
 
 Response: `{ "success": true }`.
 
-### Get the admin weekly schedule
+### Get the all-staff weekly schedule
 
 ```http
 GET /api/admin/schedule?start=2026-10-19
@@ -187,6 +187,47 @@ Response:
 ```
 
 Recurring occurrences are projected for the requested week, without creating session rows. Existing copied/manual sessions remain one-offs.
+This is a read-only view available to all authenticated staff.
+
+### Get the all-staff monthly summary
+
+```http
+GET /api/schedule/monthly?year=2026&month=10
+```
+
+`year` and `month` default to the current Vietnam year and month. Returns the same `{ "year": 2026, "month": 10, "rows": [ ... ] }` report described below, including inactive employees so their historical workload remains visible. This endpoint is read-only and available to all authenticated staff.
+
+### Read schedule history
+
+```http
+GET /api/schedule/history?limit=50
+GET /api/schedule/history?before=42&limit=50
+```
+
+Returns `{ "entries": [ ... ], "hasMore": true }` in newest-first order. `limit` defaults to 50 and must be from 1 to 100. `before` is an optional history ID cursor for loading older entries. All authenticated staff can read the append-only audit history.
+
+### Manage the staff directory
+
+The following endpoints are administrator-only:
+
+```http
+GET /api/admin/employees
+POST /api/admin/employees
+POST /api/admin/employees/deactivate
+```
+
+Create a staff account with a unique `employeeCode`, first and last name, and work `email`:
+
+```json
+{
+  "employeeCode": "KTE-42",
+  "firstName": "Mai",
+  "lastName": "Nguyen",
+  "email": "mai@example.com"
+}
+```
+
+New records are active non-admin staff and can sign in after creation. Deactivate a staff member with `{ "employeeId": 42 }`. Administrators cannot be deactivated. Deactivation changes `is_active` only; employee rows and existing schedule/work records are retained. Creation and deactivation are recorded in schedule history.
 
 ### List recurring timetable entries
 
@@ -379,7 +420,7 @@ Response: `{ "success": true }`.
 GET /api/admin/schedule/monthly?year=2026&month=10
 ```
 
-`year` and `month` default to the current UTC year and month. The admin-only response is `{ "year": 2026, "month": 10, "rows": [ ... ] }`. Projected recurring occurrences contribute estimated points without creating session rows; completed points and counts come from dated session records. Each assigned employee receives the full points for a completed occurrence. `estimated_points` sums all assigned, non-cancelled sessions assuming completion and is separate from `completed_points`. Each row also includes points and completed-session counts for days 1–10, 11–20, and 21–month-end, plus target status and goal variance. The shared default goal is 170 points; `target_is_override` indicates whether that employee has a month-specific override:
+`year` and `month` default to the current Vietnam year and month. The response is `{ "year": 2026, "month": 10, "rows": [ ... ] }`. The `/api/admin/schedule/monthly` alias is also available for compatibility. Projected recurring occurrences contribute estimated points without creating session rows; completed points and counts come from dated session records. Each assigned employee receives the full points for a completed occurrence. `estimated_points` sums all assigned, non-cancelled sessions assuming completion and is separate from `completed_points`. Each row also includes points and completed-session counts for days 1–10, 11–20, and 21–month-end, plus target status and goal variance. Active and inactive employees are included so deactivation does not hide prior records. The shared default goal is 170 points; `target_is_override` indicates whether that employee has a month-specific override:
 
 ```json
 {
@@ -441,6 +482,7 @@ Common status codes:
 | `302` | OAuth or logout redirect |
 | `400` | Invalid request body or query parameter |
 | `401` | Missing, expired, or invalid session |
-| `403` | Authenticated user lacks admin access |
-| `404` | Resource not found or not owned by the user |
+| `403` | Authenticated user lacks permission for a write or administrator-only operation |
+| `404` | Resource not found |
+| `409` | Duplicate employee or attempt to deactivate an administrator |
 | `500` | Unexpected Worker or database error |

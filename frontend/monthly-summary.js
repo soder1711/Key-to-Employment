@@ -79,17 +79,20 @@ function renderMonthlySummary(rows) {
     const personName = `${row.first_name || ''} ${row.last_name || ''}`.trim();
     const employeeId = Number(row.employee_id);
     const hasOverride = Boolean(row.target_is_override);
-    const goalEditor = `<div class="goal-editor">
-      <input class="monthly-goal-input" type="number" min="0" max="10000" step="any"
-             value="${summaryPoints(target)}" data-employee-id="${employeeId}"
-             aria-label="${escapeHtml(t('summary.goalFor', { name: personName }))}">
-      <div class="goal-actions">
-        <button class="btn small" data-goal-action="save" data-employee-id="${employeeId}">${t('summary.saveGoal')}</button>
-        <button class="btn ghost small" data-goal-action="default" data-employee-id="${employeeId}"
-                ${hasOverride ? '' : 'disabled'}>${t('summary.useDefault')}</button>
-      </div>
-      <span class="summary-cell-sub">${t(hasOverride ? 'summary.individualOverride' : 'summary.sharedDefault')}</span>
-    </div>`;
+    const goalEditor = currentUser?.isAdmin
+      ? `<div class="goal-editor">
+          <input class="monthly-goal-input" type="number" min="0" max="10000" step="any"
+                 value="${summaryPoints(target)}" data-employee-id="${employeeId}"
+                 aria-label="${escapeHtml(t('summary.goalFor', { name: personName }))}">
+          <div class="goal-actions">
+            <button class="btn small" data-goal-action="save" data-employee-id="${employeeId}">${t('summary.saveGoal')}</button>
+            <button class="btn ghost small" data-goal-action="default" data-employee-id="${employeeId}"
+                    ${hasOverride ? '' : 'disabled'}>${t('summary.useDefault')}</button>
+          </div>
+          <span class="summary-cell-sub">${t(hasOverride ? 'summary.individualOverride' : 'summary.sharedDefault')}</span>
+        </div>`
+      : `<span>${summaryPoints(target)} ${t('unit.pts')}</span>
+         <span class="summary-cell-sub">${t(hasOverride ? 'summary.individualOverride' : 'summary.sharedDefault')}</span>`;
     const periodCells = periods.map(([pointsKey, countKey, label]) => {
       const count = Math.max(0, Number(row[countKey]) || 0);
       return `<td data-label="${escapeHtml(t(label))}">${summaryPoints(row[pointsKey])} ${t('unit.pts')}` +
@@ -99,7 +102,7 @@ function renderMonthlySummary(rows) {
       <td class="summary-person" data-label="${escapeHtml(t('summary.employee'))}">${escapeHtml(personName)}</td>
       ${periodCells}
       <td class="pts" data-label="${escapeHtml(t('summary.points'))}">${summaryPoints(row.completed_points)} ${t('unit.pts')}</td>
-      <td data-label="${escapeHtml(t('summary.estimated'))}">${summaryPoints(row.estimated_points)} ${t('unit.pts')}</td>
+      <td data-label="${escapeHtml(t('summary.estimated'))}" title="${escapeHtml(t('summary.estimatedHelp'))}">${summaryPoints(row.estimated_points)} ${t('unit.pts')}</td>
       <td data-label="${escapeHtml(t('summary.goal'))}">${goalEditor}</td>
       <td class="${varianceClass}" data-label="${escapeHtml(t('summary.variance'))}">${varianceText} ${targetSet ? t('unit.pts') : ''}</td>
       <td data-label="${escapeHtml(t('summary.aboveGoal'))}">${aboveGoal}${targetSet ? ` ${t('unit.pts')}` : ''}</td>
@@ -109,7 +112,7 @@ function renderMonthlySummary(rows) {
 
   return `<table class="monthly-summary-table">
     <thead><tr><th>${t('summary.employee')}</th>${periodHeaders}
-      <th>${t('summary.points')}</th><th>${t('summary.estimated')}</th><th>${t('summary.goal')}</th>
+      <th>${t('summary.points')}</th><th title="${escapeHtml(t('summary.estimatedHelp'))}">${t('summary.estimated')}</th><th>${t('summary.goal')}</th>
       <th>${t('summary.variance')}</th><th>${t('summary.aboveGoal')}</th>
       <th>${t('summary.completedTasks')}</th>
     </tr></thead><tbody>${body}</tbody>
@@ -135,7 +138,7 @@ async function loadMonthlySummary() {
     if (LOCAL_DEMO) {
       rows = demoMonthlyRows();
     } else {
-      const res = await api(`/api/admin/schedule/monthly?year=${year}&month=${month}`);
+      const res = await api(`/api/schedule/monthly?year=${year}&month=${month}`);
       if (!res.ok) throw new Error(String(res.status));
       const data = await res.json();
       rows = data.rows;
@@ -167,6 +170,7 @@ function shiftSummaryMonth(delta) {
 }
 
 async function saveMonthlyGoal(button) {
+  if (!currentUser?.isAdmin) return;
   const employeeId = Number(button.dataset.employeeId);
   const useDefault = button.dataset.goalAction === 'default';
   const input = document.querySelector(`.monthly-goal-input[data-employee-id="${employeeId}"]`);

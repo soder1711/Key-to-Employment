@@ -60,20 +60,25 @@ function planCells(s, period) {
   const person = assignees.length
     ? assignees.map(assignee => {
       const name = planEmployeeName(assignee.employee_id);
-      return `<span class="person-chip assigned" data-employee-id="${assignee.employee_id}"
-                title="${escapeHtml(t('plan.clickOptions'))}"><span class="chip-name">${escapeHtml(name)}</span>
-                <button type="button" class="assigned-remove" data-employee-id="${assignee.employee_id}"
-                        aria-label="${escapeHtml(t('plan.removeAssignee', { name }))}"
-                        title="${escapeHtml(t('plan.removeAssignee', { name }))}">×</button></span>`;
+      return currentUser?.isAdmin
+        ? `<span class="person-chip assigned" data-employee-id="${assignee.employee_id}"
+                  title="${escapeHtml(t('plan.clickOptions'))}"><span class="chip-name">${escapeHtml(name)}</span>
+                  <button type="button" class="assigned-remove" data-employee-id="${assignee.employee_id}"
+                          aria-label="${escapeHtml(t('plan.removeAssignee', { name }))}"
+                          title="${escapeHtml(t('plan.removeAssignee', { name }))}">×</button></span>`
+        : `<span class="person-chip assigned"><span class="chip-name">${escapeHtml(name)}</span></span>`;
     }).join('')
     : `<span class="drop-here">${escapeHtml(t('plan.dropHere'))}</span>`;
-  return `
-    <td class="cell-task" data-label="${taskLabel}">
-      <button type="button" class="task-link" data-session-id="${s.session_id ?? ''}"
+  const taskName = currentUser?.isAdmin
+    ? `<button type="button" class="task-link" data-session-id="${s.session_id ?? ''}"
               data-series-id="${s.recurring_series_id ?? ''}"
               data-occurrence-date="${s.recurrence_date || s.session_date}"
               data-display-date="${s.session_date}" data-recurrence-date="${s.recurrence_date || s.session_date}"
-              title="${escapeHtml(t('plan.clickOptions'))}">${escapeHtml(s.program_name)}${scheduleBadge(s)}</button>
+              title="${escapeHtml(t('plan.clickOptions'))}">${escapeHtml(s.program_name)}${scheduleBadge(s)}</button>`
+    : `<span>${escapeHtml(s.program_name)}${scheduleBadge(s)}</span>`;
+  return `
+    <td class="cell-task" data-label="${taskLabel}">
+      ${taskName}
       ${s.is_sudden ? `<span class="mini-tag sudden">${escapeHtml(t('tag.sudden'))}</span>` : ''}
       <span class="task-sub">${fmtTime(s.start_time)}${s.end_time ? '–' + fmtTime(s.end_time) : ''}</span>
     </td>
@@ -108,7 +113,7 @@ function renderDayTable(date) {
       body += `<tr>${planCells(morning[i], t('plan.morning'))}${planCells(afternoon[i], t('plan.afternoon'))}</tr>`;
     }
   }
-  body += `
+  if (currentUser?.isAdmin) body += `
     <tr class="add-row">
       <td colspan="3"><button type="button" class="add-task-btn"
             data-date="${date}" data-period="morning">${escapeHtml(t('plan.addBtn'))}</button></td>
@@ -166,7 +171,7 @@ function renderPlanBoard() {
   }
   document.getElementById('plan-days').innerHTML = planDates.map(renderDayTable).join('');
   updatePlanWeekLabel();
-  if (planViewMode === 'sessions') initPlanSortables();
+  if (planViewMode === 'sessions' && currentUser?.isAdmin) initPlanSortables();
   else destroyPlanSortables();
 }
 
@@ -259,7 +264,9 @@ function planAssignmentTarget(cell) {
   return { seriesId, occurrenceDate, sessionId, recurring, occurrence };
 }
 
-async function savePlanAssignment(cell, employeeId, assigned, target = planAssignmentTarget(cell)) {
+async function savePlanAssignment(cell, employeeId, assigned, target) {
+  if (!currentUser?.isAdmin) return;
+  target = target || planAssignmentTarget(cell);
   if (!Number.isSafeInteger(employeeId) || employeeId < 1 || !target) {
     renderPlanBoard();
     return;
@@ -275,9 +282,9 @@ async function savePlanAssignment(cell, employeeId, assigned, target = planAssig
         employeeId, assigned,
       }),
     });
-    if (!res.ok) alert(t('err.assignFailed') + (await res.text()));
+    if (!res.ok) await showNotice(t('err.assignFailed') + (await res.text()));
   } catch (err) {
-    alert(t('err.network') + err.message);
+    await showNotice(t('err.network') + err.message);
   }
 
   await loadPlanBoard();
@@ -289,6 +296,7 @@ async function removePlanAssignee(cell, employeeId) {
 }
 
 async function onPersonDropped(evt) {
+  if (!currentUser?.isAdmin) return;
   const employeeId = Number(evt.item.dataset.employeeId);
   const target = planAssignmentTarget(evt.to);
   if (!Number.isSafeInteger(employeeId) || employeeId < 1 || !target) {
@@ -315,6 +323,10 @@ async function loadPlanBoard() {
   planSessions = data.sessions;
   adminEmployees = data.employees;
   adminPrograms = data.programs;
+  document.getElementById('plan-hint').textContent =
+    t(currentUser?.isAdmin ? 'plan.adminHint' : 'plan.viewerHint');
+  document.getElementById('plan-mode-switch').style.display =
+    currentUser?.isAdmin ? 'flex' : 'none';
   sessionById = new Map(data.sessions.map(s => [s.session_id, s]));
   sessionByOccurrence = new Map(data.sessions.filter(s => s.is_recurring)
     .map(s => [`${s.recurring_series_id}:${s.recurrence_date || s.session_date}`, s]));

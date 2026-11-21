@@ -11,6 +11,8 @@ import {
   handleAdminUpdateSession, handleAdminCloneSession, handleAdminCopyScheduleWeek,
   handleAdminSetWeeklyTimetable, handleAdminGetTimetable, handleAdminRecurringTimetable,
   handleAdminListPrograms, handleAdminCreateProgram, handleAdminDeleteProgram,
+  handleAdminListEmployees, handleAdminCreateEmployee, handleAdminDeactivateEmployee,
+  handleGetScheduleHistory,
 } from './api.js';
 
 // CORS: allow only your GitHub Pages origin
@@ -56,29 +58,28 @@ export default {
     }
 
     try {
-      // Normal task routes use the authenticated, encrypted cookie directly.
-      // Re-check D1 only where current directory authorization is needed.
-      const isAdminRoute = url.pathname.startsWith('/api/admin/');
-      const isMeRoute = url.pathname === '/api/me' && request.method === 'GET';
       const currentSession = { ...session };
-      let employee = null;
+      const employee = await getEmployeeAuth(env.DB, session.employeeId);
 
-      if (isAdminRoute || isMeRoute) {
-        employee = await getEmployeeAuth(env.DB, session.employeeId);
+      if (!employee || !employee.is_active) {
+        return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+          status: 401,
+          headers: {
+            ...corsHeaders(env),
+            'Content-Type': 'application/json',
+            'Set-Cookie': buildSetCookie('session', '', { maxAge: 0, sameSite: 'None' }),
+          },
+        });
+      }
 
-        if (!employee || !employee.is_active) {
-          return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-            status: 401,
-            headers: {
-              ...corsHeaders(env),
-              'Content-Type': 'application/json',
-              'Set-Cookie': buildSetCookie('session', '', { maxAge: 0, sameSite: 'None' }),
-            },
-          });
-        }
+      currentSession.email = employee.email;
+      currentSession.isAdmin = employee.is_admin === 1;
 
-        currentSession.email = employee.email;
-        currentSession.isAdmin = employee.is_admin === 1;
+      if (request.method !== 'GET' && !currentSession.isAdmin) {
+        return new Response(JSON.stringify({ error: 'Forbidden' }), {
+          status: 403,
+          headers: { ...corsHeaders(env), 'Content-Type': 'application/json' },
+        });
       }
 
       let response;
@@ -140,8 +141,25 @@ export default {
         const body = await request.json();
         response = await handleAdminDeleteProgram(env, currentSession, body);
       }
+      else if (url.pathname === '/api/admin/employees' && request.method === 'GET') {
+        response = await handleAdminListEmployees(env, currentSession);
+      }
+      else if (url.pathname === '/api/admin/employees' && request.method === 'POST') {
+        const body = await request.json();
+        response = await handleAdminCreateEmployee(env, currentSession, body);
+      }
+      else if (url.pathname === '/api/admin/employees/deactivate' && request.method === 'POST') {
+        const body = await request.json();
+        response = await handleAdminDeactivateEmployee(env, currentSession, body);
+      }
 
       // ---- Schedule endpoints ----
+      else if (url.pathname === '/api/schedule/history' && request.method === 'GET') {
+        response = await handleGetScheduleHistory(env, url);
+      }
+      else if (url.pathname === '/api/schedule/monthly' && request.method === 'GET') {
+        response = await handleAdminMonthlySummary(env, currentSession, url);
+      }
       else if (url.pathname === '/api/schedule' && request.method === 'GET') {
         response = await handleGetMySchedule(env, currentSession, url);
       }

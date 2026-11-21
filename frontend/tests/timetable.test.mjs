@@ -27,7 +27,7 @@ function fixture() {
     .matchAll(/id="([^"]+)"/g)].map(([, id]) => [id, new Element()]));
   const container = new Element();
   const focus = new Element();
-  const browserWindow = { location: { search: '', hostname: 'localhost' }, confirm: () => false };
+  const browserWindow = { location: { search: '', hostname: 'localhost' } };
   const context = vm.createContext({
     URLSearchParams, Date, console,
     window: browserWindow,
@@ -44,6 +44,7 @@ function fixture() {
   for (const file of ['shared.js', 'schedule.js', 'session-modals.js', 'plan.js']) {
     vm.runInContext(readFileSync(new URL(`../${file}`, import.meta.url), 'utf8'), context, { filename: file });
   }
+  vm.runInContext('currentUser = { isAdmin: true }', context);
   return { elements, context, focus, run: source => vm.runInContext(source, context) };
 }
 
@@ -75,6 +76,26 @@ test('Plan renders dated tasks for every weekday in the selected week', () => {
   assert.ok(board.includes('Thursday task'));
   assert.match(elements.get('plan-week-label').textContent, /^Mon 16 Nov/);
   assert.match(elements.get('plan-week-label').textContent, /Sun 22 Nov/);
+});
+
+test('viewer plan board is read-only and cannot submit assignments', async () => {
+  const { elements, context, run } = fixture();
+  context.testDates = ['2026-11-16'];
+  context.testSessions = [{
+    session_date: '2026-11-16', session_id: 8, program_name: 'Studio programme',
+    status: 'scheduled', points: 2,
+    assignees: [{ employee_id: 1, first_name: 'Lan', last_name: 'Nguyen' }],
+  }];
+  run("currentUser = {isAdmin:false}; planDates = testDates; planSessions = testSessions; adminEmployees = [{employee_id:1,first_name:'Lan',last_name:'Nguyen'}]; renderPlanBoard()");
+  const board = elements.get('plan-days').innerHTML;
+  assert.ok(board.includes('Studio programme'));
+  assert.ok(!board.includes('add-task-btn'));
+  assert.ok(!board.includes('assigned-remove'));
+  assert.ok(!board.includes('task-link'));
+  let requestCount = 0;
+  context.api = async () => { requestCount++; };
+  await run('savePlanAssignment(null, 2, true)');
+  assert.equal(requestCount, 0);
 });
 
 test('mode switch isolates timetable from dated navigation and gates employees', () => {
@@ -205,7 +226,7 @@ test('recurring rule overlap check warns but allows intentional same-person conf
   context.existingRules = [{ series_id: 5, employee_id: 7, weekday: 1, start_time: '09:00',
     end_time: '10:00', start_date: '2026-11-02', effective_from: '2026-11-02',
     end_date: null, program_name: 'Existing duty' }];
-  run("recurringEntries = existingRules; window.confirm = message => { window.warning = message; return false }");
+  run("recurringEntries = existingRules; confirmAction = async message => { window.warning = message; return false }");
   context.api = async () => ({ ok: true, json: async () => ({ entries: context.existingRules }) });
   const candidate = "{employeeId:7, weekday:1, startTime:'09:30', endTime:'10:30', startDate:'2026-11-16'}";
   assert.equal(await run(`confirmRecurringRuleConflict(${candidate})`), false);

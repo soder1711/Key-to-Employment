@@ -5,6 +5,8 @@ const LOCAL_DEMO = new URLSearchParams(window.location.search).get('demo') === '
   ['localhost', '127.0.0.1', '[::1]'].includes(window.location.hostname);
 
 let currentUser = null;
+let historyLoaded = false;
+let staffLoaded = false;
 
 // ================= Internationalization (EN / VI) =================
 
@@ -18,15 +20,18 @@ let lang = (() => {
 
 const I18N = {
   en: {
-    'nav.tasks': 'Tasks', 'nav.schedule': 'Schedule', 'nav.plan': 'Plan',
-    'nav.monthly': 'Monthly summary',
+    'app.name': 'Staff Scheduler', 'app.footer': '© 2026 Staff Scheduler',
+    'nav.tasks': 'My week', 'nav.schedule': 'Weekly schedule', 'nav.plan': 'Planning board',
+    'nav.monthly': 'Monthly summary', 'nav.history': 'History', 'nav.staff': 'Staff',
     'summary.title': 'Monthly summary', 'summary.prev': '← Previous month',
     'summary.current': 'This month', 'summary.next': 'Next month →',
     'summary.daysOneToTen': 'Days 1–10', 'summary.daysElevenToTwenty': 'Days 11–20',
     'summary.daysTwentyOneToEnd': 'Days 21–end', 'summary.employee': 'Employee',
-    'summary.points': 'Points earned', 'summary.estimated': 'Estimated points if all assigned sessions are completed', 'summary.goal': 'Monthly goal',
+    'summary.points': 'Points earned', 'summary.estimated': 'Estimated',
+    'summary.estimatedHelp': 'Estimated points if all assigned sessions are completed',
+    'summary.goal': 'Monthly goal',
     'summary.notSet': 'Not set', 'summary.variance': 'Goal variance',
-    'summary.aboveGoal': 'Points above goal', 'summary.completedTasks': 'Completed tasks',
+    'summary.aboveGoal': 'Points above goal', 'summary.completedTasks': 'Completed sessions',
     'summary.sharedGoal': 'Shared default: 170 points per person; admins can override for an employee and month.',
     'summary.sharedDefault': 'Shared default', 'summary.individualOverride': 'Individual override',
     'summary.goalFor': 'Monthly goal for {name}', 'summary.saveGoal': 'Save',
@@ -34,21 +39,21 @@ const I18N = {
     'summary.goalSaved': 'Monthly goal saved.', 'summary.goalReset': 'Using shared default.',
     'summary.goalSaveError': 'Could not save monthly goal ({status}).',
     'summary.invalidGoal': 'Enter a goal from 0 to 10000 points.',
-    'summary.tasksCount': '{count} tasks', 'summary.loading': 'Loading monthly summary…',
+    'summary.tasksCount': '{count} sessions', 'summary.loading': 'Loading monthly summary…',
     'summary.error': 'Could not load monthly summary ({status}).',
-    'summary.empty': 'No active employees.',
+    'summary.empty': 'No staff records found.',
     'summary.demoNotice': 'Demo preview: sample data only; no sign-in or live data is used.',
     'summary.demoUser': 'Demo preview',
-    'plan.board': 'Weekly plan table',
+    'plan.board': 'Weekly workload board',
     'user.openMenu': 'Open profile menu',
     'user.signedInAs': 'Signed in as',
     'user.language': 'Language',
     'user.logout': 'Log out',
-    'tasks.title': 'My tasks',
-    'tasks.empty': 'No tasks or Plan assignments yet.',
-    'th.task': 'Task', 'th.priority': 'Priority / category', 'th.status': 'Status',
+    'tasks.title': 'My week',
+    'tasks.empty': 'No work items or sessions scheduled for this week.',
+    'th.task': 'Work item', 'th.priority': 'Priority / category', 'th.status': 'Status',
     'th.date': 'Date / time', 'th.progress': 'Progress / points',
-    'schedule.title': 'Schedule',
+    'schedule.title': 'Weekly schedule',
     'nav.jump': 'Go to', 'nav.chooseDate': 'Choose a date', 'nav.thisWeek': 'This week',
     'schedule.view': 'Schedule view', 'schedule.dated': 'Dated schedule', 'schedule.timetable': 'Weekly timetable',
     'schedule.tools': 'Import and copy tools', 'schedule.seriesTools': 'Series management',
@@ -64,13 +69,13 @@ const I18N = {
     'schedule.templateSave': 'Import this week into timetable',
     'schedule.templateDisable': 'Stop weekly timetable',
     'schedule.timetableEdit': 'Edit weekly timetable',
-    'schedule.timetableHint': 'Weekly assignment matrix: each column is a fixed task occurrence for this week and each row is an employee. Click a task name to edit its recurring definition; assign people to individual dates in Plan.',
-    'schedule.ruleContext': 'Recurring task definition: repeats on the selected weekday within its date range, with no default assignee. Assign people to each dated occurrence in Plan.',
+    'schedule.timetableHint': 'Weekly assignment matrix: each column is a recurring programme session and each row is a staff member. Edit recurring sessions in the Planning board.',
+    'schedule.ruleContext': 'Recurring programme session: repeats on the selected weekday within its date range. Assign staff to dated sessions in the Planning board.',
     'schedule.invalidRange': 'End date must be on or after the start date.',
     'schedule.overlapWarning': 'This overlaps {task} ({time}) for the same person on {day}. Save anyway?',
     'schedule.timetableEmpty': 'No recurring entries yet.',
     'schedule.assigned': 'Assigned', 'schedule.notAssigned': 'Not assigned', 'schedule.unassigned': 'Unassigned',
-    'schedule.noTaskOnDay': 'No fixed tasks',
+    'schedule.noTaskOnDay': 'No fixed sessions',
     'schedule.weekly': 'Weekly', 'schedule.weeklyModified': 'Weekly - Modified',
     'schedule.day': 'Weekday', 'schedule.assignee': 'Assigned person',
     'schedule.editScope': 'Apply edit to',
@@ -92,24 +97,27 @@ const I18N = {
     'schedule.importConfirm': 'Import non-recurring sessions from {date} into the weekly timetable? Existing recurring entries are kept.',
     'schedule.stopConfirm': 'Stop all recurring entries from {date} onward? Earlier settings and completed sessions remain unchanged.',
     'schedule.empty': 'No sessions scheduled for you this week.',
-    'schedule.adminHint': 'Click an empty cell to add a one-off session; click a task to record completion or change its schedule. Use Weekly timetable for recurring work. Earned points count completed sessions only.',
+    'schedule.adminHint': 'Click an empty cell to add a session; click a session to record completion or edit it.',
+    'schedule.viewerHint': 'Read-only view of all staff sessions for the selected week.',
     'schedule.loadError': 'Failed to load schedule: {msg}',
-    'sth.date': 'Date', 'sth.program': 'Program', 'sth.category': 'Category',
+    'sth.date': 'Date', 'sth.program': 'Programme', 'sth.category': 'Category',
     'sth.time': 'Time', 'sth.points': 'Points', 'sth.status': 'Status',
     'grid.employee': 'Employee', 'grid.pts': 'Earned points',
-    'plan.title': 'Weekly plan', 'plan.adminTag': 'admin', 'plan.manage': 'Manage tasks',
-    'plan.view': 'Plan view', 'plan.sessions': 'Dated sessions',
-    'plan.timetableHint': 'Fixed recurring task occurrences with no default assignee. Click a cell to add one, or a rule to edit it.',
-    'plan.hint': 'This view shows dated tasks for every day in the selected week. Drag a person onto a task to assign them for that date only; recurring weekly rules stay unchanged. Use the mode switch to view or manage weekly rules.',
+    'plan.title': 'Planning board', 'plan.adminTag': 'admin', 'plan.manage': 'Manage programmes',
+    'plan.view': 'Planning board view', 'plan.sessions': 'Dated sessions',
+    'plan.timetableHint': 'Recurring programme sessions have no default assignee. Click a cell to add a session or a rule to edit it.',
+    'plan.hint': 'View sessions for every day in the selected week. Drag a staff member onto a session to assign them for that date.',
+    'plan.adminHint': 'View all dated sessions. Admins can assign staff, edit sessions, and manage recurring schedules.',
+    'plan.viewerHint': 'Read-only view of all staff sessions for the selected week.',
     'plan.prev': '← Previous week', 'plan.today': 'Today', 'plan.next': 'Next week →',
     'plan.people': 'People',
     'plan.estimateShort': 'Est.', 'plan.earnedShort': 'Earned',
     'plan.morning': 'Morning', 'plan.afternoon': 'Afternoon and evening',
-    'plan.dropHere': 'Drop person here', 'plan.noTasks': 'No tasks yet',
+    'plan.dropHere': 'Drop person here', 'plan.noTasks': 'No sessions scheduled',
     'plan.addBtn': '+ Add one-off session…', 'plan.pointsTotal': 'Planned points',
     'plan.emptyPeople': 'No active employees.', 'plan.unassignedRow': 'Unassigned',
-    'plan.loadError': 'Failed to load plan: {msg}',
-    'plan.loadErrorStatus': 'Failed to load plan ({status}).',
+    'plan.loadError': 'Failed to load the planning board: {msg}',
+    'plan.loadErrorStatus': 'Failed to load the planning board ({status}).',
     'plan.removeAssignee': 'Remove {name} from this task',
     'plan.clickOptions': 'Drag a person here to add them, or drag them here again to remove them',
     'mp.target': 'Target',
@@ -117,10 +125,10 @@ const I18N = {
     'status.pending': 'pending', 'status.assigned': 'assigned',
     'status.in_progress': 'in progress', 'status.active': 'active',
     'tag.sudden': 'sudden', 'tag.today': 'today',
-    'login.sub': 'Sign in with your work account to view and update your tasks.',
+    'login.sub': 'Sign in with your work account to view schedules, workload reports, and history.',
     'login.google': 'Sign in with Google',
     'login.hint': 'Your access level is determined by your account.',
-    'modal.task': 'Task', 'modal.date': 'Date', 'modal.start': 'Start', 'modal.end': 'End',
+    'modal.task': 'Programme', 'modal.date': 'Date', 'modal.start': 'Start', 'modal.end': 'End',
     'modal.points': 'Points (calculated automatically)', 'modal.pointsEditable': 'Points',
     'modal.sudden': ' Sudden session (doubles the points)',
     'modal.repeat': ' Copy as one-off sessions for a limited number of weeks',
@@ -129,8 +137,8 @@ const I18N = {
     'modal.notes': 'Notes', 'modal.notesPlaceholder': 'optional', 'modal.notesPrefix': 'Notes: ',
     'modal.add': 'Add one-off session',
     'modal.assignTitle': 'Add one-off session', 'modal.addTitle': 'Add one-off session',
-    'modal.detailsTitle': 'Task details', 'modal.editTitle': 'Edit task',
-    'modal.cloneTitle': 'Clone task to weekdays',
+    'modal.detailsTitle': 'Session details', 'modal.editTitle': 'Edit session',
+    'modal.cloneTitle': 'Copy session to weekdays',
     'clone.chooseDays': 'Choose other weekdays in this week:',
     'modal.employee': 'Employee #{id}',
     'modal.dragAfter': ' — drag a person onto the task afterwards',
@@ -138,14 +146,13 @@ const I18N = {
     'action.saveChanges': 'Save changes', 'action.back': 'Back', 'action.clone': 'Clone',
     'action.complete': '✓ Complete', 'action.reopen': '↺ Reopen', 'action.cancel': '✕ Cancel',
     'action.deleteDay': 'Delete this day',
-    'programs.title': 'Tasks',
-    'programs.context': 'Create new tasks or delete them from the list. Deleting a task that ' +
-      'already has scheduled sessions only hides it (the sessions are kept); a task with no ' +
-      'sessions is removed from the database.',
-    'programs.new': 'New task', 'programs.create': 'Create task',
-    'programs.listEmpty': 'No tasks in the database yet.',
+    'programs.title': 'Programmes',
+    'programs.context': 'Create programmes or hide them from the list. Hiding a programme with ' +
+      'scheduled sessions keeps those records; a programme with no sessions is removed.',
+    'programs.new': 'New programme', 'programs.create': 'Create programme',
+    'programs.listEmpty': 'No programmes in the database yet.',
     'programs.deletedTag': 'deleted', 'programs.deleteBtn': 'Delete',
-    'pth.code': 'Code', 'pth.task': 'Task', 'pth.category': 'Category',
+    'pth.code': 'Code', 'pth.task': 'Programme', 'pth.category': 'Category',
     'pth.pts': 'Default pts', 'pth.time': 'Default time', 'pth.action': 'Action',
     'plabel.code': 'Code', 'plabel.category': 'Category', 'plabel.name': 'Name',
     'plabel.points': 'Default points', 'plabel.start': 'Default start', 'plabel.end': 'Default end',
@@ -161,8 +168,8 @@ const I18N = {
     'mp.excess': 'Excess above target: +{p} pts',
     'mp.remaining': '{p} pts remaining to target',
     'mp.noTarget': 'No monthly target set',
-    'tasks.projectError': 'Failed to load project tasks ({status}).',
-    'tasks.planError': 'Failed to load Plan assignments ({status}).',
+    'tasks.projectError': 'Failed to load work items ({status}).',
+    'tasks.planError': 'Failed to load planning board sessions ({status}).',
     'err.saveFailed': 'Save failed: ', 'err.network': 'Network error: ',
     'err.cloneDays': 'Choose at least one weekday.', 'err.cloneFailed': 'Clone failed: ',
     'err.copyWeekFailed': 'Week copy failed: ',
@@ -172,11 +179,25 @@ const I18N = {
     'err.codeName': 'Code and name are required.',
     'err.points': 'Default points must be a number of at least 0.',
     'confirm.copyWeek': 'Copy the schedule from {from} to {to}? Existing matching sessions will not be duplicated.',
-    'confirm.deleteDay': 'Delete this task? The deletion is recorded in history.',
-    'confirm.programDelete': 'Delete this task? If it has scheduled sessions they are kept and the task ' +
-      'is only hidden from the lists; otherwise it is removed from the database.',
+    'confirm.deleteDay': 'Delete this session? The deletion is recorded in history.',
+    'confirm.programDelete': 'Hide or delete this programme? Existing sessions are kept.',
     'alert.copyWeek': 'Copied {count} sessions to next week; {skipped} matching sessions were not duplicated.',
-    'alert.assignRepeat': 'Task added to {n} weeks (same weekday, same time). Browse to later weeks to see it.',
+    'alert.assignRepeat': 'Session added to {n} weeks (same weekday, same time). Browse to later weeks to see it.',
+    'dialog.notice': 'Notice', 'dialog.confirm': 'Confirm action',
+    'dialog.ok': 'OK', 'dialog.confirmButton': 'Continue', 'dialog.cancel': 'Cancel',
+    'history.title': 'Schedule history', 'history.date': 'When', 'history.actor': 'Changed by',
+    'history.action': 'Action', 'history.record': 'Record', 'history.details': 'Details',
+    'history.empty': 'No history entries yet.', 'history.loadError': 'Could not load history ({status}).',
+    'history.older': 'Load older entries', 'history.loading': 'Loading history…',
+    'staff.title': 'Staff directory', 'staff.code': 'Staff ID', 'staff.firstName': 'First name',
+    'staff.lastName': 'Last name', 'staff.email': 'Work email', 'staff.status': 'Status',
+    'staff.action': 'Action', 'staff.active': 'Active', 'staff.inactive': 'Inactive',
+    'staff.add': 'Add staff member', 'staff.deactivate': 'Deactivate',
+    'staff.empty': 'No staff records found.', 'staff.loadError': 'Could not load staff ({status}).',
+    'staff.added': 'Staff member added.', 'staff.deactivated': 'Staff member deactivated; work records were retained.',
+    'staff.addError': 'Could not add staff ({status}).',
+    'staff.deactivateError': 'Could not deactivate staff ({status}).',
+    'staff.confirmDeactivate': 'Deactivate {name}? Existing schedule and work records will be retained.',
     'common.today': 'today',
     'day.sun': 'Sun', 'day.mon': 'Mon', 'day.tue': 'Tue', 'day.wed': 'Wed',
     'day.thu': 'Thu', 'day.fri': 'Fri', 'day.sat': 'Sat',
@@ -185,15 +206,18 @@ const I18N = {
     'month.9': 'September', 'month.10': 'October', 'month.11': 'November', 'month.12': 'December',
   },
   vi: {
-    'nav.tasks': 'Nhiệm vụ', 'nav.schedule': 'Lịch', 'nav.plan': 'Kế hoạch',
-    'nav.monthly': 'Tổng kết tháng',
+    'app.name': 'Lịch nhân sự', 'app.footer': '© 2026 Lịch nhân sự',
+    'nav.tasks': 'Tuần của tôi', 'nav.schedule': 'Lịch tuần', 'nav.plan': 'Bảng phân công',
+    'nav.monthly': 'Tổng kết tháng', 'nav.history': 'Lịch sử', 'nav.staff': 'Nhân sự',
     'summary.title': 'Tổng kết tháng', 'summary.prev': '← Tháng trước',
     'summary.current': 'Tháng này', 'summary.next': 'Tháng sau →',
     'summary.daysOneToTen': 'Ngày 1–10', 'summary.daysElevenToTwenty': 'Ngày 11–20',
     'summary.daysTwentyOneToEnd': 'Ngày 21–cuối tháng', 'summary.employee': 'Nhân viên',
-    'summary.points': 'Điểm đã đạt', 'summary.estimated': 'Điểm dự kiến nếu hoàn thành mọi phiên được giao', 'summary.goal': 'Mục tiêu tháng',
+    'summary.points': 'Điểm đã đạt', 'summary.estimated': 'Dự kiến',
+    'summary.estimatedHelp': 'Điểm dự kiến nếu hoàn thành mọi phiên được giao',
+    'summary.goal': 'Mục tiêu tháng',
     'summary.notSet': 'Chưa đặt', 'summary.variance': 'Chênh lệch mục tiêu',
-    'summary.aboveGoal': 'Điểm vượt mục tiêu', 'summary.completedTasks': 'Nhiệm vụ hoàn thành',
+    'summary.aboveGoal': 'Điểm vượt mục tiêu', 'summary.completedTasks': 'Phiên đã hoàn thành',
     'summary.sharedGoal': 'Mặc định chung: 170 điểm mỗi người; quản trị viên có thể đặt riêng theo nhân viên và tháng.',
     'summary.sharedDefault': 'Mặc định chung', 'summary.individualOverride': 'Mục tiêu riêng',
     'summary.goalFor': 'Mục tiêu tháng của {name}', 'summary.saveGoal': 'Lưu',
@@ -201,21 +225,21 @@ const I18N = {
     'summary.goalSaved': 'Đã lưu mục tiêu tháng.', 'summary.goalReset': 'Đang dùng mặc định chung.',
     'summary.goalSaveError': 'Không lưu được mục tiêu tháng ({status}).',
     'summary.invalidGoal': 'Nhập mục tiêu từ 0 đến 10000 điểm.',
-    'summary.tasksCount': '{count} nhiệm vụ', 'summary.loading': 'Đang tải tổng kết tháng…',
+    'summary.tasksCount': '{count} phiên', 'summary.loading': 'Đang tải tổng kết tháng…',
     'summary.error': 'Không tải được tổng kết tháng ({status}).',
-    'summary.empty': 'Không có nhân sự đang hoạt động.',
+    'summary.empty': 'Không tìm thấy nhân sự.',
     'summary.demoNotice': 'Bản xem trước: chỉ dùng dữ liệu mẫu; không cần đăng nhập và không dùng dữ liệu trực tiếp.',
     'summary.demoUser': 'Bản xem trước',
-    'plan.board': 'Bảng kế hoạch tuần',
+    'plan.board': 'Bảng khối lượng công việc tuần',
     'user.openMenu': 'Mở menu hồ sơ',
     'user.signedInAs': 'Đã đăng nhập bằng',
     'user.language': 'Ngôn ngữ',
     'user.logout': 'Đăng xuất',
-    'tasks.title': 'Nhiệm vụ của tôi',
-    'tasks.empty': 'Chưa có nhiệm vụ hay phân công Kế hoạch nào.',
-    'th.task': 'Nhiệm vụ', 'th.priority': 'Ưu tiên / danh mục', 'th.status': 'Trạng thái',
+    'tasks.title': 'Tuần của tôi',
+    'tasks.empty': 'Chưa có mục công việc hay phiên nào trong tuần này.',
+    'th.task': 'Công việc', 'th.priority': 'Ưu tiên / danh mục', 'th.status': 'Trạng thái',
     'th.date': 'Ngày / giờ', 'th.progress': 'Tiến độ / điểm',
-    'schedule.title': 'Lịch',
+    'schedule.title': 'Lịch tuần',
     'nav.jump': 'Đi tới', 'nav.chooseDate': 'Chọn ngày', 'nav.thisWeek': 'Tuần này',
     'schedule.view': 'Chế độ xem lịch', 'schedule.dated': 'Lịch theo ngày', 'schedule.timetable': 'Thời khóa biểu hàng tuần',
     'schedule.tools': 'Công cụ nhập và sao chép', 'schedule.seriesTools': 'Quản lý chuỗi',
@@ -231,13 +255,13 @@ const I18N = {
     'schedule.templateSave': 'Nhập tuần này vào thời khóa biểu',
     'schedule.templateDisable': 'Tắt thời khóa biểu hàng tuần',
     'schedule.timetableEdit': 'Sửa thời khóa biểu hàng tuần',
-    'schedule.timetableHint': 'Ma trận phân công tuần: mỗi cột là một công việc cố định trong tuần này và mỗi hàng là một nhân viên. Nhấn tên công việc để sửa quy tắc lặp; phân công cho từng ngày trong Kế hoạch.',
-    'schedule.ruleContext': 'Định nghĩa nhiệm vụ lặp lại: lặp vào ngày trong tuần đã chọn trong khoảng ngày, không có người được giao mặc định. Giao nhân viên cho từng lần theo ngày trong Kế hoạch.',
+    'schedule.timetableHint': 'Ma trận phân công tuần: mỗi cột là một phiên chương trình lặp lại và mỗi hàng là một nhân viên. Sửa phiên lặp trong Bảng phân công.',
+    'schedule.ruleContext': 'Phiên chương trình lặp lại theo ngày đã chọn trong khoảng ngày. Giao nhân viên cho từng phiên theo ngày trong Bảng phân công.',
     'schedule.invalidRange': 'Ngày kết thúc phải từ ngày bắt đầu trở đi.',
     'schedule.overlapWarning': 'Mục này trùng giờ với {task} ({time}) của cùng nhân sự vào {day}. Vẫn lưu?',
     'schedule.timetableEmpty': 'Chưa có mục lặp lại.',
     'schedule.assigned': 'Đã phân công', 'schedule.notAssigned': 'Chưa phân công', 'schedule.unassigned': 'Chưa giao',
-    'schedule.noTaskOnDay': 'Không có công việc cố định',
+    'schedule.noTaskOnDay': 'Không có phiên cố định',
     'schedule.weekly': 'Hàng tuần', 'schedule.weeklyModified': 'Hàng tuần - Đã sửa',
     'schedule.day': 'Ngày trong tuần', 'schedule.assignee': 'Người được giao',
     'schedule.editScope': 'Áp dụng chỉnh sửa cho',
@@ -259,24 +283,27 @@ const I18N = {
     'schedule.importConfirm': 'Nhập các phiên không lặp lại từ tuần {date} vào thời khóa biểu? Các mục lặp lại hiện có được giữ lại.',
     'schedule.stopConfirm': 'Dừng tất cả mục lặp lại từ {date}? Cài đặt trước đó và các phiên đã hoàn thành không đổi.',
     'schedule.empty': 'Không có phiên nào được lên lịch cho bạn trong tuần này.',
-    'schedule.adminHint': 'Nhấp ô trống để thêm phiên riêng lẻ; nhấp nhiệm vụ để ghi nhận hoàn thành hoặc sửa lịch. Dùng Thời khóa biểu hàng tuần cho công việc lặp lại. Điểm đã đạt chỉ tính phiên đã hoàn thành.',
+    'schedule.adminHint': 'Nhấp ô trống để thêm phiên; nhấp phiên để ghi nhận hoàn thành hoặc chỉnh sửa.',
+    'schedule.viewerHint': 'Chế độ chỉ xem các phiên của toàn bộ nhân viên trong tuần đã chọn.',
     'schedule.loadError': 'Không tải được lịch: {msg}',
     'sth.date': 'Ngày', 'sth.program': 'Chương trình', 'sth.category': 'Danh mục',
     'sth.time': 'Giờ', 'sth.points': 'Điểm', 'sth.status': 'Trạng thái',
     'grid.employee': 'Nhân viên', 'grid.pts': 'Điểm đã đạt',
-    'plan.title': 'Kế hoạch tuần', 'plan.adminTag': 'quản trị', 'plan.manage': 'Quản lý nhiệm vụ',
-    'plan.view': 'Chế độ xem kế hoạch', 'plan.sessions': 'Phiên theo ngày',
-    'plan.timetableHint': 'Các lần xuất hiện cố định của nhiệm vụ lặp lại, không có người được giao mặc định. Nhấp ô để thêm hoặc nhấp quy tắc để sửa.',
-    'plan.hint': 'Chế độ này hiển thị nhiệm vụ theo ngày của cả tuần đã chọn. Kéo nhân viên vào nhiệm vụ để giao riêng cho ngày đó; quy tắc hàng tuần không thay đổi. Dùng nút chuyển chế độ để xem hoặc quản lý quy tắc hàng tuần.',
+    'plan.title': 'Bảng phân công', 'plan.adminTag': 'quản trị', 'plan.manage': 'Quản lý chương trình',
+    'plan.view': 'Chế độ xem bảng phân công', 'plan.sessions': 'Phiên theo ngày',
+    'plan.timetableHint': 'Phiên chương trình lặp lại không có nhân viên được giao mặc định. Nhấp ô để thêm phiên hoặc nhấp quy tắc để sửa.',
+    'plan.hint': 'Xem các phiên trong từng ngày của tuần đã chọn. Kéo nhân viên vào phiên để phân công riêng cho ngày đó.',
+    'plan.adminHint': 'Xem tất cả phiên theo ngày. Quản trị viên có thể phân công nhân viên, sửa phiên và quản lý lịch lặp.',
+    'plan.viewerHint': 'Chế độ chỉ xem các phiên của toàn bộ nhân viên trong tuần đã chọn.',
     'plan.prev': '← Tuần trước', 'plan.today': 'Hôm nay', 'plan.next': 'Tuần sau →',
     'plan.people': 'Nhân sự',
     'plan.estimateShort': 'Dự kiến', 'plan.earnedShort': 'Đã đạt',
     'plan.morning': 'Buổi sáng', 'plan.afternoon': 'Buổi chiều và tối',
-    'plan.dropHere': 'Thả người vào đây', 'plan.noTasks': 'Chưa có nhiệm vụ',
+    'plan.dropHere': 'Thả nhân viên vào đây', 'plan.noTasks': 'Không có phiên nào được lên lịch',
     'plan.addBtn': '+ Thêm phiên riêng lẻ…', 'plan.pointsTotal': 'Điểm dự kiến',
     'plan.emptyPeople': 'Không có nhân sự đang hoạt động.', 'plan.unassignedRow': 'Chưa gán',
-    'plan.loadError': 'Không tải được kế hoạch: {msg}',
-    'plan.loadErrorStatus': 'Không tải được kế hoạch ({status}).',
+    'plan.loadError': 'Không tải được bảng phân công: {msg}',
+    'plan.loadErrorStatus': 'Không tải được bảng phân công ({status}).',
     'plan.removeAssignee': 'Gỡ {name} khỏi nhiệm vụ này',
     'plan.clickOptions': 'Kéo nhân viên vào đây để thêm; kéo lại người đó để gỡ',
     'mp.target': 'Mục tiêu',
@@ -284,10 +311,10 @@ const I18N = {
     'status.pending': 'đang chờ', 'status.assigned': 'đã gán',
     'status.in_progress': 'đang thực hiện', 'status.active': 'đang hoạt động',
     'tag.sudden': 'đột xuất', 'tag.today': 'hôm nay',
-    'login.sub': 'Đăng nhập bằng tài khoản công việc để xem và cập nhật nhiệm vụ của bạn.',
+    'login.sub': 'Đăng nhập bằng tài khoản công việc để xem lịch, báo cáo khối lượng và lịch sử.',
     'login.google': 'Đăng nhập bằng Google',
     'login.hint': 'Quyền truy cập của bạn được xác định theo tài khoản.',
-    'modal.task': 'Nhiệm vụ', 'modal.date': 'Ngày', 'modal.start': 'Bắt đầu', 'modal.end': 'Kết thúc',
+    'modal.task': 'Chương trình', 'modal.date': 'Ngày', 'modal.start': 'Bắt đầu', 'modal.end': 'Kết thúc',
     'modal.points': 'Điểm (tính tự động)', 'modal.pointsEditable': 'Điểm',
     'modal.sudden': ' Phiên đột xuất (nhân đôi điểm)',
     'modal.repeat': ' Sao chép thành phiên riêng lẻ trong số tuần giới hạn',
@@ -296,8 +323,8 @@ const I18N = {
     'modal.notes': 'Ghi chú', 'modal.notesPlaceholder': 'không bắt buộc', 'modal.notesPrefix': 'Ghi chú: ',
     'modal.add': 'Thêm phiên riêng lẻ',
     'modal.assignTitle': 'Thêm phiên riêng lẻ', 'modal.addTitle': 'Thêm phiên riêng lẻ',
-    'modal.detailsTitle': 'Chi tiết nhiệm vụ', 'modal.editTitle': 'Sửa nhiệm vụ',
-    'modal.cloneTitle': 'Sao chép nhiệm vụ sang các ngày trong tuần',
+    'modal.detailsTitle': 'Chi tiết phiên', 'modal.editTitle': 'Sửa phiên',
+    'modal.cloneTitle': 'Sao chép phiên sang các ngày trong tuần',
     'clone.chooseDays': 'Chọn các ngày khác trong tuần này:',
     'modal.employee': 'Nhân viên #{id}',
     'modal.dragAfter': ' — kéo người vào nhiệm vụ sau đó',
@@ -305,13 +332,13 @@ const I18N = {
     'action.saveChanges': 'Lưu thay đổi', 'action.back': 'Quay lại', 'action.clone': 'Sao chép',
     'action.complete': '✓ Hoàn thành', 'action.reopen': '↺ Mở lại', 'action.cancel': '✕ Hủy',
     'action.deleteDay': 'Xóa ngày này',
-    'programs.title': 'Nhiệm vụ',
-    'programs.context': 'Tạo nhiệm vụ mới hoặc xóa khỏi danh sách. Xóa nhiệm vụ đã có phiên lên lịch ' +
-      'thì chỉ ẩn đi (các phiên được giữ); nhiệm vụ chưa có phiên sẽ bị xóa khỏi cơ sở dữ liệu.',
-    'programs.new': 'Nhiệm vụ mới', 'programs.create': 'Tạo nhiệm vụ',
-    'programs.listEmpty': 'Chưa có nhiệm vụ nào trong cơ sở dữ liệu.',
+    'programs.title': 'Chương trình',
+    'programs.context': 'Tạo chương trình hoặc ẩn khỏi danh sách. Các phiên đã lên lịch được giữ lại; ' +
+      'chương trình chưa có phiên sẽ bị xóa.',
+    'programs.new': 'Chương trình mới', 'programs.create': 'Tạo chương trình',
+    'programs.listEmpty': 'Chưa có chương trình nào trong cơ sở dữ liệu.',
     'programs.deletedTag': 'đã xóa', 'programs.deleteBtn': 'Xóa',
-    'pth.code': 'Mã', 'pth.task': 'Nhiệm vụ', 'pth.category': 'Danh mục',
+    'pth.code': 'Mã', 'pth.task': 'Chương trình', 'pth.category': 'Danh mục',
     'pth.pts': 'Điểm mặc định', 'pth.time': 'Giờ mặc định', 'pth.action': 'Thao tác',
     'plabel.code': 'Mã', 'plabel.category': 'Danh mục', 'plabel.name': 'Tên',
     'plabel.points': 'Điểm mặc định', 'plabel.start': 'Giờ bắt đầu mặc định', 'plabel.end': 'Giờ kết thúc mặc định',
@@ -327,8 +354,8 @@ const I18N = {
     'mp.excess': 'Vượt mục tiêu: +{p} điểm',
     'mp.remaining': 'Còn {p} điểm để đạt mục tiêu',
     'mp.noTarget': 'Chưa đặt mục tiêu tháng',
-    'tasks.projectError': 'Không tải được nhiệm vụ dự án ({status}).',
-    'tasks.planError': 'Không tải được phân công Kế hoạch ({status}).',
+    'tasks.projectError': 'Không tải được mục công việc ({status}).',
+    'tasks.planError': 'Không tải được phiên trên bảng phân công ({status}).',
     'err.saveFailed': 'Lưu thất bại: ', 'err.network': 'Lỗi mạng: ',
     'err.cloneDays': 'Hãy chọn ít nhất một ngày.', 'err.cloneFailed': 'Sao chép thất bại: ',
     'err.copyWeekFailed': 'Không sao chép được tuần: ',
@@ -338,11 +365,25 @@ const I18N = {
     'err.codeName': 'Cần nhập mã và tên.',
     'err.points': 'Điểm mặc định phải là số không âm.',
     'confirm.copyWeek': 'Sao chép lịch từ {from} sang {to}? Các phiên trùng khớp sẽ không bị sao chép thêm.',
-    'confirm.deleteDay': 'Xóa nhiệm vụ này? Việc xóa được ghi lại trong lịch sử.',
-    'confirm.programDelete': 'Xóa nhiệm vụ này? Nếu đã có phiên lên lịch, các phiên được giữ và nhiệm vụ ' +
-      'chỉ bị ẩn khỏi danh sách; nếu chưa có phiên, nhiệm vụ bị xóa khỏi cơ sở dữ liệu.',
+    'confirm.deleteDay': 'Xóa phiên này? Thao tác sẽ được ghi lại trong lịch sử.',
+    'confirm.programDelete': 'Ẩn hoặc xóa chương trình này? Các phiên hiện có vẫn được giữ lại.',
     'alert.copyWeek': 'Đã sao chép {count} phiên sang tuần sau; không sao chép {skipped} phiên trùng khớp.',
-    'alert.assignRepeat': 'Nhiệm vụ đã được thêm vào {n} tuần (cùng ngày, cùng giờ). Chuyển đến các tuần sau để xem.',
+    'alert.assignRepeat': 'Phiên đã được thêm vào {n} tuần (cùng ngày, cùng giờ). Chuyển đến các tuần sau để xem.',
+    'dialog.notice': 'Thông báo', 'dialog.confirm': 'Xác nhận thao tác',
+    'dialog.ok': 'Đồng ý', 'dialog.confirmButton': 'Tiếp tục', 'dialog.cancel': 'Hủy',
+    'history.title': 'Lịch sử lịch làm việc', 'history.date': 'Thời gian', 'history.actor': 'Người thay đổi',
+    'history.action': 'Thao tác', 'history.record': 'Bản ghi', 'history.details': 'Chi tiết',
+    'history.empty': 'Chưa có mục lịch sử.', 'history.loadError': 'Không tải được lịch sử ({status}).',
+    'history.older': 'Tải mục cũ hơn', 'history.loading': 'Đang tải lịch sử…',
+    'staff.title': 'Danh sách nhân sự', 'staff.code': 'Mã nhân viên', 'staff.firstName': 'Tên',
+    'staff.lastName': 'Họ', 'staff.email': 'Email công việc', 'staff.status': 'Trạng thái',
+    'staff.action': 'Thao tác', 'staff.active': 'Đang hoạt động', 'staff.inactive': 'Đã ngừng hoạt động',
+    'staff.add': 'Thêm nhân viên', 'staff.deactivate': 'Ngừng hoạt động',
+    'staff.empty': 'Không tìm thấy nhân sự.', 'staff.loadError': 'Không tải được nhân sự ({status}).',
+    'staff.added': 'Đã thêm nhân viên.', 'staff.deactivated': 'Đã ngừng hoạt động; dữ liệu công việc được giữ nguyên.',
+    'staff.addError': 'Không thêm được nhân viên ({status}).',
+    'staff.deactivateError': 'Không thể ngừng hoạt động nhân viên ({status}).',
+    'staff.confirmDeactivate': 'Ngừng hoạt động {name}? Lịch và dữ liệu công việc hiện có sẽ được giữ nguyên.',
     'common.today': 'hôm nay',
     'day.sun': 'Chủ Nhật', 'day.mon': 'Thứ Hai', 'day.tue': 'Thứ Ba', 'day.wed': 'Thứ Tư',
     'day.thu': 'Thứ Năm', 'day.fri': 'Thứ Sáu', 'day.sat': 'Thứ Bảy',
@@ -363,6 +404,46 @@ function t(key, vars = {}) {
 const DAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
 const dayName = i => t('day.' + DAY_KEYS[i]);
 const monthName = i => t(`month.${i + 1}`);
+
+function showAppDialog(message, confirmation = false) {
+  const dialog = document.getElementById('app-message-dialog');
+  const title = document.getElementById('app-message-title');
+  const content = document.getElementById('app-message-content');
+  const cancel = document.getElementById('app-message-cancel');
+  const accept = document.getElementById('app-message-accept');
+  title.textContent = t(confirmation ? 'dialog.confirm' : 'dialog.notice');
+  content.textContent = message;
+  cancel.hidden = !confirmation;
+  cancel.textContent = t('dialog.cancel');
+  accept.textContent = t(confirmation ? 'dialog.confirmButton' : 'dialog.ok');
+
+  return new Promise(resolve => {
+    let result = false;
+    const finish = accepted => {
+      result = accepted;
+      dialog.close();
+    };
+    const onCancel = event => {
+      event.preventDefault();
+      finish(false);
+    };
+    const onClose = () => resolve(result);
+    cancel.onclick = () => finish(false);
+    accept.onclick = () => finish(true);
+    dialog.addEventListener('cancel', onCancel, { once: true });
+    dialog.addEventListener('close', onClose, { once: true });
+    dialog.showModal();
+    accept.focus();
+  });
+}
+
+function showNotice(message) {
+  return showAppDialog(message);
+}
+
+function confirmAction(message) {
+  return showAppDialog(message, true);
+}
 
 function applyTranslations() {
   document.documentElement.lang = lang === 'vi' ? 'vi' : 'en';
@@ -407,6 +488,8 @@ function setLang(newLang) {
         translateRuleModal();
       }
       if (planLoaded) loadPlanBoard();
+      if (historyLoaded) loadHistory(true);
+      if (staffLoaded && currentUser.isAdmin) loadStaffDirectory();
     }
     if (monthlySummaryLoaded) loadMonthlySummary();
   }
@@ -452,7 +535,20 @@ function statusPill(status) {
 }
 
 const pad2 = n => String(n).padStart(2, '0');
-const todayISO = () => new Date().toISOString().slice(0, 10);
+function vietnamDateParts(date = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Ho_Chi_Minh',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date);
+  return Object.fromEntries(parts.map(({ type, value }) => [type, value]));
+}
+
+const todayISO = () => {
+  const { year, month, day } = vietnamDateParts();
+  return `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+};
 
 function fmtDue(iso) {
   if (!iso) return '—';

@@ -1,5 +1,97 @@
 // ================= Event wiring =================
 
+let historyBefore = null;
+let historyHasMore = false;
+
+function fmtHistoryTime(value) {
+  const raw = String(value);
+  const timestamp = new Date(raw.includes('T') ? raw : `${raw.replace(' ', 'T')}Z`);
+  if (!Number.isFinite(timestamp.getTime())) return value;
+  return new Intl.DateTimeFormat(lang === 'vi' ? 'vi-VN' : 'en-GB', {
+    timeZone: 'Asia/Ho_Chi_Minh',
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(timestamp);
+}
+
+async function loadHistory(reset = false) {
+  const tbody = document.getElementById('history-entries');
+  const loading = document.getElementById('history-loading');
+  const empty = document.getElementById('history-empty');
+  const error = document.getElementById('history-error');
+  const older = document.getElementById('history-older');
+  if (reset) {
+    historyBefore = null;
+    historyHasMore = false;
+    tbody.innerHTML = '';
+  }
+  loading.style.display = tbody.children.length ? 'none' : 'block';
+  empty.style.display = 'none';
+  error.style.display = 'none';
+  older.disabled = true;
+  const query = historyBefore ? `?before=${historyBefore}` : '';
+  try {
+    const response = await api(`/api/schedule/history${query}`);
+    if (!response.ok) throw new Error(String(response.status));
+    const { entries, hasMore } = await response.json();
+    if (!Array.isArray(entries)) throw new Error('Invalid response');
+    tbody.insertAdjacentHTML('beforeend', entries.map(entry => `
+      <tr>
+        <td data-label="${escapeHtml(t('history.date'))}">${escapeHtml(fmtHistoryTime(entry.acted_at))}</td>
+        <td data-label="${escapeHtml(t('history.actor'))}">${escapeHtml(entry.actor_email)}</td>
+        <td data-label="${escapeHtml(t('history.action'))}">${escapeHtml(entry.action)}</td>
+        <td data-label="${escapeHtml(t('history.record'))}">${escapeHtml(entry.entity)}${entry.entity_id == null ? '' : ` #${escapeHtml(entry.entity_id)}`}</td>
+        <td data-label="${escapeHtml(t('history.details'))}">${escapeHtml(entry.details)}</td>
+      </tr>`).join(''));
+    if (entries.length) historyBefore = entries[entries.length - 1].history_id;
+    historyHasMore = Boolean(hasMore);
+    historyLoaded = true;
+    empty.style.display = tbody.children.length ? 'none' : 'block';
+    older.style.display = historyHasMore ? 'inline-block' : 'none';
+  } catch (err) {
+    error.textContent = t('history.loadError', { status: err.message || 'network error' });
+    error.style.display = 'block';
+    older.style.display = 'none';
+  } finally {
+    loading.style.display = 'none';
+    older.disabled = false;
+  }
+}
+
+async function loadStaffDirectory() {
+  if (!currentUser?.isAdmin) return;
+  const tbody = document.getElementById('staff-entries');
+  const empty = document.getElementById('staff-empty');
+  const error = document.getElementById('staff-error');
+  error.style.display = 'none';
+  try {
+    const response = await api('/api/admin/employees');
+    if (!response.ok) throw new Error(String(response.status));
+    const { employees } = await response.json();
+    if (!Array.isArray(employees)) throw new Error('Invalid response');
+    tbody.innerHTML = employees.map(employee => {
+      const name = `${employee.first_name} ${employee.last_name}`.trim();
+      const active = Number(employee.is_active) === 1;
+      const status = active ? t('staff.active') : t('staff.inactive');
+      const action = active && Number(employee.is_admin) !== 1
+        ? `<button class="btn danger small" type="button" data-deactivate-employee="${Number(employee.employee_id)}">${escapeHtml(t('staff.deactivate'))}</button>`
+        : '—';
+      return `<tr>
+        <td data-label="${escapeHtml(t('staff.code'))}">${escapeHtml(employee.employee_code)}</td>
+        <td data-label="${escapeHtml(t('summary.employee'))}">${escapeHtml(name)}${Number(employee.is_admin) === 1 ? ` (${escapeHtml(t('plan.adminTag'))})` : ''}</td>
+        <td data-label="${escapeHtml(t('staff.email'))}">${escapeHtml(employee.email)}</td>
+        <td data-label="${escapeHtml(t('staff.status'))}">${escapeHtml(status)}</td>
+        <td data-label="${escapeHtml(t('staff.action'))}">${action}</td>
+      </tr>`;
+    }).join('');
+    empty.style.display = employees.length ? 'none' : 'block';
+    staffLoaded = true;
+  } catch (err) {
+    error.textContent = t('staff.loadError', { status: err.message || 'network error' });
+    error.style.display = 'block';
+  }
+}
+
 // ---- Language ----
 const profileMenu = document.getElementById('profile-menu-panel');
 const profileMenuToggle = document.getElementById('profile-menu-toggle');
@@ -38,11 +130,16 @@ document.getElementById('nav-tasks').addEventListener('click', () => switchView(
 document.getElementById('nav-schedule').addEventListener('click', () => switchView('schedule'));
 document.getElementById('nav-plan').addEventListener('click', () => switchView('plan'));
 document.getElementById('nav-monthly').addEventListener('click', () => switchView('monthly-summary'));
+document.getElementById('nav-history').addEventListener('click', () => switchView('history'));
+document.getElementById('nav-staff').addEventListener('click', () => switchView('staff'));
+document.getElementById('history-older').addEventListener('click', () => {
+  if (historyHasMore) loadHistory();
+});
 document.getElementById('monthly-summary-prev').addEventListener('click', () => shiftSummaryMonth(-1));
 document.getElementById('monthly-summary-next').addEventListener('click', () => shiftSummaryMonth(1));
 document.getElementById('monthly-summary-current').addEventListener('click', () => {
-  const now = new Date();
-  monthCursor = { year: now.getUTCFullYear(), month: now.getUTCMonth() + 1 };
+  const [year, month] = todayISO().split('-').map(Number);
+  monthCursor = { year, month };
   document.getElementById('monthly-summary-status').style.display = 'none';
   loadMonthlySummary();
 });
@@ -74,7 +171,7 @@ async function updateWeeklyTimetable(enabled, button) {
   if (!currentUser?.isAdmin || !scheduleWeekStart) return;
   let cutoffDate = null;
   if (enabled) {
-    if (!confirm(t('schedule.importConfirm', { date: fmtShort(scheduleWeekStart) }))) return;
+    if (!await confirmAction(t('schedule.importConfirm', { date: fmtShort(scheduleWeekStart) }))) return;
   } else {
     const change = await requestScheduleChange({ title: t('schedule.templateDisable'),
       summary: t('schedule.stopAllSummary'), impact: t('schedule.endImpact') });
@@ -89,14 +186,14 @@ async function updateWeeklyTimetable(enabled, button) {
       body: JSON.stringify({ enabled, ...(enabled ? { weekStart: scheduleWeekStart } : { cutoffDate }) }),
     });
     if (!res.ok) {
-      alert(t('err.weeklyTemplateFailed') + (await res.text()));
+      await showNotice(t('err.weeklyTemplateFailed') + (await res.text()));
       return;
     }
     const data = await res.json();
     weeklyTimetableEnabled = data.enabled;
     refreshScheduleViews();
   } catch (err) {
-    alert(t('err.network') + err.message);
+    await showNotice(t('err.network') + err.message);
   } finally {
     button.disabled = false;
   }
@@ -112,7 +209,7 @@ document.getElementById('schedule-mode-timetable').addEventListener('click', () 
 document.getElementById('schedule-copy-next').addEventListener('click', async (e) => {
   if (!currentUser?.isAdmin || !scheduleWeekStart) return;
   const targetWeekStart = shiftISO(scheduleWeekStart, 7);
-  if (!confirm(t('confirm.copyWeek', {
+  if (!await confirmAction(t('confirm.copyWeek', {
     from: fmtShort(scheduleWeekStart), to: fmtShort(targetWeekStart),
   }))) return;
 
@@ -124,23 +221,24 @@ document.getElementById('schedule-copy-next').addEventListener('click', async (e
       body: JSON.stringify({ weekStart: scheduleWeekStart }),
     });
     if (!res.ok) {
-      alert(t('err.copyWeekFailed') + (await res.text()));
+      await showNotice(t('err.copyWeekFailed') + (await res.text()));
       return;
     }
     const data = await res.json();
     scheduleWeekStart = data.targetWeekStart;
     refreshScheduleViews();
-    alert(t('alert.copyWeek', {
+    await showNotice(t('alert.copyWeek', {
       count: data.createdCount, skipped: data.skippedCount,
     }));
   } catch (err) {
-    alert(t('err.network') + err.message);
+    await showNotice(t('err.network') + err.message);
   } finally {
     button.disabled = false;
   }
 });
 
 document.getElementById('admin-schedule-grid').addEventListener('click', (e) => {
+  if (!currentUser?.isAdmin) return;
   const chip = e.target.closest('.slot-chip');
   if (chip) {
     openDetailsFromElement(chip);
@@ -348,7 +446,7 @@ document.getElementById('modal-assign-form').addEventListener('submit', async (e
       closeModal();
       refreshScheduleViews();
       if (!isEditing && data?.repeatedWeeks > 1) {
-        alert(t('alert.assignRepeat', { n: data.repeatedWeeks }));
+        await showNotice(t('alert.assignRepeat', { n: data.repeatedWeeks }));
       }
     }
   } catch (err) {
@@ -407,7 +505,7 @@ document.querySelectorAll('#modal-details [data-status]').forEach(b => {
       body: JSON.stringify(body),
     });
     if (res.ok) { closeModal(); refreshScheduleViews(); }
-    else alert(t('err.statusFailed'));
+    else await showNotice(t('err.statusFailed'));
   });
 });
 
@@ -418,7 +516,7 @@ document.getElementById('session-delete').addEventListener('click', async () => 
     const change = await requestScheduleChange({ title: t('action.deleteDay'), summary: currentSession.program_name,
       scope: 'occurrence', occurrenceDate: currentSession.session_date });
     if (!change) return;
-  } else if (!confirm(t('confirm.deleteDay'))) return;
+  } else if (!await confirmAction(t('confirm.deleteDay'))) return;
   const body = currentSession.is_recurring
     ? recurringSessionPayload(currentSession)
     : { sessionId: currentSession.session_id };
@@ -427,7 +525,7 @@ document.getElementById('session-delete').addEventListener('click', async () => 
     body: JSON.stringify(body),
   });
   if (res.ok) { closeModal(); refreshScheduleViews(); }
-  else alert(t('err.deleteFailed'));
+  else await showNotice(t('err.deleteFailed'));
 });
 
 document.getElementById('session-end-series').addEventListener('click', async () => {
@@ -517,7 +615,7 @@ document.getElementById('program-submit').addEventListener('click', async (e) =>
 document.getElementById('program-list').addEventListener('click', async (e) => {
   const btn = e.target.closest('.pm-del');
   if (!btn) return;
-  if (!confirm(t('confirm.programDelete'))) return;
+  if (!await confirmAction(t('confirm.programDelete'))) return;
   document.getElementById('program-error').style.display = 'none';
   try {
     const res = await api('/api/admin/programs/delete', {
@@ -533,6 +631,63 @@ document.getElementById('program-list').addEventListener('click', async (e) => {
     }
   } catch (err) {
     showProgramError(t('err.network') + err.message);
+  }
+});
+
+document.getElementById('staff-add-form').addEventListener('submit', async event => {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const status = document.getElementById('staff-status');
+  const error = document.getElementById('staff-error');
+  error.style.display = 'none';
+  status.style.display = 'none';
+  const body = {
+    employeeCode: document.getElementById('staff-code').value.trim(),
+    firstName: document.getElementById('staff-first-name').value.trim(),
+    lastName: document.getElementById('staff-last-name').value.trim(),
+    email: document.getElementById('staff-email').value.trim(),
+  };
+  try {
+    const response = await api('/api/admin/employees', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    });
+    if (!response.ok) throw new Error(String(response.status));
+    form.reset();
+    await loadStaffDirectory();
+    status.textContent = t('staff.added');
+    status.className = 'summary-status summary-status-success';
+    status.style.display = 'block';
+  } catch (err) {
+    error.textContent = t('staff.addError', { status: err.message || 'network error' });
+    error.style.display = 'block';
+  }
+});
+
+document.getElementById('staff-entries').addEventListener('click', async event => {
+  const button = event.target.closest('[data-deactivate-employee]');
+  if (!button || !currentUser?.isAdmin) return;
+  const name = button.closest('tr').children[1].textContent;
+  if (!await confirmAction(t('staff.confirmDeactivate', { name }))) return;
+  const error = document.getElementById('staff-error');
+  const status = document.getElementById('staff-status');
+  error.style.display = 'none';
+  status.style.display = 'none';
+  button.disabled = true;
+  try {
+    const response = await api('/api/admin/employees/deactivate', {
+      method: 'POST',
+      body: JSON.stringify({ employeeId: Number(button.dataset.deactivateEmployee) }),
+    });
+    if (!response.ok) throw new Error(String(response.status));
+    await loadStaffDirectory();
+    status.textContent = t('staff.deactivated');
+    status.className = 'summary-status summary-status-success';
+    status.style.display = 'block';
+  } catch (err) {
+    error.textContent = t('staff.deactivateError', { status: err.message || 'network error' });
+    error.style.display = 'block';
+    button.disabled = false;
   }
 });
 

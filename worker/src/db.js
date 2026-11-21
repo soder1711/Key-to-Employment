@@ -1,5 +1,6 @@
 import { aggregateMonthlyRows, monthlyDateRange } from './monthly-summary.js';
 import { expandRecurringOccurrences } from './recurrence.js';
+import { vietnamDateISO } from './date.js';
 
 // All queries use parameter binding — never string concatenation
 export async function getEmployeeAuth(db, employeeId) {
@@ -9,6 +10,66 @@ export async function getEmployeeAuth(db, employeeId) {
     WHERE employee_id = ?
     LIMIT 1
   `).bind(employeeId).first();
+}
+
+export async function getEmployeeDirectory(db) {
+  const { results } = await db.prepare(`
+    SELECT employee_id, employee_code, first_name, last_name, email, is_active, is_admin
+    FROM employees
+    ORDER BY is_active DESC, first_name, last_name
+  `).all();
+  return results;
+}
+
+export async function getManagedEmployee(db, employeeId) {
+  return await db.prepare(`
+    SELECT employee_id, employee_code, first_name, last_name, email, is_active, is_admin
+    FROM employees
+    WHERE employee_id = ?
+    LIMIT 1
+  `).bind(employeeId).first();
+}
+
+export async function findEmployeeByCodeOrEmail(db, employeeCode, email) {
+  return await db.prepare(`
+    SELECT employee_id
+    FROM employees
+    WHERE employee_code = ? OR email = ?
+    LIMIT 1
+  `).bind(employeeCode, email).first();
+}
+
+export async function createEmployee(db, employee) {
+  return await db.prepare(`
+    INSERT INTO employees (employee_code, first_name, last_name, email, is_admin, is_active)
+    VALUES (?, ?, ?, ?, 0, 1)
+  `).bind(
+    employee.employeeCode,
+    employee.firstName,
+    employee.lastName,
+    employee.email,
+  ).run();
+}
+
+export async function deactivateEmployee(db, employeeId) {
+  return await db.prepare(`
+    UPDATE employees
+    SET is_active = 0
+    WHERE employee_id = ? AND is_admin = 0 AND is_active = 1
+  `).bind(employeeId).run();
+}
+
+export async function getScheduleHistory(db, beforeId, limit) {
+  const query = beforeId
+    ? `SELECT history_id, acted_at, actor_email, action, entity, entity_id, details
+       FROM schedule_history WHERE history_id < ? ORDER BY history_id DESC LIMIT ?`
+    : `SELECT history_id, acted_at, actor_email, action, entity, entity_id, details
+       FROM schedule_history ORDER BY history_id DESC LIMIT ?`;
+  const statement = db.prepare(query);
+  const result = beforeId
+    ? await statement.bind(beforeId, limit).all()
+    : await statement.bind(limit).all();
+  return result.results;
 }
 
 export async function getEmployeeTasks(db, employeeId) {
@@ -134,7 +195,7 @@ export async function updateAssignmentProgressAsAdmin(
 export function weekStartFrom(dateStr) {
   const base = dateStr && /^\d{4}-\d{2}-\d{2}$/.test(dateStr)
     ? dateStr
-    : new Date().toISOString().slice(0, 10);
+    : vietnamDateISO();
   const d = new Date(base + 'T00:00:00Z');
   const day = d.getUTCDay(); // 0 = Sunday
   d.setUTCDate(d.getUTCDate() + (day === 0 ? -6 : 1 - day)); // Monday start
@@ -733,7 +794,7 @@ export async function getMonthlySummary(db, year, month, employeeId = null) {
      ))
     LEFT JOIN monthly_targets mt
       ON mt.employee_id = e.employee_id AND mt.year = ? AND mt.month = ?
-    WHERE e.is_active = 1
+    WHERE 1 = 1
       ${employeeId ? 'AND e.employee_id = ?' : ''}
     ORDER BY e.first_name, e.last_name, s.session_date`;
   const params = employeeId

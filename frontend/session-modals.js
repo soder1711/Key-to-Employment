@@ -241,7 +241,7 @@ async function confirmRecurringRuleConflict(candidate, excludedSeriesId = null) 
   });
   if (!conflict) return true;
   const time = `${fmtTime(conflict.start_time)}${conflict.end_time ? `–${fmtTime(conflict.end_time)}` : ''}`;
-  return window.confirm(t('schedule.overlapWarning', {
+  return await confirmAction(t('schedule.overlapWarning', {
     task: conflict.program_name, time, day: dayName(weekday),
   }));
 }

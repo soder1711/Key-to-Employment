@@ -4,7 +4,10 @@ let scheduleWeekStart = null;
 let scheduleLoaded = false;
 let weeklyTimetableEnabled = false;
 let schedMode = 'week';
-let monthCursor = { year: new Date().getUTCFullYear(), month: new Date().getUTCMonth() + 1 };
+let monthCursor = (() => {
+  const [year, month] = todayISO().split('-').map(Number);
+  return { year, month };
+})();
 let monthlySummaryLoaded = false;
 let adminPrograms = [];
 let adminEmployees = [];
@@ -56,19 +59,25 @@ function switchView(view) {
   const showTasks = view === 'tasks';
   const showSchedule = view === 'schedule';
   const showPlan = view === 'plan';
-  const showMonthlySummary = view === 'monthly-summary' && currentUser?.isAdmin;
+  const showMonthlySummary = view === 'monthly-summary';
+  const showHistory = view === 'history';
+  const showStaff = view === 'staff' && currentUser?.isAdmin;
 
   document.getElementById('nav-tasks').classList.toggle('active', showTasks);
   document.getElementById('nav-schedule').classList.toggle('active', showSchedule);
   document.getElementById('nav-plan').classList.toggle('active', showPlan);
   document.getElementById('nav-monthly').classList.toggle('active', showMonthlySummary);
+  document.getElementById('nav-history').classList.toggle('active', showHistory);
+  document.getElementById('nav-staff').classList.toggle('active', showStaff);
 
   document.getElementById('my-tasks-section').style.display = showTasks ? 'block' : 'none';
   document.getElementById('schedule-section').style.display = showSchedule ? 'block' : 'none';
   document.getElementById('plan-section').style.display =
-    showPlan && currentUser?.isAdmin ? 'block' : 'none';
+    showPlan ? 'block' : 'none';
   document.getElementById('monthly-summary-section').style.display =
     showMonthlySummary ? 'block' : 'none';
+  document.getElementById('history-section').style.display = showHistory ? 'block' : 'none';
+  document.getElementById('staff-section').style.display = showStaff ? 'block' : 'none';
   const container = document.querySelector('.container');
   container.classList.toggle('schedule-workspace', showSchedule);
   container.classList.toggle('monthly-summary-workspace', showMonthlySummary);
@@ -79,6 +88,8 @@ function switchView(view) {
     monthlySummaryLoaded = true;
     loadMonthlySummary();
   }
+  if (showHistory && !historyLoaded) loadHistory();
+  if (showStaff) loadStaffDirectory();
   if (showTasks) loadMyTasks();
   if (showSchedule) {
     if (!scheduleLoaded) {
@@ -92,16 +103,18 @@ function switchView(view) {
 function loadSchedule() {
   const isAdmin = currentUser?.isAdmin;
   setScheduleMode(isAdmin ? scheduleViewMode : 'dated', false);
+  document.getElementById('schedule-mode-switch').style.display = isAdmin ? 'flex' : 'none';
   document.getElementById('schedule-tools').style.display = isAdmin ? 'block' : 'none';
   document.getElementById('schedule-template-disable').style.display =
     isAdmin && weeklyTimetableEnabled ? 'inline-block' : 'none';
-  document.getElementById('admin-schedule-hint').style.display = isAdmin ? 'block' : 'none';
-  document.getElementById('admin-schedule-wrap').style.display = isAdmin ? 'block' : 'none';
-  document.getElementById('worker-schedule-wrap').style.display = isAdmin ? 'none' : 'block';
+  document.getElementById('admin-schedule-hint').textContent =
+    t(isAdmin ? 'schedule.adminHint' : 'schedule.viewerHint');
+  document.getElementById('admin-schedule-hint').style.display = 'block';
+  document.getElementById('admin-schedule-wrap').style.display = 'block';
+  document.getElementById('worker-schedule-wrap').style.display = 'none';
   document.getElementById('my-schedule-empty').style.display = 'none';
-  document.getElementById('my-week-totals').style.display = isAdmin ? 'none' : 'block';
-  if (isAdmin) loadAdminSchedule();
-  else loadMySchedule();
+  document.getElementById('my-week-totals').style.display = 'none';
+  loadAdminSchedule();
 }
 
 // ---------- Worker week ----------
@@ -177,7 +190,7 @@ function renderMonthProgress(summary, label) {
     <div class="month-progress">
       <div class="mp-label">${labelTxt}<strong>${earned.toFixed(1)}</strong> / ${target.toFixed(1)} ${t('mp.credited')} ·
         ${t('mp.sessionsDone', { done: summary.completed_sessions || 0, total: summary.total_sessions || 0 })}</div>
-      <div class="summary-cell-sub">${t('summary.estimated')}: ${estimated.toFixed(1)} ${t('unit.pts')}</div>
+      <div class="summary-cell-sub" title="${escapeHtml(t('summary.estimatedHelp'))}">${t('summary.estimated')}: ${estimated.toFixed(1)} ${t('unit.pts')}</div>
       ${progressBar(pct)}
       ${footer}
     </div>`;
@@ -439,7 +452,7 @@ async function loadAdminMonth() {
   }
   wrap.innerHTML = `<table class="month-table">
     <thead><tr>
-      <th>${t('grid.employee')}</th><th>${t('sth.program')}</th><th>${t('totals.completed')}</th><th>${t('totals.earned')}</th><th>${t('summary.estimated')}</th>
+      <th>${t('grid.employee')}</th><th>${t('sth.program')}</th><th>${t('totals.completed')}</th><th>${t('totals.earned')}</th><th title="${escapeHtml(t('summary.estimatedHelp'))}">${t('summary.estimated')}</th>
       <th>${t('mp.target')}</th><th>${t('th.progress')}</th><th>${t('mp.excessShort', { p: '' })}</th>
     </tr></thead>
     <tbody>${rows.map(r => {

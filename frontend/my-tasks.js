@@ -120,9 +120,12 @@ async function load() {
 
   await loadMyTasks();
 
+  document.getElementById('nav-plan').style.display = 'inline-block';
+  document.getElementById('nav-monthly').style.display = 'inline-block';
+  document.getElementById('nav-history').style.display = 'inline-block';
   if (user.isAdmin) {
-    document.getElementById('nav-plan').style.display = 'inline-block';
-    document.getElementById('nav-monthly').style.display = 'inline-block';
+    document.getElementById('nav-staff').style.display = 'inline-block';
+    document.getElementById('manage-tasks-btn').style.display = 'inline-block';
   }
 }
 
