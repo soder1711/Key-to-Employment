@@ -712,7 +712,7 @@ export async function handleAdminAssignSession(env, session, body) {
     ? `${created.first_name} ${created.last_name}`
     : 'no person yet';
   await logScheduleHistory(
-    env.DB, session.email, 'add', 'session', sessionId,
+    env.DB, session.email, 'create', 'session', sessionId,
     `Added "${created?.program_name ?? parsedProgramId}" on ${sessionDate}` +
     ` (${startTime || '—'}–${endTime || '—'}) for ${pts} points` +
     `${isSudden ? ' [sudden]' : ''} — ${who}` +
@@ -838,7 +838,7 @@ export async function handleAdminCloneSession(env, session, body) {
     const created = await getSessionById(env.DB, result.meta.last_row_id);
     cloned.push(created);
     await logScheduleHistory(
-      env.DB, session.email, 'add', 'session', created.session_id,
+      env.DB, session.email, 'create', 'session', created.session_id,
       `Cloned "${created.program_name}" from ${source.session_date} to ${date}`
     );
   }
@@ -1116,7 +1116,7 @@ export async function handleAdminDeleteSession(env, session, body) {
 
   await deleteSession(env.DB, sessionId);
   await logScheduleHistory(
-    env.DB, session.email, 'remove', 'session', sessionId,
+    env.DB, session.email, 'delete', 'session', sessionId,
     `Deleted "${before.program_name}" ${before.session_date} ` +
     `(${before.first_name} ${before.last_name}, was ${before.status})`
   );
