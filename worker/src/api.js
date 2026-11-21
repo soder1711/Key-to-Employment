@@ -190,6 +190,10 @@ export async function handleAdminCreateProgram(env, session, body) {
     code, name, category, defaultPoints, defaultStart, defaultEnd,
   });
   const program = await getProgramById(env.DB, result.meta.last_row_id);
+  await logScheduleHistory(
+    env.DB, session.email, 'create', 'programme', result.meta.last_row_id,
+    `Created programme "${name}" (${code})`
+  );
   return Response.json({ program }, { status: 201 });
 }
 
@@ -216,15 +220,24 @@ export async function handleAdminDeleteProgram(env, session, body) {
   if (!Number.isSafeInteger(programId) || programId < 1) {
     return new Response('Invalid task type identifier', { status: 400 });
   }
-  if (!await getProgramById(env.DB, programId)) {
+  const program = await getProgramById(env.DB, programId);
+  if (!program) {
     return new Response('Task type not found', { status: 404 });
   }
 
-  if (await countProgramReferences(env.DB, programId)) {
+  const hasReferences = await countProgramReferences(env.DB, programId);
+  if (hasReferences) {
     await deactivateProgram(env.DB, programId);
   } else {
     await hardDeleteProgram(env.DB, programId);
   }
+  await logScheduleHistory(
+    env.DB, session.email, 'delete', 'programme', programId,
+    `Deleted programme "${program.name}" (${program.code}); ` +
+    (hasReferences
+      ? 'hidden; existing schedule records retained'
+      : 'removed; no schedule records referenced it')
+  );
   return Response.json({ success: true });
 }
 

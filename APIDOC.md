@@ -205,7 +205,7 @@ GET /api/schedule/history?limit=50
 GET /api/schedule/history?before=42&limit=50
 ```
 
-Returns `{ "entries": [ ... ], "hasMore": true }` in newest-first order. `limit` defaults to 50 and must be from 1 to 100. `before` is an optional history ID cursor for loading older entries. All authenticated staff can read the append-only audit history.
+Returns `{ "entries": [ ... ], "hasMore": true }` in newest-first order. `limit` defaults to 50 and must be from 1 to 100. `before` is an optional history ID cursor for loading older entries. All authenticated staff can read the append-only audit history, including schedule, staff, and programme creation/deletion changes.
 
 ### Manage the staff directory
 

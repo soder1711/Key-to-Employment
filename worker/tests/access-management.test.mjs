@@ -5,6 +5,8 @@ import {
   handleAdminMonthlySummary,
   handleAdminCreateEmployee,
   handleAdminDeactivateEmployee,
+  handleAdminCreateProgram,
+  handleAdminDeleteProgram,
   handleGetScheduleHistory,
   handleUpdateProgress,
 } from '../src/api.js';
@@ -267,6 +269,78 @@ test('deactivation only flips active status and preserves staff history', async 
   assert.match(update.sql, /is_admin = 0 AND is_active = 1/);
   assert.ok(statements.some(item => item.sql.includes('INSERT INTO schedule_history')));
   assert.ok(statements.every(item => !item.sql.startsWith('DELETE FROM employees')));
+});
+
+function makeProgramTestEnv(referenceCount = 0) {
+  const statements = [];
+  const program = {
+    program_id: 42, code: 'NEWS', name: 'Morning news',
+    category: 'news', default_points: 1, default_start: null,
+    default_end: null, is_active: 1,
+  };
+  const env = {
+    DB: {
+      prepare(sql) {
+        return {
+          bind(...values) {
+            statements.push({ sql, values });
+            if (sql.includes('SELECT program_id FROM programs WHERE code = ?')) {
+              return { first: async () => null };
+            }
+            if (sql.trimStart().startsWith('SELECT') &&
+                sql.includes('FROM programs WHERE program_id = ?')) {
+              return { first: async () => program };
+            }
+            if (sql.includes('COUNT(*)')) {
+              return { first: async () => ({ n: referenceCount }) };
+            }
+            return { run: async () => ({ meta: { last_row_id: 42, changes: 1 } }) };
+          },
+        };
+      },
+    },
+  };
+  return { env, statements };
+}
+
+test('programme creation is recorded in schedule history', async () => {
+  const { env, statements } = makeProgramTestEnv();
+  const response = await handleAdminCreateProgram(
+    env, { isAdmin: true, email: 'admin@example.com' },
+    { code: 'NEWS', name: 'Morning news', category: 'news' },
+  );
+  assert.equal(response.status, 201);
+  const history = statements.find(item => item.sql.includes('INSERT INTO schedule_history'));
+  assert.deepEqual(history.values, [
+    'admin@example.com', 'create', 'programme', 42,
+    'Created programme "Morning news" (NEWS)',
+  ]);
+});
+
+test('programme deletions are recorded whether hidden or permanently removed', async () => {
+  for (const { referenceCount, mutation, details } of [
+    {
+      referenceCount: 2,
+      mutation: 'UPDATE programs SET is_active = 0',
+      details: 'Deleted programme "Morning news" (NEWS); hidden; existing schedule records retained',
+    },
+    {
+      referenceCount: 0,
+      mutation: 'DELETE FROM programs',
+      details: 'Deleted programme "Morning news" (NEWS); removed; no schedule records referenced it',
+    },
+  ]) {
+    const { env, statements } = makeProgramTestEnv(referenceCount);
+    const response = await handleAdminDeleteProgram(
+      env, { isAdmin: true, email: 'admin@example.com' }, { programId: 42 },
+    );
+    assert.equal(response.status, 200);
+    assert.ok(statements.some(item => item.sql.includes(mutation)));
+    const history = statements.find(item => item.sql.includes('INSERT INTO schedule_history'));
+    assert.deepEqual(history.values, [
+      'admin@example.com', 'delete', 'programme', 42, details,
+    ]);
+  }
 });
 
 test('history endpoint validates pagination and uses a descending cursor', async () => {
