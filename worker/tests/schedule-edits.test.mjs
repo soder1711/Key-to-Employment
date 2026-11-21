@@ -4,6 +4,7 @@ import {
   handleAdminAssignSession,
   handleAdminCloneSession,
   handleAdminCopyScheduleWeek,
+  handleAdminDeleteSession,
   handleAdminSetWeeklyTimetable,
   handleAdminUpdateSession,
 } from '../src/api.js';
@@ -78,6 +79,14 @@ function mockDb(initialSessions = [makeSession()]) {
               return { meta: { changes: 1 } };
             } };
           }
+          if (sql.includes('DELETE FROM schedule_sessions')) {
+            return { run: async () => {
+              const index = sessions.findIndex(row => row.session_id === values[0]);
+              if (index === -1) return { meta: { changes: 0 } };
+              sessions.splice(index, 1);
+              return { meta: { changes: 1 } };
+            } };
+          }
           if (sql.includes('INSERT INTO schedule_history')) {
             return { run: async () => { history.push(values); return { success: true }; } };
           }
@@ -95,6 +104,17 @@ function mockDb(initialSessions = [makeSession()]) {
   };
   return { db, sessions, history };
 }
+
+test('adding a session records an add action in schedule history', async () => {
+  const { db, history } = mockDb([]);
+  const response = await handleAdminAssignSession({ DB: db }, admin, {
+    programId: 1, date: '2026-10-19', startTime: '09:00', endTime: '10:00', points: 2,
+  });
+
+  assert.equal(response.status, 200);
+  assert.equal(history[0][1], 'add');
+  assert.equal(history[0][2], 'session');
+});
 
 test('admin edits one session without changing its assignee or status', async () => {
   const { db, sessions, history } = mockDb();
@@ -189,7 +209,7 @@ test('session edit rejects invalid calendar dates', async () => {
 });
 
 test('weekday clone keeps task settings and assignee but starts scheduled', async () => {
-  const { db, sessions } = mockDb();
+  const { db, sessions, history } = mockDb();
   const response = await handleAdminCloneSession(
     { DB: db }, admin, { sessionId: 1, dates: ['2026-10-21', '2026-10-23'] },
   );
@@ -200,6 +220,17 @@ test('weekday clone keeps task settings and assignee but starts scheduled', asyn
   assert.deepEqual(sessions.slice(1).map(row => row.session_date), ['2026-10-21', '2026-10-23']);
   assert.ok(sessions.slice(1).every(row => row.employee_id == null && row.employee_ids.includes(7) && row.points === 2 &&
     row.notes === 'original' && row.status === 'scheduled'));
+  assert.ok(history.every(entry => entry[1] === 'add' && entry[2] === 'session'));
+});
+
+test('deleting a session records a remove action in schedule history', async () => {
+  const { db, sessions, history } = mockDb();
+  const response = await handleAdminDeleteSession({ DB: db }, admin, { sessionId: 1 });
+
+  assert.equal(response.status, 200);
+  assert.equal(sessions.length, 0);
+  assert.equal(history[0][1], 'remove');
+  assert.equal(history[0][2], 'session');
 });
 
 test('weekday clone rejects dates outside the source week', async () => {
