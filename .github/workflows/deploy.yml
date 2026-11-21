@@ -30,7 +30,11 @@ jobs:
 
       - uses: actions/upload-pages-artifact@v3
         with:
+          # Keep artifacts from earlier attempts of this run from matching deployment.
+          name: github-pages-${{ github.run_id }}-${{ github.run_attempt }}
           path: ./frontend
 
       - id: deployment
         uses: actions/deploy-pages@v4
+        with:
+          artifact_name: github-pages-${{ github.run_id }}-${{ github.run_attempt }}
