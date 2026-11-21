@@ -13,7 +13,7 @@ import {
   setOccurrenceAssignment, getAllPrograms, getProgramById, getProgramByCode,
   createProgram, deactivateProgram, hardDeleteProgram, countProgramReferences,
   getEmployeeDirectory, findEmployeeByCodeOrEmail, createEmployee,
-  getManagedEmployee, deactivateEmployee, getScheduleHistory,
+  getManagedEmployee, deactivateEmployee, reactivateEmployee, getScheduleHistory,
 } from './db.js';
 import { monthlyDateRange } from './monthly-summary.js';
 import { vietnamDateISO, vietnamDateParts } from './date.js';
@@ -1136,6 +1136,36 @@ export async function handleAdminDeactivateEmployee(env, session, body) {
   await logScheduleHistory(
     env.DB, session.email, 'deactivate', 'employee', employeeId,
     `Deactivated ${employee.first_name} ${employee.last_name} (${employee.employee_code}); work records retained`
+  );
+  return Response.json({ success: true });
+}
+
+export async function handleAdminReactivateEmployee(env, session, body) {
+  const denied = requireAdmin(session);
+  if (denied) return denied;
+  const employeeId = Number(body?.employeeId);
+  if (!Number.isSafeInteger(employeeId) || employeeId < 1) {
+    return new Response('Invalid employee identifier', { status: 400 });
+  }
+  const employee = await getManagedEmployee(env.DB, employeeId);
+  if (!employee) return new Response('Employee not found', { status: 404 });
+  if (employee.is_admin === 1) {
+    return new Response('Administrator accounts cannot be reactivated through this endpoint', { status: 409 });
+  }
+  if (employee.is_active) return new Response('Employee is already active', { status: 409 });
+
+  const result = await reactivateEmployee(env.DB, employeeId);
+  if (result.meta.changes === 0) {
+    const current = await getManagedEmployee(env.DB, employeeId);
+    if (!current) return new Response('Employee not found', { status: 404 });
+    if (current.is_admin === 1) {
+      return new Response('Administrator accounts cannot be reactivated through this endpoint', { status: 409 });
+    }
+    return new Response('Employee is already active', { status: 409 });
+  }
+  await logScheduleHistory(
+    env.DB, session.email, 'reactivate', 'employee', employeeId,
+    `Reactivated ${employee.first_name} ${employee.last_name} (${employee.employee_code})`
   );
   return Response.json({ success: true });
 }

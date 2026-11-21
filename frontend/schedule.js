@@ -3,7 +3,6 @@
 let scheduleWeekStart = null;
 let scheduleLoaded = false;
 let weeklyTimetableEnabled = false;
-let schedMode = 'week';
 let monthCursor = (() => {
   const [year, month] = todayISO().split('-').map(Number);
   return { year, month };
@@ -111,66 +110,7 @@ function loadSchedule() {
     t(isAdmin ? 'schedule.adminHint' : 'schedule.viewerHint');
   document.getElementById('admin-schedule-hint').style.display = 'block';
   document.getElementById('admin-schedule-wrap').style.display = 'block';
-  document.getElementById('worker-schedule-wrap').style.display = 'none';
-  document.getElementById('my-schedule-empty').style.display = 'none';
-  document.getElementById('my-week-totals').style.display = 'none';
   loadAdminSchedule();
-}
-
-// ---------- Worker week ----------
-
-async function loadMySchedule() {
-  const tbody = document.getElementById('my-schedule-body');
-  const empty = document.getElementById('my-schedule-empty');
-  const error = document.getElementById('schedule-error');
-  const totals = document.getElementById('my-week-totals');
-
-  try {
-    const res = await api(`/api/schedule?start=${scheduleWeekStart}`);
-    if (!res.ok) throw new Error(`Request failed (${res.status})`);
-    const data = await res.json();
-    scheduleWeekStart = data.weekStart;
-    document.getElementById('schedule-week-label').textContent =
-      `${fmtShort(data.dates[0])} – ${fmtShort(data.dates[6])}`;
-    error.style.display = 'none';
-
-    const visible = data.sessions.filter(s => s.status !== 'cancelled');
-    if (!data.sessions.length) {
-      tbody.innerHTML = '';
-      empty.style.display = 'block';
-    } else {
-      empty.style.display = 'none';
-      tbody.innerHTML = data.sessions.map(s => `
-        <tr${s.status === 'cancelled' ? ' class="cancelled-row"' : ''}>
-          <td data-label="${escapeHtml(t('sth.date'))}">${fmtCellDate(s.session_date)}</td>
-          <td data-label="${escapeHtml(t('sth.program'))}">${escapeHtml(s.program_name)}${scheduleBadge(s)}${s.is_sudden ? ` <span class="mini-tag sudden">${escapeHtml(t('tag.sudden'))}</span>` : ''}</td>
-          <td data-label="${escapeHtml(t('sth.category'))}"><span class="cat-tag ${escapeHtml(s.category)}">${escapeHtml(s.category)}</span></td>
-          <td data-label="${escapeHtml(t('sth.time'))}">${s.start_time ? fmtTime(s.start_time) : '—'}${s.end_time ? '–' + fmtTime(s.end_time) : ''}</td>
-          <td class="pts" data-label="${escapeHtml(t('sth.points'))}">${Number(s.points).toFixed(1)}</td>
-          <td data-label="${escapeHtml(t('sth.status'))}">${statusPill(s.status)}</td>
-        </tr>`).join('');
-    }
-
-    const done = data.sessions.filter(s => s.status === 'completed');
-    const earned = done.reduce((a, s) => a + Number(s.points), 0);
-    const planned = visible.reduce((a, s) => a + Number(s.points), 0);
-
-    totals.innerHTML = `
-      <div class="totals-row">
-        <span>${t('totals.sessions')} <strong>${visible.length}</strong></span>
-        <span>${t('totals.completed')} <strong>${done.length}</strong></span>
-        <span>${t('totals.earned')} <strong>${earned.toFixed(1)}</strong></span>
-        <span>${t('totals.potential')} <strong>${planned.toFixed(1)}</strong></span>
-      </div>
-      ${renderMonthProgress(data.summary,
-        data.summaryMonth ? monthName(data.summaryMonth.month - 1) : '')}`;
-  } catch (err) {
-    tbody.innerHTML = '';
-    empty.style.display = 'none';
-    totals.innerHTML = '';
-    error.textContent = t('schedule.loadError', { msg: err.message });
-    error.style.display = 'block';
-  }
 }
 
 function renderMonthProgress(summary, label) {
@@ -429,68 +369,5 @@ function openDetailsFromElement(element) {
   const date = element.dataset.recurrenceDate || element.dataset.occurrenceDate;
   if (seriesId && date) openDetailsModal(null, seriesId, date);
   else openDetailsModal(Number(element.dataset.sessionId));
-}
-
-// ---------- Month view ----------
-
-async function loadMonthView() {
-  if (currentUser?.isAdmin) await loadAdminMonth();
-  else await loadWorkerMonth();
-}
-
-async function loadAdminMonth() {
-  const { year, month } = monthCursor;
-  document.getElementById('month-label').textContent = `${monthName(month - 1)} ${year}`;
-  const res = await api(`/api/admin/schedule/monthly?year=${year}&month=${month}`);
-  if (!res.ok) return;
-  const { rows } = await res.json();
-  const wrap = document.getElementById('month-summary-wrap');
-
-  if (!rows.length) {
-    wrap.innerHTML = `<div class="empty">${t('plan.emptyPeople')}</div>`;
-    return;
-  }
-  wrap.innerHTML = `<table class="month-table">
-    <thead><tr>
-      <th>${t('grid.employee')}</th><th>${t('sth.program')}</th><th>${t('totals.completed')}</th><th>${t('totals.earned')}</th><th title="${escapeHtml(t('summary.estimatedHelp'))}">${t('summary.estimated')}</th>
-      <th>${t('mp.target')}</th><th>${t('th.progress')}</th><th>${t('mp.excessShort', { p: '' })}</th>
-    </tr></thead>
-    <tbody>${rows.map(r => {
-      const earned = Number(r.completed_points);
-      const target = Number(r.target_points);
-      const pct = target > 0 ? Math.min(100, (earned / target) * 100) : 0;
-      const excess = target > 0 ? Math.max(0, earned - target) : 0;
-      return `<tr>
-        <td>${escapeHtml(r.first_name)} ${escapeHtml(r.last_name)}</td>
-        <td>${r.scheduled_sessions}</td>
-        <td>${r.completed_sessions}</td>
-        <td class="pts">${earned.toFixed(1)}</td>
-        <td>${Number(r.estimated_points || 0).toFixed(1)}</td>
-        <td><input type="number" min="0" step="1" class="target-input"
-                   data-employee-id="${r.employee_id}" value="${target}"></td>
-        <td style="min-width:150px">${progressBar(pct)}</td>
-        <td>${excess > 0 ? '+' + excess.toFixed(1) : '—'}</td>
-      </tr>`;
-    }).join('')}</tbody></table>`;
-}
-
-async function loadWorkerMonth() {
-  const { year, month } = monthCursor;
-  document.getElementById('month-label').textContent = `${monthName(month - 1)} ${year}`;
-  const probe = mondayOf(`${year}-${pad2(month)}-01`);
-  const res = await api(`/api/schedule?start=${probe}&year=${year}&month=${month}`);
-  if (!res.ok) return;
-  const data = await res.json();
-  document.getElementById('month-summary-wrap').innerHTML =
-    data.summary ? renderMonthProgress(data.summary, '') : '';
-}
-
-function shiftMonth(delta) {
-  let m = monthCursor.month + delta;
-  let y = monthCursor.year;
-  if (m < 1) { m = 12; y--; }
-  if (m > 12) { m = 1; y++; }
-  monthCursor = { year: y, month: m };
-  loadMonthView();
 }
 

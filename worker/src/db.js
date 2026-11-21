@@ -59,6 +59,14 @@ export async function deactivateEmployee(db, employeeId) {
   `).bind(employeeId).run();
 }
 
+export async function reactivateEmployee(db, employeeId) {
+  return await db.prepare(`
+    UPDATE employees
+    SET is_active = 1
+    WHERE employee_id = ? AND is_admin = 0 AND is_active = 0
+  `).bind(employeeId).run();
+}
+
 export async function getScheduleHistory(db, beforeId, limit, afterId = null) {
   const query = afterId !== null
     ? `SELECT history_id, acted_at, actor_email, action, entity, entity_id, details

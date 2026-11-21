@@ -66,6 +66,10 @@
           <h2 data-i18n="tasks.title">My week</h2>
           <span id="my-tasks-week" class="week-label"></span>
         </div>
+        <div id="my-month-progress-wrap" class="week-totals" style="display:none;">
+          <h3 data-i18n="tasks.monthlyProgress">My monthly progress</h3>
+          <div id="my-month-progress"></div>
+        </div>
         <div class="table-scroll">
           <table class="data-table">
             <thead><tr>
@@ -115,21 +119,6 @@
         <div id="admin-schedule-wrap" class="grid-scroll" style="display:none;">
           <table class="sched-grid" id="admin-schedule-grid"></table>
         </div>
-        <div id="worker-schedule-wrap" class="table-scroll">
-          <table class="sched-table">
-            <thead><tr>
-              <th data-i18n="sth.date">Date</th>
-              <th data-i18n="sth.program">Programme</th>
-              <th data-i18n="sth.category">Category</th>
-              <th data-i18n="sth.time">Time</th>
-              <th data-i18n="sth.points">Points</th>
-              <th data-i18n="sth.status">Status</th>
-            </tr></thead>
-            <tbody id="my-schedule-body"></tbody>
-          </table>
-        </div>
-        <div id="my-schedule-empty" class="empty" style="display:none;" data-i18n="schedule.empty">No sessions scheduled for you this week.</div>
-        <div id="my-week-totals" class="week-totals" style="display:none;"></div>
         </div>
         <div id="timetable-editor" style="display:none;">
           <p class="hint" data-i18n="schedule.timetableHint">Recurring programme sessions have no default assignee. Edit them in the Planning board.</p>

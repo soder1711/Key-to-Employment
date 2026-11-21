@@ -216,6 +216,7 @@ The following endpoints are administrator-only:
 GET /api/admin/employees
 POST /api/admin/employees
 POST /api/admin/employees/deactivate
+POST /api/admin/employees/reactivate
 ```
 
 Create a staff account with a unique `employeeCode`, first and last name, and work `email`:
@@ -229,7 +230,7 @@ Create a staff account with a unique `employeeCode`, first and last name, and wo
 }
 ```
 
-New records are active non-admin staff and can sign in after creation. Deactivate a staff member with `{ "employeeId": 42 }`. Administrators cannot be deactivated. Deactivation changes `is_active` only; employee rows and existing schedule/work records are retained. Creation and deactivation are recorded in schedule history.
+New records are active non-admin staff and can sign in after creation. Deactivate or reactivate a non-admin staff member with `{ "employeeId": 42 }` on the corresponding endpoint. Administrators cannot be deactivated or reactivated through these endpoints. Deactivation changes `is_active` only; employee rows and existing schedule/work records are retained. Creation, deactivation, and reactivation are recorded in schedule history.
 
 ### List recurring timetable entries
 

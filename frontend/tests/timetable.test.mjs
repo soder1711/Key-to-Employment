@@ -16,6 +16,7 @@ function fixture() {
     classes = new Set();
     classList = {
       toggle: (name, enabled) => enabled ? this.classes.add(name) : this.classes.delete(name),
+      contains: name => this.classes.has(name),
     };
     setAttribute(name, value) { this.attributes.set(name, value); }
     focus() { this.focused = true; }
@@ -63,6 +64,35 @@ test('successful writes refresh the loaded history without refreshing the page',
 
   await run("api('/api/me')");
   assert.deepEqual(refreshes, [true]);
+});
+
+test('viewer My week shows personal monthly progress', async () => {
+  const { elements, context, run } = fixture();
+  const myTasks = readFileSync(new URL('../my-tasks.js', import.meta.url), 'utf8')
+    .split('// ================= Sign-in / bootstrap =================')[0];
+  vm.runInContext(myTasks, context, { filename: 'my-tasks.js' });
+  context.api = async path => path === '/api/me/tasks'
+    ? { ok: true, json: async () => ({ tasks: [] }) }
+    : {
+        ok: true,
+        json: async () => ({
+          weekStart: '2026-07-13',
+          dates: ['2026-07-13', '2026-07-14', '2026-07-15', '2026-07-16',
+            '2026-07-17', '2026-07-18', '2026-07-19'],
+          sessions: [],
+          summary: {
+            completed_points: 5, estimated_points: 10, target_points: 20,
+            completed_sessions: 1, total_sessions: 2,
+          },
+          summaryMonth: { year: 2026, month: 7 },
+        }),
+      };
+  run('currentUser = { isAdmin: false }');
+
+  await run('loadMyTasks()');
+
+  assert.equal(elements.get('my-month-progress-wrap').style.display, 'block');
+  assert.match(elements.get('my-month-progress').innerHTML, /5\.0<\/strong> \/ 20\.0/);
 });
 
 test('admin Schedule and Plan open their distinct default assignment views', () => {

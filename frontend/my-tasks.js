@@ -19,6 +19,8 @@ async function loadMyTasks() {
   ]);
   const taskError = document.getElementById('project-tasks-error');
   const planError = document.getElementById('planned-tasks-error');
+  const monthProgressWrap = document.getElementById('my-month-progress-wrap');
+  const monthProgress = document.getElementById('my-month-progress');
 
   let tasks = [];
   if (tasksResult.ok) {
@@ -36,8 +38,17 @@ async function loadMyTasks() {
     planWeekStart = data.weekStart;
     document.getElementById('my-tasks-week').textContent =
       `${fmtShort(data.dates[0])} – ${fmtShort(data.dates[6])}`;
+    monthProgress.innerHTML = data.summary
+      ? renderMonthProgress(
+          data.summary,
+          data.summaryMonth ? monthName(data.summaryMonth.month - 1) : '',
+        )
+      : '';
+    monthProgressWrap.style.display = data.summary ? 'block' : 'none';
     planError.style.display = 'none';
   } else {
+    monthProgress.innerHTML = '';
+    monthProgressWrap.style.display = 'none';
     planError.textContent = t('tasks.planError', { status: planResult.status });
     planError.style.display = 'block';
   }

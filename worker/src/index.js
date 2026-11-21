@@ -12,6 +12,7 @@ import {
   handleAdminSetWeeklyTimetable, handleAdminGetTimetable, handleAdminRecurringTimetable,
   handleAdminListPrograms, handleAdminCreateProgram, handleAdminDeleteProgram,
   handleAdminListEmployees, handleAdminCreateEmployee, handleAdminDeactivateEmployee,
+  handleAdminReactivateEmployee,
   handleGetScheduleHistory,
 } from './api.js';
 
@@ -170,6 +171,10 @@ export default {
       else if (url.pathname === '/api/admin/employees/deactivate' && request.method === 'POST') {
         const body = await request.json();
         response = await handleAdminDeactivateEmployee(env, currentSession, body);
+      }
+      else if (url.pathname === '/api/admin/employees/reactivate' && request.method === 'POST') {
+        const body = await request.json();
+        response = await handleAdminReactivateEmployee(env, currentSession, body);
       }
 
       // ---- Schedule endpoints ----

@@ -7,6 +7,7 @@ import {
   handleAdminDeactivateEmployee,
   handleAdminCreateProgram,
   handleAdminDeleteProgram,
+  handleAdminReactivateEmployee,
   handleGetScheduleHistory,
   handleUpdateProgress,
 } from '../src/api.js';
@@ -269,6 +270,71 @@ test('deactivation only flips active status and preserves staff history', async 
   assert.match(update.sql, /is_admin = 0 AND is_active = 1/);
   assert.ok(statements.some(item => item.sql.includes('INSERT INTO schedule_history')));
   assert.ok(statements.every(item => !item.sql.startsWith('DELETE FROM employees')));
+});
+
+test('reactivation only activates inactive non-admin staff and logs the change', async () => {
+  const statements = [];
+  const employee = {
+    employee_id: 8, employee_code: 'STAFF-8', first_name: 'Lan',
+    last_name: 'Tran', email: 'lan@example.com', is_active: 0, is_admin: 0,
+  };
+  const env = {
+    DB: {
+      prepare(sql) {
+        return {
+          bind(...values) {
+            statements.push({ sql, values });
+            if (sql.includes('SELECT employee_id, employee_code') &&
+                sql.includes('FROM employees')) {
+              return { first: async () => employee };
+            }
+            return { run: async () => ({ meta: { changes: 1 } }) };
+          },
+        };
+      },
+    },
+  };
+  const response = await handleAdminReactivateEmployee(
+    env, { isAdmin: true, email: 'admin@example.com' }, { employeeId: 8 },
+  );
+  assert.equal(response.status, 200);
+  const update = statements.find(item => item.sql.trimStart().startsWith('UPDATE employees'));
+  assert.match(update.sql, /SET is_active = 1/);
+  assert.match(update.sql, /is_admin = 0 AND is_active = 0/);
+  const history = statements.find(item => item.sql.includes('INSERT INTO schedule_history'));
+  assert.deepEqual(history.values, [
+    'admin@example.com', 'reactivate', 'employee', 8,
+    'Reactivated Lan Tran (STAFF-8)',
+  ]);
+});
+
+test('reactivation endpoint cannot change administrator accounts', async () => {
+  let updateAttempted = false;
+  const env = {
+    DB: {
+      prepare(sql) {
+        return {
+          bind() {
+            if (sql.includes('SELECT employee_id, employee_code')) {
+              return {
+                first: async () => ({
+                  employee_id: 3, employee_code: 'ADMIN', first_name: 'Ada',
+                  last_name: 'Admin', email: 'admin@example.com', is_active: 0, is_admin: 1,
+                }),
+              };
+            }
+            updateAttempted = true;
+            return { run: async () => ({ meta: { changes: 1 } }) };
+          },
+        };
+      },
+    },
+  };
+  const response = await handleAdminReactivateEmployee(
+    env, { isAdmin: true, email: 'admin@example.com' }, { employeeId: 3 },
+  );
+  assert.equal(response.status, 409);
+  assert.equal(updateAttempted, false);
 });
 
 function makeProgramTestEnv(referenceCount = 0) {

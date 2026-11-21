@@ -142,9 +142,12 @@ async function loadStaffDirectory() {
       const name = `${employee.first_name} ${employee.last_name}`.trim();
       const active = Number(employee.is_active) === 1;
       const status = active ? t('staff.active') : t('staff.inactive');
-      const action = active && Number(employee.is_admin) !== 1
-        ? `<button class="btn danger small" type="button" data-deactivate-employee="${Number(employee.employee_id)}">${escapeHtml(t('staff.deactivate'))}</button>`
-        : '—';
+      const isAdmin = Number(employee.is_admin) === 1;
+      const action = isAdmin
+        ? '—'
+        : active
+          ? `<button class="btn danger small" type="button" data-deactivate-employee="${Number(employee.employee_id)}">${escapeHtml(t('staff.deactivate'))}</button>`
+          : `<button class="btn small" type="button" data-reactivate-employee="${Number(employee.employee_id)}">${escapeHtml(t('staff.reactivate'))}</button>`;
       return `<tr>
         <td data-label="${escapeHtml(t('staff.code'))}">${escapeHtml(employee.employee_code)}</td>
         <td data-label="${escapeHtml(t('summary.employee'))}">${escapeHtml(name)}${Number(employee.is_admin) === 1 ? ` (${escapeHtml(t('plan.adminTag'))})` : ''}</td>
@@ -734,27 +737,32 @@ document.getElementById('staff-add-form').addEventListener('submit', async event
 });
 
 document.getElementById('staff-entries').addEventListener('click', async event => {
-  const button = event.target.closest('[data-deactivate-employee]');
+  const button = event.target.closest('[data-deactivate-employee], [data-reactivate-employee]');
   if (!button || !currentUser?.isAdmin) return;
+  const deactivating = button.hasAttribute('data-deactivate-employee');
+  const action = deactivating ? 'deactivate' : 'reactivate';
+  const employeeId = Number(button.dataset.deactivateEmployee ?? button.dataset.reactivateEmployee);
   const name = button.closest('tr').children[1].textContent;
-  if (!await confirmAction(t('staff.confirmDeactivate', { name }))) return;
+  const confirmation = deactivating ? 'staff.confirmDeactivate' : 'staff.confirmReactivate';
+  if (!await confirmAction(t(confirmation, { name }))) return;
   const error = document.getElementById('staff-error');
   const status = document.getElementById('staff-status');
   error.style.display = 'none';
   status.style.display = 'none';
   button.disabled = true;
   try {
-    const response = await api('/api/admin/employees/deactivate', {
+    const response = await api(`/api/admin/employees/${action}`, {
       method: 'POST',
-      body: JSON.stringify({ employeeId: Number(button.dataset.deactivateEmployee) }),
+      body: JSON.stringify({ employeeId }),
     });
     if (!response.ok) throw new Error(String(response.status));
     await loadStaffDirectory();
-    status.textContent = t('staff.deactivated');
+    status.textContent = t(deactivating ? 'staff.deactivated' : 'staff.reactivated');
     status.className = 'summary-status summary-status-success';
     status.style.display = 'block';
   } catch (err) {
-    error.textContent = t('staff.deactivateError', { status: err.message || 'network error' });
+    const errorKey = deactivating ? 'staff.deactivateError' : 'staff.reactivateError';
+    error.textContent = t(errorKey, { status: err.message || 'network error' });
     error.style.display = 'block';
     button.disabled = false;
   }
