@@ -11,10 +11,11 @@ import {
   handleAdminUpdateSession, handleAdminCloneSession, handleAdminCopyScheduleWeek,
   handleAdminSetWeeklyTimetable, handleAdminGetTimetable, handleAdminRecurringTimetable,
   handleAdminListPrograms, handleAdminCreateProgram, handleAdminDeleteProgram,
-  handleAdminReactivateProgram,
+  handleAdminUpdateProgram, handleAdminReactivateProgram,
   handleAdminListEmployees, handleAdminCreateEmployee, handleAdminDeactivateEmployee,
   handleAdminReactivateEmployee,
   handleGetScheduleHistory,
+  handleAdminQuarterlySummary, handleAdminMonthlySessions,
 } from './api.js';
 
 // CORS: allow only your GitHub Pages origin
@@ -158,6 +159,10 @@ export default {
         const body = await request.json();
         response = await handleAdminCreateProgram(env, currentSession, body);
       }
+      else if (url.pathname === '/api/admin/programs/update' && request.method === 'POST') {
+        const body = await request.json();
+        response = await handleAdminUpdateProgram(env, currentSession, body);
+      }
       else if (url.pathname === '/api/admin/programs/delete' && request.method === 'POST') {
         const body = await request.json();
         response = await handleAdminDeleteProgram(env, currentSession, body);
@@ -236,6 +241,12 @@ export default {
       }
       else if (url.pathname === '/api/admin/schedule/monthly' && request.method === 'GET') {
         response = await handleAdminMonthlySummary(env, currentSession, url);
+      }
+      else if (url.pathname === '/api/admin/schedule/quarterly' && request.method === 'GET') {
+        response = await handleAdminQuarterlySummary(env, currentSession, url);
+      }
+      else if (url.pathname === '/api/admin/schedule/monthly/sessions' && request.method === 'GET') {
+        response = await handleAdminMonthlySessions(env, currentSession, url);
       }
       else if (url.pathname === '/api/admin/schedule/target' && request.method === 'POST') {
         const body = await request.json();

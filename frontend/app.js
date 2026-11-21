@@ -1,8 +1,7 @@
 // ================= Event wiring =================
 
-let historyBefore = null;
-let historyHasMore = false;
-let historyNewestId = 0;
+let historyPage = 1;
+let historyPageCount = 1;
 let historyRequestInFlight = false;
 const HISTORY_REFRESH_INTERVAL_MS = 10_000;
 
@@ -27,88 +26,66 @@ function renderHistoryEntry(entry) {
   </tr>`;
 }
 
-async function loadHistory(reset = false) {
+function historyFiltersAreEmpty() {
+  return ['history-staff-filter', 'history-record-filter', 'history-from-filter', 'history-to-filter']
+    .every(id => !document.getElementById(id).value.trim());
+}
+
+async function loadHistory(page = 1) {
   if (historyRequestInFlight) return;
   historyRequestInFlight = true;
   const tbody = document.getElementById('history-entries');
   const loading = document.getElementById('history-loading');
   const empty = document.getElementById('history-empty');
   const error = document.getElementById('history-error');
-  const older = document.getElementById('history-older');
-  if (reset) {
-    historyBefore = null;
-    historyHasMore = false;
-    historyNewestId = 0;
-    tbody.innerHTML = '';
-  }
-  loading.style.display = tbody.children.length ? 'none' : 'block';
+  const previous = document.getElementById('history-prev');
+  const next = document.getElementById('history-next');
+  tbody.innerHTML = '';
+  loading.style.display = 'block';
   empty.style.display = 'none';
   error.style.display = 'none';
-  older.disabled = true;
-  const query = historyBefore ? `?before=${historyBefore}` : '';
+  previous.disabled = true;
+  next.disabled = true;
+  const params = new URLSearchParams({
+    page: String(page),
+    limit: '50',
+    staff: document.getElementById('history-staff-filter').value.trim(),
+    record: document.getElementById('history-record-filter').value.trim(),
+    from: document.getElementById('history-from-filter').value,
+    to: document.getElementById('history-to-filter').value,
+  });
   try {
-    const response = await api(`/api/schedule/history${query}`, { cache: 'no-store' });
+    const response = await api(`/api/schedule/history?${params}`, { cache: 'no-store' });
     if (!response.ok) throw new Error(String(response.status));
-    const { entries, hasMore } = await response.json();
-    if (!Array.isArray(entries)) throw new Error('Invalid response');
+    const { entries, page: currentPage, pageCount } = await response.json();
+    if (!Array.isArray(entries) || !Number.isInteger(currentPage) ||
+        !Number.isInteger(pageCount) || pageCount < 1) throw new Error('Invalid response');
     tbody.insertAdjacentHTML('beforeend', entries.map(renderHistoryEntry).join(''));
-    if (entries.length) historyBefore = entries[entries.length - 1].history_id;
-    if (reset) historyNewestId = entries.length ? Number(entries[0].history_id) : 0;
-    historyHasMore = Boolean(hasMore);
+    historyPage = currentPage;
+    historyPageCount = pageCount;
+    document.getElementById('history-page').value = String(historyPage);
+    document.getElementById('history-page').max = String(historyPageCount);
+    document.getElementById('history-page-count').textContent =
+      t('history.pageOf', { count: historyPageCount });
     historyLoaded = true;
-    empty.style.display = tbody.children.length ? 'none' : 'block';
-    older.style.display = historyHasMore ? 'inline-block' : 'none';
+    empty.style.display = entries.length ? 'none' : 'block';
+    previous.disabled = historyPage <= 1;
+    next.disabled = historyPage >= historyPageCount;
   } catch (err) {
     error.textContent = t('history.loadError', { status: err.message || 'network error' });
     error.style.display = 'block';
-    older.style.display = 'none';
+    document.getElementById('history-page').value = String(historyPage);
+    previous.disabled = historyPage <= 1;
+    next.disabled = historyPage >= historyPageCount;
   } finally {
     loading.style.display = 'none';
-    older.disabled = false;
     historyRequestInFlight = false;
   }
 }
 
 async function refreshLatestHistory() {
-  if (!historyLoaded || historyRequestInFlight) return;
-  historyRequestInFlight = true;
-  const tbody = document.getElementById('history-entries');
-  const empty = document.getElementById('history-empty');
-  const error = document.getElementById('history-error');
-  try {
-    let after = historyNewestId;
-    let hasMore;
-    const newEntries = [];
-    do {
-      const response = await api(
-        `/api/schedule/history?after=${after}&limit=100`,
-        { cache: 'no-store' },
-      );
-      if (!response.ok) throw new Error(String(response.status));
-      const data = await response.json();
-      if (!Array.isArray(data.entries)) throw new Error('Invalid response');
-      if (!data.entries.length) break;
-      newEntries.push(...data.entries);
-      const lastId = Number(data.entries[data.entries.length - 1].history_id);
-      if (!Number.isSafeInteger(lastId) || lastId <= after) {
-        throw new Error('Invalid history cursor');
-      }
-      after = lastId;
-      hasMore = Boolean(data.hasMore);
-    } while (hasMore);
-
-    if (newEntries.length) {
-      historyNewestId = after;
-      tbody.insertAdjacentHTML('afterbegin', newEntries.reverse().map(renderHistoryEntry).join(''));
-      empty.style.display = 'none';
-    }
-    error.style.display = 'none';
-  } catch (err) {
-    error.textContent = t('history.loadError', { status: err.message || 'network error' });
-    error.style.display = 'block';
-  } finally {
-    historyRequestInFlight = false;
-  }
+  if (!historyLoaded || historyPage !== 1 || !historyFiltersAreEmpty()) return;
+  loadHistory(1);
 }
 
 function isHistoryViewVisible() {
@@ -120,6 +97,22 @@ setInterval(() => {
     refreshLatestHistory();
   }
 }, HISTORY_REFRESH_INTERVAL_MS);
+
+document.getElementById('history-filter-apply').addEventListener('click', () => loadHistory(1));
+document.getElementById('history-prev').addEventListener('click', () => {
+  if (historyPage > 1) loadHistory(historyPage - 1);
+});
+document.getElementById('history-next').addEventListener('click', () => {
+  if (historyPage < historyPageCount) loadHistory(historyPage + 1);
+});
+document.getElementById('history-page').addEventListener('change', event => {
+  const page = Number(event.target.value);
+  if (Number.isSafeInteger(page) && page >= 1 && page <= historyPageCount) loadHistory(page);
+  else event.target.value = String(historyPage);
+});
+document.getElementById('history-page').addEventListener('keydown', event => {
+  if (event.key === 'Enter') event.currentTarget.dispatchEvent(new Event('change'));
+});
 
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible' && isHistoryViewVisible()) {
@@ -202,11 +195,9 @@ document.getElementById('nav-tasks').addEventListener('click', () => switchView(
 document.getElementById('nav-schedule').addEventListener('click', () => switchView('schedule'));
 document.getElementById('nav-plan').addEventListener('click', () => switchView('plan'));
 document.getElementById('nav-monthly').addEventListener('click', () => switchView('monthly-summary'));
+document.getElementById('nav-quarterly').addEventListener('click', () => switchView('quarterly-report'));
 document.getElementById('nav-history').addEventListener('click', () => switchView('history'));
 document.getElementById('nav-staff').addEventListener('click', () => switchView('staff'));
-document.getElementById('history-older').addEventListener('click', () => {
-  if (historyHasMore) loadHistory();
-});
 document.getElementById('monthly-summary-prev').addEventListener('click', () => shiftSummaryMonth(-1));
 document.getElementById('monthly-summary-next').addEventListener('click', () => shiftSummaryMonth(1));
 document.getElementById('monthly-summary-current').addEventListener('click', () => {
@@ -218,6 +209,20 @@ document.getElementById('monthly-summary-current').addEventListener('click', () 
 document.getElementById('monthly-summary-wrap').addEventListener('click', async (event) => {
   const button = event.target.closest('button[data-goal-action]');
   if (button && !button.disabled) await saveMonthlyGoal(button);
+  const sessionLink = event.target.closest('[data-month-session]');
+  if (sessionLink) {
+    openMonthlySessions(
+      Number(sessionLink.dataset.employeeId),
+      Number(sessionLink.dataset.year),
+      Number(sessionLink.dataset.month),
+      sessionLink.dataset.employeeName,
+      [{
+        month: Number(sessionLink.dataset.month),
+        completed_points: Number(sessionLink.dataset.completedPoints),
+        completed_sessions: Number(sessionLink.dataset.completedSessions),
+      }],
+    );
+  }
 });
 
 document.getElementById('schedule-prev').addEventListener('click', () => {
@@ -655,10 +660,12 @@ document.getElementById('occurrence-notes-save').addEventListener('click', async
 // ---- Task types modal wiring (create / delete programs) ----
 document.getElementById('manage-tasks-btn').addEventListener('click', openProgramModal);
 document.getElementById('program-modal-close').addEventListener('click', closeProgramModal);
+document.getElementById('program-cancel-edit').addEventListener('click', cancelProgramEdit);
 programModal.addEventListener('click', (e) => { if (e.target === programModal) closeProgramModal(); });
 
 document.getElementById('program-submit').addEventListener('click', async (e) => {
   const btn = e.target;
+  const isEditing = editingProgramId !== null;
   const code = document.getElementById('program-code').value.trim();
   const name = document.getElementById('program-name').value.trim();
   const category = document.getElementById('program-category').value.trim() || 'general';
@@ -667,27 +674,27 @@ document.getElementById('program-submit').addEventListener('click', async (e) =>
   const defaultEnd = document.getElementById('program-end').value || null;
 
   document.getElementById('program-error').style.display = 'none';
-  if (!code || !name) { showProgramError(t('err.codeName')); return; }
-  if (!Number.isFinite(defaultPoints) || defaultPoints < 0) {
+  if ((!isEditing && !code) || !name) { showProgramError(t('err.codeName')); return; }
+  if (!Number.isFinite(defaultPoints) || defaultPoints < 0 || defaultPoints > 100 ||
+      (defaultStart && defaultEnd && defaultStart === defaultEnd)) {
     showProgramError(t('err.points'));
     return;
   }
 
   btn.disabled = true;
   try {
-    const res = await api('/api/admin/programs', {
+    const res = await api(isEditing ? '/api/admin/programs/update' : '/api/admin/programs', {
       method: 'POST',
-      body: JSON.stringify({ code, name, category, defaultPoints, defaultStart, defaultEnd }),
+      body: JSON.stringify({
+        ...(isEditing ? { programId: editingProgramId } : { code, category }),
+        name, defaultPoints, defaultStart, defaultEnd,
+      }),
     });
     if (!res.ok) {
       showProgramError(t('err.saveFailed') + (await res.text()));
     } else {
       const data = await res.json();
-      ['program-code', 'program-name', 'program-category'].forEach(
-        id => document.getElementById(id).value = '');
-      document.getElementById('program-points').value = 1;
-      document.getElementById('program-start').value = '';
-      document.getElementById('program-end').value = '';
+      cancelProgramEdit();
       // Refresh the picker too; selects the new task if the assign form is open
       await refreshAdminPrograms(data.program?.program_id);
       renderProgramList();
@@ -700,6 +707,11 @@ document.getElementById('program-submit').addEventListener('click', async (e) =>
 });
 
 document.getElementById('program-list').addEventListener('click', async (e) => {
+  const editButton = e.target.closest('.pm-edit');
+  if (editButton) {
+    beginProgramEdit(Number(editButton.dataset.programId));
+    return;
+  }
   const btn = e.target.closest('.pm-del, .pm-reactivate');
   if (!btn) return;
   const reactivating = btn.matches('.pm-reactivate');

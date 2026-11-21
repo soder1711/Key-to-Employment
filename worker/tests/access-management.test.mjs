@@ -139,7 +139,10 @@ test('active viewers can read workforce monthly reports and history', async () =
               }),
               all: async () => ({ results: [] }),
             }
-          : { all: async () => ({ results: [] }) },
+          : {
+              first: async () => ({ total: 0 }),
+              all: async () => ({ results: [] }),
+            },
       }),
     },
   };
@@ -427,9 +430,10 @@ test('programme reactivation restores it and its weekly timetable', async () => 
   ]);
 });
 
-test('history endpoint validates pagination and uses a descending cursor', async () => {
+test('history endpoint validates filters and preserves descending cursor pagination', async () => {
   let query;
   let bindings;
+  let total = 5;
   let historyRows = [{ history_id: 4 }, { history_id: 3 }];
   const env = {
     DB: {
@@ -438,7 +442,10 @@ test('history endpoint validates pagination and uses a descending cursor', async
         return {
           bind(...values) {
             bindings = values;
-            return { all: async () => ({ results: historyRows }) };
+            return {
+              first: async () => ({ total }),
+              all: async () => ({ results: historyRows }),
+            };
           },
         };
       },
@@ -449,25 +456,42 @@ test('history endpoint validates pagination and uses a descending cursor', async
   );
   assert.equal(response.status, 200);
   assert.deepEqual(bindings, [9, 2]);
-  assert.match(query, /history_id < \? ORDER BY history_id DESC LIMIT \?/);
-  assert.deepEqual(await response.json(), { entries: [{ history_id: 4 }], hasMore: true });
+  assert.match(query, /history_id < \?\s+ORDER BY history_id DESC LIMIT \?/);
+  assert.deepEqual(await response.json(), {
+    entries: [{ history_id: 4 }], hasMore: true, page: 1, pageCount: 5, total: 5,
+  });
 
   historyRows = [{ history_id: 4 }];
+  total = 1;
   const lastPage = await handleGetScheduleHistory(
     env, new URL('https://worker.example/api/schedule/history?limit=1'),
   );
-  assert.deepEqual(await lastPage.json(), { entries: [{ history_id: 4 }], hasMore: false });
+  assert.deepEqual(await lastPage.json(), {
+    entries: [{ history_id: 4 }], hasMore: false, page: 1, pageCount: 1, total: 1,
+  });
 
   historyRows = [{ history_id: 5 }, { history_id: 6 }];
+  total = 2;
   const newer = await handleGetScheduleHistory(
     env, new URL('https://worker.example/api/schedule/history?after=4&limit=2'),
   );
   assert.deepEqual(bindings, [4, 3]);
-  assert.match(query, /history_id > \? ORDER BY history_id ASC LIMIT \?/);
+  assert.match(query, /history_id > \?\s+ORDER BY history_id ASC LIMIT \?/);
   assert.deepEqual(await newer.json(), {
     entries: [{ history_id: 5 }, { history_id: 6 }],
-    hasMore: false,
+    hasMore: false, page: 1, pageCount: 1, total: 2,
   });
+
+  const filtered = await handleGetScheduleHistory(
+    env, new URL('https://worker.example/api/schedule/history?staff=admin%40example.com&record=session&from=2026-01-01&to=2026-01-31&page=2&limit=1'),
+  );
+  assert.match(query, /LOWER\(actor_email\) LIKE \?/);
+  assert.match(query, /LOWER\(entity\) LIKE \?/);
+  assert.match(query, /date\(datetime\(acted_at, '\+7 hours'\)\) >= \?/);
+  assert.deepEqual(bindings.slice(0, 5), [
+    '%admin@example.com%', '%session%', '%session%', '2026-01-01', '2026-01-31',
+  ]);
+  assert.equal((await filtered.json()).page, 2);
 
   const invalid = await handleGetScheduleHistory(
     env, new URL('https://worker.example/api/schedule/history?limit=101'),
@@ -477,4 +501,8 @@ test('history endpoint validates pagination and uses a descending cursor', async
     env, new URL('https://worker.example/api/schedule/history?before=9&after=4'),
   );
   assert.equal(conflictingCursors.status, 400);
+  const invalidRange = await handleGetScheduleHistory(
+    env, new URL('https://worker.example/api/schedule/history?from=2026-02-01&to=2026-01-01'),
+  );
+  assert.equal(invalidRange.status, 400);
 });

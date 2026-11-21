@@ -99,9 +99,21 @@ function renderMonthlySummary(rows) {
         `<span class="summary-cell-sub">${t('summary.tasksCount', { count })}</span></td>`;
     }).join('');
     return `<tr>
-      <td class="summary-person" data-label="${escapeHtml(t('summary.employee'))}">${escapeHtml(personName)}</td>
+      <td class="summary-person" data-label="${escapeHtml(t('summary.employee'))}">
+        <button class="summary-session-link" type="button" data-month-session
+          data-employee-id="${employeeId}" data-year="${monthCursor.year}" data-month="${monthCursor.month}"
+          data-completed-points="${summaryPoints(row.completed_points)}"
+          data-completed-sessions="${Math.max(0, Number(row.completed_sessions) || 0)}"
+          data-employee-name="${escapeHtml(personName)}">${escapeHtml(personName)}</button>
+      </td>
       ${periodCells}
-      <td class="pts" data-label="${escapeHtml(t('summary.points'))}">${summaryPoints(row.completed_points)} ${t('unit.pts')}</td>
+      <td class="pts" data-label="${escapeHtml(t('summary.points'))}">
+        <button class="summary-session-link" type="button" data-month-session
+          data-employee-id="${employeeId}" data-year="${monthCursor.year}" data-month="${monthCursor.month}"
+          data-completed-points="${summaryPoints(row.completed_points)}"
+          data-completed-sessions="${Math.max(0, Number(row.completed_sessions) || 0)}"
+          data-employee-name="${escapeHtml(personName)}">${summaryPoints(row.completed_points)} ${t('unit.pts')}</button>
+      </td>
       <td data-label="${escapeHtml(t('summary.estimated'))}" title="${escapeHtml(t('summary.estimatedHelp'))}">${summaryPoints(row.estimated_points)} ${t('unit.pts')}</td>
       <td data-label="${escapeHtml(t('summary.goal'))}">${goalEditor}</td>
       <td class="${varianceClass}" data-label="${escapeHtml(t('summary.variance'))}">${varianceText} ${targetSet ? t('unit.pts') : ''}</td>

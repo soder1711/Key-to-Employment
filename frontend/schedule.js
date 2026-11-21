@@ -33,6 +33,12 @@ function shiftISO(iso, days) {
 }
 
 function fmtTime(time) { return time ? String(time).slice(0, 5) : '—'; }
+function fmtTimeRange(start, end) {
+  const range = `${fmtTime(start)}${end ? `–${fmtTime(end)}` : ''}`;
+  return start && end && String(end).slice(0, 5) < String(start).slice(0, 5)
+    ? `${range} ${t('schedule.nextDay')}`
+    : range;
+}
 
 function fmtShort(iso) {
   const d = new Date(iso + 'T00:00:00Z');
@@ -59,6 +65,7 @@ function switchView(view) {
   const showSchedule = view === 'schedule';
   const showPlan = view === 'plan';
   const showMonthlySummary = view === 'monthly-summary';
+  const showQuarterlyReport = view === 'quarterly-report' && currentUser?.isAdmin;
   const showHistory = view === 'history';
   const showStaff = view === 'staff' && currentUser?.isAdmin;
 
@@ -66,6 +73,7 @@ function switchView(view) {
   document.getElementById('nav-schedule').classList.toggle('active', showSchedule);
   document.getElementById('nav-plan').classList.toggle('active', showPlan);
   document.getElementById('nav-monthly').classList.toggle('active', showMonthlySummary);
+  document.getElementById('nav-quarterly').classList.toggle('active', showQuarterlyReport);
   document.getElementById('nav-history').classList.toggle('active', showHistory);
   document.getElementById('nav-staff').classList.toggle('active', showStaff);
 
@@ -75,11 +83,13 @@ function switchView(view) {
     showPlan ? 'block' : 'none';
   document.getElementById('monthly-summary-section').style.display =
     showMonthlySummary ? 'block' : 'none';
+  document.getElementById('quarterly-report-section').style.display =
+    showQuarterlyReport ? 'block' : 'none';
   document.getElementById('history-section').style.display = showHistory ? 'block' : 'none';
   document.getElementById('staff-section').style.display = showStaff ? 'block' : 'none';
   const container = document.querySelector('.container');
   container.classList.toggle('schedule-workspace', showSchedule);
-  container.classList.toggle('monthly-summary-workspace', showMonthlySummary);
+  container.classList.toggle('monthly-summary-workspace', showMonthlySummary || showQuarterlyReport);
   container.classList.toggle('plan-page-workspace', showPlan);
 
   if (showPlan && !planLoaded) initPlan();
@@ -87,7 +97,8 @@ function switchView(view) {
     monthlySummaryLoaded = true;
     loadMonthlySummary();
   }
-  if (showHistory) loadHistory(true);
+  if (showQuarterlyReport) initQuarterlyReport();
+  if (showHistory) loadHistory(1);
   if (showStaff) loadStaffDirectory();
   if (showTasks) loadMyTasks();
   if (showSchedule) {
@@ -148,7 +159,7 @@ function slotChipHtml(s) {
     program: programName,
     status,
     date: fmtCellDate(s.session_date),
-    time: fmtTime(s.start_time),
+    time: fmtTimeRange(s.start_time, s.end_time),
     points: Number(s.points).toFixed(1),
     unit: t('unit.pts'),
   });
@@ -160,8 +171,8 @@ function slotChipHtml(s) {
           data-series-id="${s.recurring_series_id ?? ''}"
           data-occurrence-date="${s.recurrence_date || s.session_date}"
           data-display-date="${s.session_date}" data-recurrence-date="${s.recurrence_date || s.session_date}"
-          title="${escapeHtml(s.program_name)} · ${fmtTime(s.start_time)} · ${Number(s.points).toFixed(1)} ${t('unit.pts')} · ${escapeHtml(status)}">
-      <span>${escapeHtml(s.program_code)}${s.start_time ? ' ' + fmtTime(s.start_time) : ''}${scheduleBadge(s)}${deletedProgramBadge(s)}</span>
+          title="${escapeHtml(s.program_name)} · ${fmtTimeRange(s.start_time, s.end_time)} · ${Number(s.points).toFixed(1)} ${t('unit.pts')} · ${escapeHtml(status)}">
+      <span>${escapeHtml(s.program_code)}${s.start_time || s.end_time ? ' ' + escapeHtml(fmtTimeRange(s.start_time, s.end_time)) : ''}${scheduleBadge(s)}${deletedProgramBadge(s)}</span>
       <span class="slot-status" ${interactive ? 'aria-hidden="true"' : ''}>${statusCue}${escapeHtml(status)}</span>
     </${tag}>`;
 }
@@ -199,7 +210,7 @@ function timetableChipHtml(entry) {
   const dates = t('schedule.ruleDates', { start: entry.start_date, end: entry.end_date || t('schedule.noEnd') });
   return `<button type="button" class="slot-chip recurring timetable-chip${entry.is_sudden ? ' sudden' : ''}"
     data-timetable-edit="${entry.series_id}">
-    <span>${escapeHtml(entry.program_name)}${deletedProgramBadge(entry)} · ${escapeHtml(fmtTime(entry.start_time))}${entry.end_time ? `–${escapeHtml(fmtTime(entry.end_time))}` : ''}</span>
+    <span>${escapeHtml(entry.program_name)}${deletedProgramBadge(entry)} · ${escapeHtml(fmtTimeRange(entry.start_time, entry.end_time))}</span>
     <span class="mini-tag weekly-tag">${escapeHtml(t('schedule.weekly'))}</span>
     <small>${escapeHtml(dates)}</small><small>${escapeHtml(effective)}</small>
   </button>`;
@@ -346,7 +357,7 @@ function renderScheduleAssignmentMatrix() {
       const statusClass = occurrence.status === 'cancelled' ? ' cancelled' : '';
       html += `<th class="assignment-slot-head${statusClass}" title="${escapeHtml(occurrence.program_name)} · ${fmtTime(occurrence.start_time)} · ${Number(occurrence.points).toFixed(1)} ${t('unit.pts')}">
         <button type="button" class="assignment-task" data-timetable-edit="${occurrence.recurring_series_id}" title="${escapeHtml(t('schedule.timetableEdit'))}">${escapeHtml(occurrence.program_name)}</button>
-        <span>${escapeHtml(fmtTime(occurrence.start_time))}${occurrence.end_time ? `–${escapeHtml(fmtTime(occurrence.end_time))}` : ''} · ${Number(occurrence.points).toFixed(1)} ${escapeHtml(t('unit.pts'))}</span>
+        <span>${escapeHtml(fmtTimeRange(occurrence.start_time, occurrence.end_time))} · ${Number(occurrence.points).toFixed(1)} ${escapeHtml(t('unit.pts'))}</span>
         ${scheduleBadge(occurrence)}
       </th>`;
     }

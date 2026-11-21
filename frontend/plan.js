@@ -80,7 +80,7 @@ function planCells(s, period) {
     <td class="cell-task" data-label="${taskLabel}">
       ${taskName}
       ${s.is_sudden ? `<span class="mini-tag sudden">${escapeHtml(t('tag.sudden'))}</span>` : ''}
-      <span class="task-sub">${fmtTime(s.start_time)}${s.end_time ? '–' + fmtTime(s.end_time) : ''}</span>
+      <span class="task-sub">${escapeHtml(fmtTimeRange(s.start_time, s.end_time))}</span>
     </td>
     <td class="cell-pts" data-label="${pointsLabel}">${Number(s.points || 0).toFixed(1)}</td>
     <td class="cell-person-slot" data-label="${peopleLabel}" data-session-id="${s.session_id ?? ''}"

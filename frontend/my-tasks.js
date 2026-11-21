@@ -62,7 +62,7 @@ async function loadMyTasks() {
         <td class="cell-task" data-label="${escapeHtml(t('th.task'))}"><span class="task-name">${escapeHtml(s.program_name)}${scheduleBadge(s)}${deletedProgramBadge(s)}</span></td>
         <td data-label="${escapeHtml(t('th.priority'))}"><span class="cat-tag ${escapeHtml(s.category)}">${escapeHtml(s.category)}</span></td>
         <td data-label="${escapeHtml(t('th.status'))}">${statusPill(s.status)}</td>
-        <td class="cell-due" data-label="${escapeHtml(t('th.date'))}">${fmtCellDate(s.session_date)} · ${fmtTime(s.start_time)}${s.end_time ? '–' + fmtTime(s.end_time) : ''}</td>
+        <td class="cell-due" data-label="${escapeHtml(t('th.date'))}">${fmtCellDate(s.session_date)} · ${escapeHtml(fmtTimeRange(s.start_time, s.end_time))}</td>
         <td class="cell-progress" data-label="${escapeHtml(t('th.progress'))}">${Number(s.points || 0).toFixed(1)} ${t('unit.pts')}</td>
       </tr>`),
   ];
@@ -91,6 +91,7 @@ async function loadApp() {
     document.getElementById('nav-schedule').style.display = 'none';
     document.getElementById('nav-plan').style.display = 'none';
     document.getElementById('nav-monthly').style.display = 'inline-block';
+    document.getElementById('nav-quarterly').style.display = 'inline-block';
     document.getElementById('monthly-summary-demo').style.display = 'block';
     switchView('monthly-summary');
     return;
@@ -133,6 +134,7 @@ async function loadApp() {
 
   document.getElementById('nav-plan').style.display = 'inline-block';
   document.getElementById('nav-monthly').style.display = 'inline-block';
+  document.getElementById('nav-quarterly').style.display = user.isAdmin ? 'inline-block' : 'none';
   document.getElementById('nav-history').style.display = 'inline-block';
   if (user.isAdmin) {
     document.getElementById('nav-staff').style.display = 'inline-block';

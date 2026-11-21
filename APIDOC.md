@@ -39,7 +39,7 @@ Unauthenticated or inactive users return `401 Unauthorized`. Non-admin write req
 - State-changing requests must include an `Origin` exactly matching the configured `FRONTEND_URL` origin; missing or different origins return `403 Forbidden`.
 - CORS allows only the configured `FRONTEND_URL` origin and supports credentials.
 - Dates use `YYYY-MM-DD` in the `Asia/Ho_Chi_Minh` timezone.
-- Times use `HH:MM`.
+- Times use `HH:MM`. An end time earlier than its start time means the session ends on the following calendar day; equal start and end times are invalid.
 - Progress and points are numeric values; progress is limited to `0–100`.
 
 ## Current-user endpoints
@@ -142,6 +142,15 @@ Content-Type: application/json
 
 Request: `{ "programId": 4 }`. Reactivates the programme and its weekly timetable templates.
 
+### Edit programme defaults
+
+```http
+POST /api/admin/programs/update
+Content-Type: application/json
+```
+
+Request fields: `programId`, `name`, `defaultPoints`, `defaultStart`, and `defaultEnd`. This changes programme defaults only; existing session point and time values are not rewritten.
+
 ### List all staff tasks
 
 ```http
@@ -210,12 +219,11 @@ GET /api/schedule/monthly?year=2026&month=10
 ### Read schedule history
 
 ```http
-GET /api/schedule/history?limit=50
-GET /api/schedule/history?before=42&limit=50
-GET /api/schedule/history?after=42&limit=100
+GET /api/schedule/history?page=1&limit=50
+GET /api/schedule/history?staff=example%40company.test&record=session&from=2026-10-01&to=2026-10-31
 ```
 
-Returns `{ "entries": [ ... ], "hasMore": true }` in newest-first order. `limit` defaults to 50 and must be from 1 to 100. `before` is an optional history ID cursor for loading older entries. `after` is an optional cursor for retrieving newer entries in ascending order; it cannot be combined with `before`. All authenticated staff can read the append-only audit history, including schedule, staff, and programme creation/deletion changes.
+Returns `{ "entries": [ ... ], "page": 1, "pageCount": 4, "total": 173, "hasMore": true }` in newest-first order. `limit` defaults to 50 and must be from 1 to 100. `page` is a 1-based page number. Optional `staff` matches the actor's email, `record` matches the entity name or ID, and `from`/`to` select inclusive Vietnam-calendar dates. Existing `before` and `after` history-ID cursors remain supported. All authenticated staff can read the append-only audit history.
 
 ### Manage the staff directory
 
@@ -456,6 +464,22 @@ GET /api/admin/schedule/monthly?year=2026&month=10
   "points_above_goal": 4
 }
 ```
+
+### Get a quarterly workload report (administrator only)
+
+```http
+GET /api/admin/schedule/quarterly?employeeId=2&year=2026&quarter=4
+```
+
+Returns the selected employee's credited points, monthly targets, completed session counts for each of the quarter's three months, and summed quarterly totals.
+
+### Trace an employee's month to sessions (administrator only)
+
+```http
+GET /api/admin/schedule/monthly/sessions?employeeId=2&year=2026&month=10
+```
+
+Returns `{ "year": 2026, "month": 10, "employee": { ... }, "sessions": [ ... ] }` with the selected employee's dated and recurring sessions, including status, times, and points.
 
 Without an override, rows use the shared 170-point goal and set `target_is_override` to `false`. `goal_variance` is completed points minus the effective goal; `points_above_goal` is zero when below goal.
 

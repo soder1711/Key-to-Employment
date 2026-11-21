@@ -20,6 +20,7 @@
         <button id="nav-schedule" class="nav-btn" data-i18n="nav.schedule">Weekly schedule</button>
         <button id="nav-plan" class="nav-btn" style="display:none;" data-i18n="nav.plan">Planning board</button>
         <button id="nav-monthly" class="nav-btn" style="display:none;" data-i18n="nav.monthly">Monthly summary</button>
+        <button id="nav-quarterly" class="nav-btn" style="display:none;" data-i18n="nav.quarterly">Quarterly report</button>
         <button id="nav-history" class="nav-btn" style="display:none;" data-i18n="nav.history">History</button>
         <button id="nav-staff" class="nav-btn" style="display:none;" data-i18n="nav.staff">Staff</button>
       </nav>
@@ -92,6 +93,7 @@
         <div class="card-head">
           <h2 data-i18n="schedule.title">Weekly schedule</h2>
         </div>
+        <p class="hint timezone-hint" data-i18n="schedule.timezone">Schedule timezone: Asia/Ho_Chi_Minh (UTC+07:00).</p>
         <div id="schedule-mode-switch" class="schedule-mode-switch" style="display:none;" aria-label="Schedule view" data-i18n-aria-label="schedule.view">
           <button id="schedule-mode-dated" class="btn ghost small" aria-pressed="false" data-i18n="schedule.dated">Dated schedule</button>
           <button id="schedule-mode-timetable" class="btn small" aria-pressed="true" data-i18n="schedule.timetable">Weekly timetable</button>
@@ -152,9 +154,42 @@
         <div id="monthly-summary-error" class="error" style="display:none;" role="alert"></div>
       </section>
 
+      <!-- ===== Admin: quarterly workload and eligibility ===== -->
+      <section id="quarterly-report-section" class="card" style="display:none;">
+        <div class="card-head"><h2 data-i18n="quarterly.title">Quarterly workload &amp; eligibility</h2></div>
+        <div class="quarterly-filters">
+          <label><span data-i18n="quarterly.employee">Employee</span><select id="quarterly-employee"></select></label>
+          <label><span data-i18n="quarterly.year">Year</span><input id="quarterly-year" type="number" min="1" max="9999"></label>
+          <label><span data-i18n="quarterly.quarter">Quarter</span>
+            <select id="quarterly-quarter">
+              <option value="1" data-i18n="quarterly.q1">Q1</option><option value="2" data-i18n="quarterly.q2">Q2</option>
+              <option value="3" data-i18n="quarterly.q3">Q3</option><option value="4" data-i18n="quarterly.q4">Q4</option>
+            </select>
+          </label>
+        </div>
+        <p id="quarterly-loading" class="empty" style="display:none;" role="status" data-i18n="quarterly.loading">Loading quarterly report…</p>
+        <div id="quarterly-report-wrap" class="table-scroll" style="display:none;"></div>
+        <p id="quarterly-empty" class="empty" style="display:none;" data-i18n="quarterly.empty">Select an employee to view the report.</p>
+        <p id="quarterly-error" class="error" style="display:none;" role="alert"></p>
+      </section>
+
       <!-- ===== Staff-visible history ===== -->
       <section id="history-section" class="card" style="display:none;">
         <div class="card-head"><h2 data-i18n="history.title">Schedule history</h2></div>
+        <div class="history-filters">
+          <label><span data-i18n="history.staffFilter">Staff member (email)</span><input id="history-staff-filter" type="search" maxlength="254"></label>
+          <label><span data-i18n="history.recordFilter">Record</span><input id="history-record-filter" type="search" maxlength="120"></label>
+          <label><span data-i18n="history.from">From</span><input id="history-from-filter" type="date"></label>
+          <label><span data-i18n="history.to">To</span><input id="history-to-filter" type="date"></label>
+          <button id="history-filter-apply" class="btn small" type="button" data-i18n="history.apply">Apply filters</button>
+        </div>
+        <div class="history-pagination" aria-label="History pagination" data-i18n-aria-label="history.pagination">
+          <button id="history-prev" class="btn ghost small" type="button" data-i18n="history.previous" aria-label="Previous page" data-i18n-aria-label="history.previousPage">←</button>
+          <label><span data-i18n="history.page">Page</span>
+            <input id="history-page" type="number" min="1" value="1" aria-label="History page" data-i18n-aria-label="history.page"></label>
+          <span id="history-page-count"></span>
+          <button id="history-next" class="btn ghost small" type="button" data-i18n="history.next" aria-label="Next page" data-i18n-aria-label="history.nextPage">→</button>
+        </div>
         <p id="history-loading" class="empty" style="display:none;" role="status" data-i18n="history.loading">Loading history…</p>
         <p id="history-empty" class="empty" style="display:none;" data-i18n="history.empty">No history entries yet.</p>
         <p id="history-error" class="error" style="display:none;" role="alert"></p>
@@ -170,7 +205,6 @@
             <tbody id="history-entries"></tbody>
           </table>
         </div>
-        <button id="history-older" class="btn ghost small" type="button" style="display:none;" data-i18n="history.older">Load older entries</button>
       </section>
 
       <!-- ===== Admin staff directory ===== -->
@@ -208,6 +242,7 @@
           <h2 data-i18n="plan.title">Planning board</h2>
           <button id="manage-tasks-btn" class="btn ghost small" style="display:none;margin-left:auto;" data-i18n="plan.manage">Manage programmes</button>
         </div>
+        <p class="hint timezone-hint" data-i18n="schedule.timezone">Schedule timezone: Asia/Ho_Chi_Minh (UTC+07:00).</p>
         <div id="plan-mode-switch" class="schedule-mode-switch" style="display:none;" aria-label="Planning board view" data-i18n-aria-label="plan.view">
           <button id="plan-mode-sessions" class="btn small" aria-pressed="true" data-i18n="plan.sessions">Dated sessions</button>
           <button id="plan-mode-timetable" class="btn ghost small" aria-pressed="false" data-i18n="schedule.timetable">Weekly timetable</button>
@@ -312,6 +347,7 @@
           </div>
         </div>
         <p id="assign-period-hint" class="assign-repeat-note"></p>
+        <p class="assign-repeat-note" data-i18n="modal.overnightHint">An end time earlier than the start means the session ends the next day.</p>
         <label for="assign-points" data-i18n="modal.points">Points (calculated automatically)</label>
         <input type="number" id="assign-points" min="0" max="100" step="0.5" readonly>
         <label class="check-row"><input type="checkbox" id="assign-sudden"><span data-i18n="modal.sudden"> Sudden session (doubles the points)</span></label>
@@ -389,7 +425,7 @@
         </table>
       </div>
 
-      <h4 class="pm-subhead" data-i18n="programs.new">New programme</h4>
+      <h4 id="program-form-title" class="pm-subhead" data-i18n="programs.new">New programme</h4>
       <div class="modal-row">
         <div>
           <label for="program-code" data-i18n="plabel.code">Code</label>
@@ -417,7 +453,21 @@
         </div>
       </div>
       <button id="program-submit" class="btn modal-submit" data-i18n="programs.create">Create programme</button>
+      <button id="program-cancel-edit" class="btn ghost modal-submit" type="button" style="display:none;" data-i18n="programs.cancelEdit">Cancel edit</button>
       <p id="program-error" class="error" style="display:none;"></p>
+    </div>
+  </dialog>
+
+  <dialog id="monthly-sessions-modal" class="modal-overlay" aria-labelledby="monthly-sessions-title">
+    <div class="modal monthly-sessions-modal">
+      <div class="modal-head">
+        <h3 id="monthly-sessions-title" data-i18n="monthlySessions.title">Monthly sessions</h3>
+        <button id="monthly-sessions-close" class="modal-x" type="button" aria-label="Close">✕</button>
+      </div>
+      <p id="monthly-sessions-loading" class="empty" style="display:none;" role="status" data-i18n="monthlySessions.loading">Loading sessions…</p>
+      <p id="monthly-sessions-error" class="error" style="display:none;" role="alert"></p>
+      <div id="monthly-sessions-wrap" class="program-list-wrap" style="display:none;"></div>
+      <p id="monthly-sessions-empty" class="empty" style="display:none;" data-i18n="monthlySessions.empty">No sessions found for this month.</p>
     </div>
   </dialog>
 
@@ -457,6 +507,7 @@
   <script src="my-tasks.js" defer></script>
   <script src="schedule.js" defer></script>
   <script src="monthly-summary.js" defer></script>
+  <script src="quarterly-report.js" defer></script>
   <script src="plan.js" defer></script>
   <script src="session-modals.js" defer></script>
   <script src="task-management.js" defer></script>

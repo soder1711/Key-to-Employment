@@ -22,7 +22,8 @@ const I18N = {
   en: {
     'app.name': 'Staff Scheduler', 'app.footer': '© 2026 Staff Scheduler',
     'nav.tasks': 'My week', 'nav.schedule': 'Weekly schedule', 'nav.plan': 'Planning board',
-    'nav.monthly': 'Monthly summary', 'nav.history': 'History', 'nav.staff': 'Staff',
+    'nav.monthly': 'Monthly summary', 'nav.quarterly': 'Quarterly report',
+    'nav.history': 'History', 'nav.staff': 'Staff',
     'summary.title': 'Monthly summary', 'summary.prev': '← Previous month',
     'summary.current': 'This month', 'summary.next': 'Next month →',
     'summary.daysOneToTen': 'Days 1–10', 'summary.daysElevenToTwenty': 'Days 11–20',
@@ -44,6 +45,13 @@ const I18N = {
     'summary.empty': 'No staff records found.',
     'summary.demoNotice': 'Demo preview: sample data only; no sign-in or live data is used.',
     'summary.demoUser': 'Demo preview',
+    'quarterly.title': 'Quarterly workload & eligibility',
+    'quarterly.employee': 'Employee', 'quarterly.year': 'Year', 'quarterly.quarter': 'Quarter',
+    'quarterly.month': 'Month', 'quarterly.total': 'Quarter total',
+    'quarterly.loading': 'Loading quarterly report…',
+    'quarterly.empty': 'Select an employee to view the report.',
+    'quarterly.error': 'Could not load quarterly report ({status}).',
+    'quarterly.q1': 'Q1', 'quarterly.q2': 'Q2', 'quarterly.q3': 'Q3', 'quarterly.q4': 'Q4',
     'plan.board': 'Weekly workload board',
     'user.openMenu': 'Open profile menu',
     'user.signedInAs': 'Signed in as',
@@ -54,6 +62,8 @@ const I18N = {
     'th.task': 'Work item', 'th.priority': 'Priority / category', 'th.status': 'Status',
     'th.date': 'Date / time', 'th.progress': 'Progress / points',
     'schedule.title': 'Weekly schedule',
+    'schedule.timezone': 'Schedule timezone: Asia/Ho_Chi_Minh (UTC+07:00).',
+    'schedule.nextDay': '(next day)',
     'nav.jump': 'Go to', 'nav.chooseDate': 'Choose a date', 'nav.thisWeek': 'This week',
     'schedule.view': 'Schedule view', 'schedule.dated': 'Dated schedule', 'schedule.timetable': 'Weekly timetable',
     'schedule.tools': 'Import and copy tools', 'schedule.seriesTools': 'Series management',
@@ -135,6 +145,7 @@ const I18N = {
     'modal.task': 'Programme', 'modal.date': 'Date', 'modal.start': 'Start', 'modal.end': 'End',
     'modal.points': 'Points (calculated automatically)', 'modal.pointsEditable': 'Points',
     'modal.sudden': ' Sudden session (doubles the points)',
+    'modal.overnightHint': 'An end time earlier than the start means the session ends the next day.',
     'modal.repeat': ' Copy as one-off sessions for a limited number of weeks',
     'modal.repeatWeeks': 'Repeat for (weeks, including this one)',
     'modal.repeatNote': 'Creates separate one-off sessions (max 53 weeks), not a recurring rule. For ongoing work, use Weekly timetable in Schedule.',
@@ -154,6 +165,8 @@ const I18N = {
     'action.complete': '✓ Complete', 'action.reopen': '↺ Reopen', 'action.cancel': '✕ Cancel',
     'action.deleteDay': 'Delete this day',
     'programs.title': 'Programmes',
+    'programs.edit': 'Edit defaults', 'programs.saveEdit': 'Save defaults',
+    'programs.cancelEdit': 'Cancel edit', 'programs.editTitle': 'Edit programme defaults',
     'programs.context': 'Create programmes or hide them from the list. Hiding a programme with ' +
       'scheduled sessions keeps those records; a programme with no sessions is removed.',
     'programs.new': 'New programme', 'programs.create': 'Create programme',
@@ -196,8 +209,20 @@ const I18N = {
     'dialog.ok': 'OK', 'dialog.confirmButton': 'Continue', 'dialog.cancel': 'Cancel',
     'history.title': 'Schedule history', 'history.date': 'When', 'history.actor': 'Changed by',
     'history.action': 'Action', 'history.record': 'Record', 'history.details': 'Details',
+    'history.staffFilter': 'Staff member (email)', 'history.recordFilter': 'Record',
+    'history.from': 'From', 'history.to': 'To', 'history.apply': 'Apply filters',
+    'history.previous': '←', 'history.next': '→', 'history.page': 'Page',
+    'history.pagination': 'History pagination', 'history.previousPage': 'Previous page',
+    'history.nextPage': 'Next page',
+    'history.pageOf': 'of {count}',
     'history.empty': 'No history entries yet.', 'history.loadError': 'Could not load history ({status}).',
-    'history.older': 'Load older entries', 'history.loading': 'Loading history…',
+    'history.loading': 'Loading history…',
+    'monthlySessions.title': 'Monthly sessions',
+    'monthlySessions.titleFor': '{name} · {month}',
+    'monthlySessions.loading': 'Loading sessions…',
+    'monthlySessions.empty': 'No sessions found for this month.',
+    'monthlySessions.error': 'Could not load sessions ({status}).',
+    'monthlySessions.demoSession': 'Scheduled work', 'monthlySessions.status': 'Status',
     'staff.title': 'Staff directory', 'staff.code': 'Staff ID', 'staff.firstName': 'First name',
     'staff.lastName': 'Last name', 'staff.email': 'Work email', 'staff.status': 'Status',
     'staff.action': 'Action', 'staff.active': 'Active', 'staff.inactive': 'Inactive',
@@ -222,7 +247,8 @@ const I18N = {
   vi: {
     'app.name': 'Lịch nhân sự', 'app.footer': '© 2026 Lịch nhân sự',
     'nav.tasks': 'Tuần của tôi', 'nav.schedule': 'Lịch tuần', 'nav.plan': 'Bảng phân công',
-    'nav.monthly': 'Tổng kết tháng', 'nav.history': 'Lịch sử', 'nav.staff': 'Nhân sự',
+    'nav.monthly': 'Tổng kết tháng', 'nav.quarterly': 'Báo cáo quý',
+    'nav.history': 'Lịch sử', 'nav.staff': 'Nhân sự',
     'summary.title': 'Tổng kết tháng', 'summary.prev': '← Tháng trước',
     'summary.current': 'Tháng này', 'summary.next': 'Tháng sau →',
     'summary.daysOneToTen': 'Ngày 1–10', 'summary.daysElevenToTwenty': 'Ngày 11–20',
@@ -244,6 +270,14 @@ const I18N = {
     'summary.empty': 'Không tìm thấy nhân sự.',
     'summary.demoNotice': 'Bản xem trước: chỉ dùng dữ liệu mẫu; không cần đăng nhập và không dùng dữ liệu trực tiếp.',
     'summary.demoUser': 'Bản xem trước',
+    'quarterly.title': 'Khối lượng công việc & điều kiện theo quý',
+    'quarterly.employee': 'Nhân viên', 'quarterly.year': 'Năm', 'quarterly.quarter': 'Quý',
+    'quarterly.month': 'Tháng', 'quarterly.total': 'Tổng quý',
+    'quarterly.loading': 'Đang tải báo cáo quý…',
+    'quarterly.empty': 'Chọn nhân viên để xem báo cáo.',
+    'quarterly.error': 'Không tải được báo cáo quý ({status}).',
+    'quarterly.q1': 'Quý 1', 'quarterly.q2': 'Quý 2',
+    'quarterly.q3': 'Quý 3', 'quarterly.q4': 'Quý 4',
     'plan.board': 'Bảng khối lượng công việc tuần',
     'user.openMenu': 'Mở menu hồ sơ',
     'user.signedInAs': 'Đã đăng nhập bằng',
@@ -254,6 +288,8 @@ const I18N = {
     'th.task': 'Công việc', 'th.priority': 'Ưu tiên / danh mục', 'th.status': 'Trạng thái',
     'th.date': 'Ngày / giờ', 'th.progress': 'Tiến độ / điểm',
     'schedule.title': 'Lịch tuần',
+    'schedule.timezone': 'Múi giờ lịch: Asia/Ho_Chi_Minh (UTC+07:00).',
+    'schedule.nextDay': '(ngày hôm sau)',
     'nav.jump': 'Đi tới', 'nav.chooseDate': 'Chọn ngày', 'nav.thisWeek': 'Tuần này',
     'schedule.view': 'Chế độ xem lịch', 'schedule.dated': 'Lịch theo ngày', 'schedule.timetable': 'Thời khóa biểu hàng tuần',
     'schedule.tools': 'Công cụ nhập và sao chép', 'schedule.seriesTools': 'Quản lý chuỗi',
@@ -335,6 +371,7 @@ const I18N = {
     'modal.task': 'Chương trình', 'modal.date': 'Ngày', 'modal.start': 'Bắt đầu', 'modal.end': 'Kết thúc',
     'modal.points': 'Điểm (tính tự động)', 'modal.pointsEditable': 'Điểm',
     'modal.sudden': ' Phiên đột xuất (nhân đôi điểm)',
+    'modal.overnightHint': 'Giờ kết thúc sớm hơn giờ bắt đầu nghĩa là phiên kết thúc vào ngày hôm sau.',
     'modal.repeat': ' Sao chép thành phiên riêng lẻ trong số tuần giới hạn',
     'modal.repeatWeeks': 'Lặp lại (số tuần, kể cả tuần này)',
     'modal.repeatNote': 'Tạo các phiên riêng lẻ (tối đa 53 tuần), không tạo quy tắc lặp lại. Với công việc lâu dài, dùng Thời khóa biểu hàng tuần trong Lịch.',
@@ -354,6 +391,8 @@ const I18N = {
     'action.complete': '✓ Hoàn thành', 'action.reopen': '↺ Mở lại', 'action.cancel': '✕ Hủy',
     'action.deleteDay': 'Xóa ngày này',
     'programs.title': 'Chương trình',
+    'programs.edit': 'Sửa mặc định', 'programs.saveEdit': 'Lưu mặc định',
+    'programs.cancelEdit': 'Hủy sửa', 'programs.editTitle': 'Sửa mặc định chương trình',
     'programs.context': 'Tạo chương trình hoặc ẩn khỏi danh sách. Các phiên đã lên lịch được giữ lại; ' +
       'chương trình chưa có phiên sẽ bị xóa.',
     'programs.new': 'Chương trình mới', 'programs.create': 'Tạo chương trình',
@@ -396,8 +435,20 @@ const I18N = {
     'dialog.ok': 'Đồng ý', 'dialog.confirmButton': 'Tiếp tục', 'dialog.cancel': 'Hủy',
     'history.title': 'Lịch sử lịch làm việc', 'history.date': 'Thời gian', 'history.actor': 'Người thay đổi',
     'history.action': 'Thao tác', 'history.record': 'Bản ghi', 'history.details': 'Chi tiết',
+    'history.staffFilter': 'Nhân viên (email)', 'history.recordFilter': 'Bản ghi',
+    'history.from': 'Từ ngày', 'history.to': 'Đến ngày', 'history.apply': 'Lọc',
+    'history.previous': '←', 'history.next': '→', 'history.page': 'Trang',
+    'history.pagination': 'Phân trang lịch sử', 'history.previousPage': 'Trang trước',
+    'history.nextPage': 'Trang tiếp theo',
+    'history.pageOf': 'trên {count}',
     'history.empty': 'Chưa có mục lịch sử.', 'history.loadError': 'Không tải được lịch sử ({status}).',
-    'history.older': 'Tải mục cũ hơn', 'history.loading': 'Đang tải lịch sử…',
+    'history.loading': 'Đang tải lịch sử…',
+    'monthlySessions.title': 'Phiên trong tháng',
+    'monthlySessions.titleFor': '{name} · {month}',
+    'monthlySessions.loading': 'Đang tải phiên…',
+    'monthlySessions.empty': 'Không tìm thấy phiên trong tháng này.',
+    'monthlySessions.error': 'Không tải được phiên ({status}).',
+    'monthlySessions.demoSession': 'Công việc đã lên lịch', 'monthlySessions.status': 'Trạng thái',
     'staff.title': 'Danh sách nhân sự', 'staff.code': 'Mã nhân viên', 'staff.firstName': 'Tên',
     'staff.lastName': 'Họ', 'staff.email': 'Email công việc', 'staff.status': 'Trạng thái',
     'staff.action': 'Thao tác', 'staff.active': 'Đang hoạt động', 'staff.inactive': 'Đã ngừng hoạt động',
@@ -517,10 +568,14 @@ function setLang(newLang) {
         translateRuleModal();
       }
       if (planLoaded) loadPlanBoard();
-      if (historyLoaded) loadHistory(true);
+      if (historyLoaded) loadHistory(1);
       if (staffLoaded && currentUser.isAdmin) loadStaffDirectory();
     }
     if (monthlySummaryLoaded) loadMonthlySummary();
+    if (quarterlyReportLoaded &&
+        document.getElementById('quarterly-report-section').style.display !== 'none') {
+      loadQuarterlyReport();
+    }
   }
 }
 

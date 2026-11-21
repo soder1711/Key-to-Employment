@@ -283,10 +283,17 @@ async function confirmRecurringRuleConflict(candidate, excludedSeriesId = null) 
     const otherStart = entry.start_time;
     const otherEnd = entry.end_time;
     if (!startTime || !endTime || !otherStart || !otherEnd) return startTime === otherStart;
-    return startTime < otherEnd && otherStart < endTime;
+    const toMinutes = value => Number(value.slice(0, 2)) * 60 + Number(value.slice(3, 5));
+    const candidateStart = toMinutes(startTime);
+    const otherStartMinutes = toMinutes(otherStart);
+    const candidateEnd = toMinutes(endTime) + (endTime < startTime ? 1440 : 0);
+    const otherEndMinutes = toMinutes(otherEnd) + (otherEnd < otherStart ? 1440 : 0);
+    return [-1440, 0, 1440].some(offset =>
+      candidateStart < otherEndMinutes + offset &&
+      otherStartMinutes + offset < candidateEnd);
   });
   if (!conflict) return true;
-  const time = `${fmtTime(conflict.start_time)}${conflict.end_time ? `–${fmtTime(conflict.end_time)}` : ''}`;
+  const time = fmtTimeRange(conflict.start_time, conflict.end_time);
   return await confirmAction(t('schedule.overlapWarning', {
     task: conflict.program_name, time, day: dayName(weekday),
   }));
@@ -375,7 +382,7 @@ function openDetailsModal(sessionId, seriesId = null, occurrenceDate = null) {
   document.getElementById('detail-info').innerHTML = `
     <strong>${escapeHtml(s.program_name)}</strong>${scheduleBadge(s)}${deletedProgramBadge(s)} (${escapeHtml(s.category)})<br>
     ${people} · ${fmtCellDate(s.session_date)}<br>
-    ${fmtTime(s.start_time)}${s.end_time ? '–' + fmtTime(s.end_time) : ''} ·
+    ${escapeHtml(fmtTimeRange(s.start_time, s.end_time))} ·
     ${Number(s.points).toFixed(1)} ${t('unit.pts')}${s.is_sudden ? ` · ${escapeHtml(t('tag.sudden'))}` : ''} ·
     <span class="status-pill ${escapeHtml(s.status)}">${escapeHtml(t('status.' + s.status))}</span>
     ${(s.occurrence_notes || s.notes) ? `<br>${escapeHtml(t('modal.notesPrefix'))}${escapeHtml(s.occurrence_notes || s.notes)}` : ''}`;
@@ -383,6 +390,15 @@ function openDetailsModal(sessionId, seriesId = null, occurrenceDate = null) {
   document.getElementById('occurrence-notes').value = s.occurrence_notes || '';
   document.getElementById('session-clone').style.display = s.is_recurring ? 'none' : 'inline-block';
   document.getElementById('session-end-series').style.display = s.is_recurring ? 'inline-block' : 'none';
+  document.querySelectorAll('#modal-details .modal-actions button').forEach(button => {
+    button.style.display = currentUser?.isAdmin ? '' : 'none';
+  });
+  document.getElementById('session-delete').style.display =
+    currentUser?.isAdmin ? 'inline-block' : 'none';
+  document.getElementById('session-clone').style.display =
+    currentUser?.isAdmin && !s.is_recurring ? 'inline-block' : 'none';
+  document.getElementById('session-end-series').style.display =
+    currentUser?.isAdmin && s.is_recurring ? 'inline-block' : 'none';
   openModal('details');
 }
 

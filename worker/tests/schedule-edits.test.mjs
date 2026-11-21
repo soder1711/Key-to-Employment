@@ -162,10 +162,10 @@ test('one-off session updates reject recurring materialized sessions', async () 
   assert.deepEqual(history, []);
 });
 
-test('session assignment rejects invalid calendar dates and reversed times', async () => {
+test('session assignment rejects invalid calendar dates and zero-length times', async () => {
   for (const payload of [
     { date: '2026-02-31', startTime: '09:00', endTime: '10:00' },
-    { date: '2026-02-28', startTime: '11:00', endTime: '10:00' },
+    { date: '2026-02-28', startTime: '11:00', endTime: '11:00' },
   ]) {
     let queries = 0;
     const response = await handleAdminAssignSession(

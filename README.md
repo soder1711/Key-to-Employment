@@ -33,6 +33,11 @@ Session rows represent one actual dated occurrence, including its shared status,
 - Admins: **Schedule** opens the selected week's **Weekly timetable** assignment matrix, with recurring definitions editable from each task slot; **Plan** opens dated sessions for all seven days of the selected week. Employees retain their personal dated schedule.
 - **Weekly timetable** shows the selected week's fixed recurring task occurrences as weekday-grouped columns and employees as rows. Each occurrence column shows its task, time, points, and per-employee assignment status; the unassigned row identifies occurrences with no assignees. Click a task to edit its recurring definition or **Add recurring entry** to create one. This is a dated assignment preview, not a historical timetable editor.
 - **Plan** retains the dated-sessions view: each day's fixed tasks are the timetable occurrences returned for that date, alongside one-off sessions. Assignees come from the occurrence assignment links. Dragging a person onto a task adds them for that date; dragging them onto it again removes them. Multiple people can share one occurrence. Assignment changes never affect the recurring definition or another date. Completion remains shared on the occurrence. Existing future exceptions are preserved unless explicitly replaced. Cancelling a recurring-rule change makes no change.
+- **Monthly summary** compares each employee's completed points with their monthly goal. Click an employee or monthly points total to inspect the dated sessions that make up the month.
+- **Quarterly report** lets admins select an employee, year, and quarter to compare each month's credited points and target, with totals for the quarter. Click a month's points or the quarter total to trace it to sessions.
+- **History** supports staff, record, and inclusive date-range filters, numbered pages, and previous/next navigation.
+- Schedule and planning views display the schedule timezone (`Asia/Ho_Chi_Minh`, UTC+07:00). An end time earlier than a start time denotes an overnight session ending the following day.
+- Programme defaults can be edited without rewriting stored session points or times. Admin session details expose the hide/delete action for the selected date.
 - **Dated schedule** is for completion, actual notes, and exceptions. Clicking an empty cell adds a one-off session. **Import and copy tools** contains the optional setup shortcuts; finite repeat copies remain separate one-off sessions.
 - Saving recurring edits opens a change dialog with a before/after summary. Choose **This and future occurrences** (default) with an effective date, or **Only this occurrence** when editing a dated task. Use **Go to** to pick a date; Plan also offers **Today** and **This week** shortcuts.
 - End an individual series from its timetable rule or task details. **Series management** contains **Stop weekly timetable**, which ends all recurring entries from a selected date without affecting one-offs. Completion and actual notes remain occurrence-only.
@@ -86,7 +91,7 @@ migrations, so a fresh database does not need them. Verify the target database's
 existing schema before applying any migration, and do not use `--remote` unless
 you intend to modify production data.
 
-### Preview the monthly summary without OAuth
+### Preview workload reports without OAuth
 
 From the repository root, run:
 
@@ -94,7 +99,7 @@ From the repository root, run:
 node frontend/dev-server.mjs
 ```
 
-Open `http://127.0.0.1:4173/?demo=1` to view sample monthly summary data. The demo is limited to localhost and does not call the Worker or use live data; goal edits only affect in-memory sample data. The shared monthly goal is 170 points, with admin overrides scoped to an employee and month. Without `?demo=1`, the frontend follows the normal authentication flow.
+Open `http://127.0.0.1:4173/?demo=1` to view sample monthly and quarterly report data. Click a monthly or quarterly points total to open its session list. The demo is limited to localhost and does not call the Worker or use live data; goal edits only affect in-memory sample data. The shared monthly goal is 170 points, with admin overrides scoped to an employee and month. Without `?demo=1`, the frontend follows the normal authentication flow.
 
 ## Deployment
 
@@ -109,6 +114,7 @@ For a manual Worker deployment, run `wrangler deploy --config wrangler.toml` fro
 There is no package manifest, build step, or linter. The monthly-summary aggregation tests use Node's built-in test runner. Before submitting changes:
 
 - Run `node --experimental-default-type=module --test worker/tests/monthly-summary.test.mjs`.
+- Run `node --experimental-default-type=module --test worker/tests/report-management.test.mjs` for quarterly reports, programme edits, and overnight-session validation.
 - Run `node --experimental-default-type=module --test worker/tests/recurrence.test.mjs worker/tests/schedule-edits.test.mjs worker/tests/occurrence-assignments.test.mjs` for recurrence and assignment regressions.
 - Worker CI initializes an isolated Wrangler local D1, verifies legacy migration 007, then applies migration 008 and asserts that stored session and exception assignments are preserved as occurrence links. The Worker deployment waits for these tests to pass.
 - Run `node --test frontend/tests/timetable.test.mjs` for timetable grouping, mode gating, and change-dialog behavior.

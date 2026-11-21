@@ -5,13 +5,14 @@ import {
   getSessionsBetween, getScheduleBetween, getRecurringOccurrencesBetween,
   getRecurringOccurrenceByKey, clearRecurringException,
   getSessionById, createSession, updateSession, setSessionStatus,
-  deleteSession, logScheduleHistory, getMonthlySummary, setMonthlyTarget, clearMonthlyTarget,
+  deleteSession, logScheduleHistory, getMonthlySummary, getMonthlySessions,
+  setMonthlyTarget, clearMonthlyTarget,
   getRecurringTimetable, getRecurringVersionAt, createRecurringSeries,
   createRecurringSeriesBatch,
   updateRecurringSeriesFrom, endRecurringSeriesFrom, endRecurringTimetableFrom,
   setRecurringException, saveRecurringOccurrence,
   setOccurrenceAssignment, getAllPrograms, getProgramById, getProgramByCode,
-  createProgram, deactivateProgram, reactivateProgram, hardDeleteProgram, countProgramReferences,
+  createProgram, updateProgram, deactivateProgram, reactivateProgram, hardDeleteProgram, countProgramReferences,
   getEmployeeDirectory, findEmployeeByCodeOrEmail, createEmployee,
   getManagedEmployee, deactivateEmployee, reactivateEmployee, getScheduleHistory,
 } from './db.js';
@@ -179,7 +180,8 @@ export async function handleAdminCreateProgram(env, session, body) {
   if (!code || code.length > 16 || !name || name.length > 120 ||
       category.length > 32 || !Number.isFinite(defaultPoints) ||
       defaultPoints < 0 || defaultPoints > 100 ||
-      !validTime(defaultStart) || !validTime(defaultEnd)) {
+      !validTime(defaultStart) || !validTime(defaultEnd) ||
+      (defaultStart && defaultEnd && defaultStart === defaultEnd)) {
     return new Response('Invalid task type', { status: 400 });
   }
   if (await getProgramByCode(env.DB, code)) {
@@ -195,6 +197,35 @@ export async function handleAdminCreateProgram(env, session, body) {
     `Created programme "${name}" (${code})`
   );
   return Response.json({ program }, { status: 201 });
+}
+
+export async function handleAdminUpdateProgram(env, session, body) {
+  const denied = requireAdmin(session);
+  if (denied) return denied;
+  const programId = Number(body?.programId);
+  const name = typeof body?.name === 'string' ? body.name.trim() : '';
+  const defaultPoints = Number(body?.defaultPoints);
+  const defaultStart = body?.defaultStart || null;
+  const defaultEnd = body?.defaultEnd || null;
+  const validTime = value => value === null ||
+    (typeof value === 'string' && TIME_RE.test(value) &&
+      Number(value.slice(0, 2)) <= 23 && Number(value.slice(3, 5)) <= 59);
+  if (!Number.isSafeInteger(programId) || programId < 1 ||
+      !name || name.length > 120 || !Number.isFinite(defaultPoints) ||
+      defaultPoints < 0 || defaultPoints > 100 ||
+      !validTime(defaultStart) || !validTime(defaultEnd) ||
+      (defaultStart && defaultEnd && defaultStart === defaultEnd)) {
+    return new Response('Invalid programme defaults', { status: 400 });
+  }
+  const before = await getProgramById(env.DB, programId);
+  if (!before) return new Response('Programme not found', { status: 404 });
+  await updateProgram(env.DB, programId, { name, defaultPoints, defaultStart, defaultEnd });
+  const program = await getProgramById(env.DB, programId);
+  await logScheduleHistory(
+    env.DB, session.email, 'update', 'programme', programId,
+    `Updated programme defaults for "${before.name}" (${before.code})`
+  );
+  return Response.json({ program });
 }
 
 
@@ -484,6 +515,7 @@ function recurringInput(body, current = null, effectiveFrom = null) {
       !Number.isFinite(version.points) || version.points < 0 || version.points > 100 ||
       typeof version.isSudden !== 'boolean' || !validTime(version.startTime) ||
       !validTime(version.endTime) ||
+      (version.startTime && version.endTime && version.startTime === version.endTime) ||
       (version.notes !== null && (typeof version.notes !== 'string' || version.notes.length > 1000)) ||
       !isValidISODate(version.startDate) ||
       (version.endDate !== null && (!isValidISODate(version.endDate) || version.endDate < version.startDate)) ||
@@ -664,8 +696,8 @@ export async function handleAdminAssignSession(env, session, body) {
       Number(value.slice(0, 2)) <= 23 && Number(value.slice(3, 5)) <= 59);
   if (!validOptionalTime(startTime)) return new Response('Invalid start time', { status: 400 });
   if (!validOptionalTime(endTime)) return new Response('Invalid end time', { status: 400 });
-  if (startTime && endTime && endTime <= startTime) {
-    return new Response('End time must be after start time', { status: 400 });
+  if (startTime && endTime && endTime === startTime) {
+    return new Response('Start and end times must be different', { status: 400 });
   }
   if (employeeId !== null) {
     const employee = await env.DB.prepare(
@@ -762,6 +794,7 @@ export async function handleAdminUpdateSession(env, session, body) {
       typeof sessionDate !== 'string' || !isValidISODate(sessionDate) ||
       (startTime !== null && (typeof startTime !== 'string' || !TIME_RE.test(startTime))) ||
       (endTime !== null && (typeof endTime !== 'string' || !TIME_RE.test(endTime))) ||
+      (startTime && endTime && startTime === endTime) ||
       !Number.isFinite(points) || points < 0 || points > 100 ||
       typeof isSudden !== 'boolean') {
     return new Response('Invalid update payload', { status: 400 });
@@ -1149,6 +1182,62 @@ export async function handleAdminMonthlySummary(env, session, url) {
   return Response.json({ year, month, rows });
 }
 
+export async function handleAdminQuarterlySummary(env, session, url) {
+  const denied = requireAdmin(session);
+  if (denied) return denied;
+  const year = Number(url.searchParams.get('year'));
+  const quarter = Number(url.searchParams.get('quarter'));
+  const employeeId = Number(url.searchParams.get('employeeId'));
+  if (!Number.isInteger(year) || year < 1 || year > 9999 ||
+      !Number.isInteger(quarter) || quarter < 1 || quarter > 4 ||
+      !Number.isSafeInteger(employeeId) || employeeId < 1) {
+    return new Response('Invalid quarterly report selection', { status: 400 });
+  }
+  const employee = await getManagedEmployee(env.DB, employeeId);
+  if (!employee) return new Response('Employee not found', { status: 404 });
+  const firstMonth = (quarter - 1) * 3 + 1;
+  const monthlyRows = await Promise.all([0, 1, 2].map(async offset => {
+    const month = firstMonth + offset;
+    const [row] = await getMonthlySummary(env.DB, year, month, employeeId);
+    return {
+      month,
+      completed_points: Number(row?.completed_points) || 0,
+      target_points: Number(row?.target_points) || 0,
+      completed_sessions: Number(row?.completed_sessions) || 0,
+    };
+  }));
+  const totals = monthlyRows.reduce((result, month) => ({
+    completed_points: result.completed_points + month.completed_points,
+    target_points: result.target_points + month.target_points,
+    completed_sessions: result.completed_sessions + month.completed_sessions,
+  }), { completed_points: 0, target_points: 0, completed_sessions: 0 });
+  return Response.json({
+    year, quarter, employee,
+    months: monthlyRows,
+    totals: {
+      ...totals,
+      goal_variance: totals.completed_points - totals.target_points,
+    },
+  });
+}
+
+export async function handleAdminMonthlySessions(env, session, url) {
+  const denied = requireAdmin(session);
+  if (denied) return denied;
+  const year = Number(url.searchParams.get('year'));
+  const month = Number(url.searchParams.get('month'));
+  const employeeId = Number(url.searchParams.get('employeeId'));
+  if (!Number.isInteger(year) || year < 1 || year > 9999 ||
+      !Number.isInteger(month) || month < 1 || month > 12 ||
+      !Number.isSafeInteger(employeeId) || employeeId < 1) {
+    return new Response('Invalid monthly session selection', { status: 400 });
+  }
+  const employee = await getManagedEmployee(env.DB, employeeId);
+  if (!employee) return new Response('Employee not found', { status: 404 });
+  const sessions = await getMonthlySessions(env.DB, year, month, employeeId);
+  return Response.json({ year, month, employee, sessions });
+}
+
 export async function handleAdminListEmployees(env, session) {
   const denied = requireAdmin(session);
   if (denied) return denied;
@@ -1253,16 +1342,36 @@ export async function handleGetScheduleHistory(env, url) {
     : null;
   const after = hasAfter ? Number(url.searchParams.get('after')) : null;
   const limit = url.searchParams.has('limit') ? Number(url.searchParams.get('limit')) : 50;
+  const page = url.searchParams.has('page') ? Number(url.searchParams.get('page')) : 1;
+  const staff = (url.searchParams.get('staff') || '').trim();
+  const record = (url.searchParams.get('record') || '').trim();
+  const fromDate = url.searchParams.get('from') || '';
+  const toDate = url.searchParams.get('to') || '';
   if ((hasBefore && hasAfter) ||
       (before !== null && (!Number.isSafeInteger(before) || before < 1)) ||
       (after !== null && (!Number.isSafeInteger(after) || after < 0)) ||
-      !Number.isSafeInteger(limit) || limit < 1 || limit > 100) {
+      !Number.isSafeInteger(limit) || limit < 1 || limit > 100 ||
+      !Number.isSafeInteger(page) || page < 1 || page > 100000 ||
+      staff.length > 254 || record.length > 120 ||
+      (fromDate && !isValidISODate(fromDate)) ||
+      (toDate && !isValidISODate(toDate)) ||
+      (fromDate && toDate && fromDate > toDate)) {
     return new Response('Invalid history pagination', { status: 400 });
   }
-  const entries = await getScheduleHistory(env.DB, before, limit + 1, after);
+  const { entries, total, page: currentPage } = await getScheduleHistory(env.DB, {
+    beforeId: before, afterId: after, page,
+    limit: after !== null || before !== null ? limit + 1 : limit,
+    staff, record, fromDate, toDate,
+  });
+  const pageCount = Math.max(1, Math.ceil(total / limit));
   return Response.json({
     entries: entries.slice(0, limit),
-    hasMore: entries.length > limit,
+    hasMore: after !== null || before !== null
+      ? entries.length > limit
+      : currentPage < pageCount,
+    page: currentPage,
+    pageCount,
+    total,
   });
 }
 

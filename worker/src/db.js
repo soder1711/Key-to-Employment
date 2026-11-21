@@ -67,20 +67,52 @@ export async function reactivateEmployee(db, employeeId) {
   `).bind(employeeId).run();
 }
 
-export async function getScheduleHistory(db, beforeId, limit, afterId = null) {
-  const query = afterId !== null
-    ? `SELECT history_id, acted_at, actor_email, action, entity, entity_id, details
-       FROM schedule_history WHERE history_id > ? ORDER BY history_id ASC LIMIT ?`
-    : beforeId !== null
-      ? `SELECT history_id, acted_at, actor_email, action, entity, entity_id, details
-         FROM schedule_history WHERE history_id < ? ORDER BY history_id DESC LIMIT ?`
-      : `SELECT history_id, acted_at, actor_email, action, entity, entity_id, details
-         FROM schedule_history ORDER BY history_id DESC LIMIT ?`;
-  const statement = db.prepare(query);
-  const result = afterId !== null || beforeId !== null
-    ? await statement.bind(afterId ?? beforeId, limit).all()
-    : await statement.bind(limit).all();
-  return result.results;
+export async function getScheduleHistory(db, {
+  beforeId = null, afterId = null, page = 1, limit = 50,
+  staff = '', record = '', fromDate = '', toDate = '',
+} = {}) {
+  const clauses = [];
+  const bindings = [];
+  if (staff) {
+    clauses.push('LOWER(actor_email) LIKE ?');
+    bindings.push(`%${staff.toLowerCase()}%`);
+  }
+  if (record) {
+    clauses.push('(LOWER(entity) LIKE ? OR CAST(entity_id AS TEXT) LIKE ?)');
+    bindings.push(`%${record.toLowerCase()}%`, `%${record.toLowerCase()}%`);
+  }
+  if (fromDate) {
+    clauses.push("date(datetime(acted_at, '+7 hours')) >= ?");
+    bindings.push(fromDate);
+  }
+  if (toDate) {
+    clauses.push("date(datetime(acted_at, '+7 hours')) <= ?");
+    bindings.push(toDate);
+  }
+  const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
+  const count = await db.prepare(
+    `SELECT COUNT(*) AS total FROM schedule_history ${where}`
+  ).bind(...bindings).first();
+  const total = Number(count?.total) || 0;
+  const pageCount = Math.max(1, Math.ceil(total / limit));
+  page = Math.min(page, pageCount);
+  const cursorCondition = afterId !== null
+    ? 'history_id > ?'
+    : beforeId !== null ? 'history_id < ?' : '';
+  const cursorClause = cursorCondition
+    ? `${where ? ' AND' : 'WHERE'} ${cursorCondition}`
+    : '';
+  const cursorBindings = afterId !== null ? [afterId] : beforeId !== null ? [beforeId] : [];
+  const direction = afterId !== null ? 'ASC' : 'DESC';
+  const offset = (page - 1) * limit;
+  const query = `SELECT history_id, acted_at, actor_email, action, entity, entity_id, details
+    FROM schedule_history ${where}${cursorClause}
+    ORDER BY history_id ${direction} LIMIT ?${afterId !== null || beforeId !== null ? '' : ' OFFSET ?'}`;
+  const result = await db.prepare(query).bind(
+    ...bindings, ...cursorBindings, limit,
+    ...(afterId !== null || beforeId !== null ? [] : [offset]),
+  ).all();
+  return { entries: result.results, total, page };
 }
 
 export async function getEmployeeTasks(db, employeeId) {
@@ -261,6 +293,14 @@ export async function createProgram(db, p) {
      VALUES (?, ?, ?, ?, ?, ?, 1)`
   ).bind(p.code, p.name, p.category, p.defaultPoints,
          p.defaultStart || null, p.defaultEnd || null).run();
+}
+
+export async function updateProgram(db, programId, p) {
+  return await db.prepare(
+    `UPDATE programs
+     SET name = ?, default_points = ?, default_start = ?, default_end = ?
+     WHERE program_id = ?`
+  ).bind(p.name, p.defaultPoints, p.defaultStart || null, p.defaultEnd || null, programId).run();
 }
 
 // Soft delete: hides the task from pickers but keeps existing sessions intact
@@ -521,6 +561,15 @@ export async function getScheduleBetween(db, startDate, endDate, employeeId = nu
     String(a.start_time || '').localeCompare(String(b.start_time || '')) ||
     Number(typeof a.session_id === 'number' ? a.session_id : a.recurring_series_id) -
       Number(typeof b.session_id === 'number' ? b.session_id : b.recurring_series_id));
+}
+
+export async function getMonthlySessions(db, year, month, employeeId) {
+  const { start, end } = monthlyDateRange(year, month);
+  const sessions = await getScheduleBetween(db, start, end, employeeId);
+  return sessions.filter(session =>
+    (session.employee_ids || []).includes(employeeId) ||
+    Number(session.employee_id) === employeeId ||
+    (session.assignees || []).some(person => Number(person.employee_id) === employeeId));
 }
 
 export async function getSessionById(db, sessionId) {
