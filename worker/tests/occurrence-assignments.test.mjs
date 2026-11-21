@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { handleAdminReassignSession, handleAdminRecurringTimetable } from '../src/api.js';
-import { getScheduleBetween } from '../src/db.js';
+import { getRecurringTimetable, getScheduleBetween } from '../src/db.js';
 
 const admin = { isAdmin: true, employeeId: 99, email: 'admin@example.com' };
 
@@ -37,6 +37,28 @@ function scheduleDb({ assignees = [], oneOff = null } = {}) {
     },
   };
 }
+
+test('recurring timetable filters by the Vietnam calendar date', async () => {
+  let query = '';
+  let bindings = [];
+  const db = {
+    prepare(sql) {
+      query = sql;
+      return {
+        bind(...values) {
+          bindings = values;
+          return { all: async () => ({ results: [] }) };
+        },
+      };
+    },
+  };
+
+  await getRecurringTimetable(db, '2026-11-22');
+
+  assert.match(query, /v\.end_date IS NULL OR v\.end_date >= \?/);
+  assert.doesNotMatch(query, /date\('now'\)/);
+  assert.deepEqual(bindings, ['2026-11-22']);
+});
 
 test('recurring occurrences distinguish unassigned, single, and multiple employees', async () => {
   const assigned = [

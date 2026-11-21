@@ -511,7 +511,7 @@ export async function getSessionById(db, sessionId) {
   return session ? addSessionAssignees(session) : null;
 }
 
-export async function getRecurringTimetable(db) {
+export async function getRecurringTimetable(db, today = vietnamDateISO()) {
   const { results } = await db.prepare(`
     SELECT v.version_id, v.series_id, v.weekday, v.program_id, v.employee_id,
            v.start_time, v.end_time, v.points, v.is_sudden, v.notes,
@@ -523,9 +523,9 @@ export async function getRecurringTimetable(db) {
     JOIN programs p ON p.program_id = v.program_id AND p.is_active = 1
     LEFT JOIN employees e ON e.employee_id = v.employee_id
     WHERE v.effective_to IS NULL AND rs.ended_from IS NULL
-      AND (v.end_date IS NULL OR v.end_date >= date('now'))
+      AND (v.end_date IS NULL OR v.end_date >= ?)
     ORDER BY v.weekday, v.start_time, v.series_id
-  `).all();
+  `).bind(today).all();
   return results;
 }
 
