@@ -280,15 +280,16 @@ New recurring definitions are unassigned. `weekday` uses JavaScript numbering (S
   "points": 2.5,
   "isSudden": false,
   "notes": null,
+  "correctionReason": "Updated the planned point value after review",
   "replaceFutureExceptions": false
 }
 ```
 
-Future occurrence exceptions are preserved unless `replaceFutureExceptions` is explicitly `true`. The update and its schedule-history record are applied atomically. Existing completed sessions retain their recorded values.
+Edits require a non-empty `correctionReason` of at most 1000 characters; creates do not. The schedule-history record includes the old and new points and the reason. Future occurrence exceptions are preserved unless `replaceFutureExceptions` is explicitly `true`. The update and its schedule-history record are applied atomically. Existing completed sessions retain their recorded values.
 
 ### Modify or cancel one occurrence; end a series
 
-Use the same `POST /api/admin/schedule/timetable` route with an `operation` of `exception` to store an occurrence override (`action: "modify"`) or cancellation (`action: "cancel"`). Modified exceptions may set `movedDate`, task, times, points, and notes; they appear with `is_modified: true`. Assignments are changed separately using the occurrence-assignment endpoint. Completion and occurrence notes remain on the dated session, not in the recurring definition. Completed occurrences cannot be moved, modified, or cancelled.
+Use the same `POST /api/admin/schedule/timetable` route with an `operation` of `exception` to store an occurrence override (`action: "modify"`) or cancellation (`action: "cancel"`). Modifications require a non-empty `correctionReason` of at most 1000 characters and record the old and new points and reason in schedule history. Modified exceptions may set `movedDate`, task, times, points, and notes; they appear with `is_modified: true`. Assignments are changed separately using the occurrence-assignment endpoint. Completion and occurrence notes remain on the dated session, not in the recurring definition. Completed occurrences cannot be moved, modified, or cancelled.
 
 To stop one recurring series from a date onward, send `{ "operation": "end", "seriesId": 12, "cutoffDate": "2026-11-23" }`. Earlier versions and completed session records are retained. Ending the whole timetable uses the legacy endpoint below with `enabled: false` and an explicit `cutoffDate`.
 
@@ -363,7 +364,7 @@ POST /api/admin/schedule/update
 Content-Type: application/json
 ```
 
-Request fields: `sessionId`, `programId`, `sessionDate`, `points`, and `isSudden`; `startTime`, `endTime`, and `notes` are optional. This updates only a one-off session and preserves its assignee and status. Use the recurring timetable endpoint to edit a recurring occurrence or series.
+Request fields: `sessionId`, `programId`, `sessionDate`, `points`, `isSudden`, and a non-empty `correctionReason` of at most 1000 characters; `startTime`, `endTime`, and `notes` are optional. The history entry records the old and new points and correction reason. This updates only a one-off session and preserves its assignee and status. Use the recurring timetable endpoint to edit a recurring occurrence or series.
 
 Response: `{ "success": true, "session": { ... } }`.
 

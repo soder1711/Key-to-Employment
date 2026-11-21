@@ -282,6 +282,8 @@ test('recurring rule overlap check warns but allows intentional same-person conf
 test('new recurring rules remain unassigned and clear rule mode before one-off creation', () => {
   const { run, elements } = fixture();
   run("adminPrograms = [{program_id:1,default_points:5,default_start:'09:00',default_end:'10:00'}]; openRuleModal(2)");
+  assert.equal(elements.get('correction-reason-field').style.display, 'none');
+  assert.equal(elements.get('correction-reason').required, false);
   // A real select selects its first option automatically.
   elements.get('assign-program').value = '1';
   run('refreshAssignDefaults()');
@@ -292,10 +294,23 @@ test('new recurring rules remain unassigned and clear rule mode before one-off c
   assert.equal(elements.get('assign-repeat-option').style.display, 'none');
   assert.equal(elements.get('assign-rule-start').required, true);
   run("closeModal(); openAssignModal(3, '2026-11-16')");
+  assert.equal(elements.get('correction-reason-field').style.display, 'none');
   assert.equal(elements.get('assign-rule-fields').style.display, 'none');
   assert.equal(elements.get('assign-rule-start').disabled, true);
   assert.equal(elements.get('assign-repeat-option').style.display, 'block');
   assert.equal(elements.get('assign-points').readOnly, true);
+});
+
+test('editing a session requires a correction reason', () => {
+  const { run, elements } = fixture();
+  run(`adminPrograms = [{program_id:1,name:'Task',code:'TASK',category:'general',default_points:2}];
+    currentSession = {session_id:1,program_id:1,program_name:'Task',program_code:'TASK',
+      category:'general',session_date:'2026-11-16',start_time:'09:00',end_time:'10:00',
+      points:2,status:'completed',employee_id:1};
+    openSessionEdit()`);
+
+  assert.equal(elements.get('correction-reason-field').style.display, 'block');
+  assert.equal(elements.get('correction-reason').required, true);
 });
 
 test('shared rule save uses series endpoints and validates date ranges without writes', async () => {
@@ -316,7 +331,8 @@ test('shared rule save uses series endpoints and validates date ranges without w
   context.rule = {series_id:7,weekday:1,program_id:1,points:5,start_date:'2026-11-16',effective_from:'2099-01-01'};
   run('openRuleModal(1, rule)');
   elements.get('assign-weekday').value = '2';
-  const pending = run('saveTimetableRule({programId:1,points:8})');
+  elements.get('correction-reason').value = 'Updated after review';
+  const pending = run("saveTimetableRule({programId:1,points:8,correctionReason:'Updated after review'})");
   submit(elements);
   await pending;
   assert.equal(writes[1].operation, 'edit');
@@ -324,6 +340,7 @@ test('shared rule save uses series endpoints and validates date ranges without w
   assert.equal(writes[1].cutoffDate, '2099-01-01');
   assert.equal(writes[1].replaceFutureExceptions, false);
   assert.equal(writes[1].employeeId, null);
+  assert.equal(writes[1].correctionReason, 'Updated after review');
 });
 
 test('Plan shows multiple assignees and separates estimated from earned points', () => {

@@ -96,10 +96,11 @@ function mockDb(initialSessions = [makeSession()]) {
 }
 
 test('admin edits one session without changing its assignee or status', async () => {
-  const { db, sessions } = mockDb();
+  const { db, sessions, history } = mockDb();
   const response = await handleAdminUpdateSession({ DB: db }, admin, {
     sessionId: 1, programId: 1, sessionDate: '2026-10-20', startTime: '11:00',
     endTime: '12:00', points: 4.5, isSudden: true, notes: 'updated',
+    correctionReason: 'Corrected after review',
   });
 
   assert.equal(response.status, 200);
@@ -107,6 +108,23 @@ test('admin edits one session without changing its assignee or status', async ()
   assert.equal(sessions[0].points, 4.5);
   assert.equal(sessions[0].employee_id, 7);
   assert.equal(sessions[0].status, 'completed');
+  assert.match(history[0][4], /points 2\.0 -> 4\.5/);
+  assert.match(history[0][4], /reason: Corrected after review/);
+});
+
+test('session correction requires a reason before reading the session', async () => {
+  let queryCount = 0;
+  const response = await handleAdminUpdateSession(
+    { DB: { prepare() { queryCount++; } } }, admin,
+    {
+      sessionId: 1, programId: 1, sessionDate: '2026-10-20',
+      points: 4.5, isSudden: false,
+    },
+  );
+
+  assert.equal(response.status, 400);
+  assert.match(await response.text(), /Correction reason is required/);
+  assert.equal(queryCount, 0);
 });
 
 test('session edit rejects invalid calendar dates', async () => {

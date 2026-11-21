@@ -278,6 +278,13 @@ export async function handleAdminUpdateProgress(env, session, body) {
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const TIME_RE = /^\d{2}:\d{2}$/;
+const MAX_CORRECTION_REASON_LENGTH = 1000;
+
+function parseCorrectionReason(body) {
+  if (typeof body?.correctionReason !== 'string') return null;
+  const reason = body.correctionReason.trim();
+  return reason && reason.length <= MAX_CORRECTION_REASON_LENGTH ? reason : null;
+}
 
 function isValidISODate(value) {
   if (!DATE_RE.test(value)) return false;
@@ -470,6 +477,11 @@ export async function handleAdminRecurringTimetable(env, session, body) {
   }
 
   const operation = body.operation;
+  const correctionReason = parseCorrectionReason(body);
+  if ((operation === 'edit' ||
+       (operation === 'exception' && body.action === 'modify')) && !correctionReason) {
+    return new Response('Correction reason is required (maximum 1000 characters)', { status: 400 });
+  }
   if (operation === 'create') {
     const effectiveFrom = body.startDate;
     const version = recurringInput(body, null, effectiveFrom);
@@ -507,7 +519,7 @@ export async function handleAdminRecurringTimetable(env, session, body) {
       return new Response('replaceFutureExceptions must be a boolean', { status: 400 });
     }
     await updateRecurringSeriesFrom(env.DB, seriesId, current, version, cutoffDate,
-      body.replaceFutureExceptions, session.employeeId, session.email);
+      body.replaceFutureExceptions, session.employeeId, session.email, correctionReason);
     return Response.json({ success: true, seriesId, cutoffDate });
   }
 
@@ -546,7 +558,9 @@ export async function handleAdminRecurringTimetable(env, session, body) {
       if (invalid) return new Response(invalid, { status: 400 });
       await setRecurringException(env.DB, seriesId, occurrenceDate, 'modified', version, session.employeeId);
       await logScheduleHistory(env.DB, session.email, 'modify', 'recurring-occurrence', seriesId,
-        `Modified series ${seriesId} occurrence ${occurrenceDate}`);
+        `Modified series ${seriesId} occurrence ${occurrenceDate}; ` +
+        `points ${Number(occurrence.points).toFixed(1)} -> ${Number(version.points).toFixed(1)}; ` +
+        `reason: ${correctionReason}`);
       return Response.json({ success: true, occurrenceDate, modified: true });
     }
     return new Response('Invalid occurrence action', { status: 400 });
@@ -670,6 +684,7 @@ export async function handleAdminAssignSession(env, session, body) {
  * @apiBody {String} [endTime] End time in HH:MM format.
  * @apiBody {Number} points Credited points from 0 to 100.
  * @apiBody {Boolean} isSudden Whether this is a sudden session.
+ * @apiBody {String} correctionReason Required reason for editing the session (1-1000 characters).
  * @apiBody {String} [notes] Optional notes.
  * @apiSuccess {Boolean} success Always true when updated.
  * @apiError 400 Invalid update payload.
@@ -688,6 +703,7 @@ export async function handleAdminUpdateSession(env, session, body) {
   const points = Number(body?.points);
   const isSudden = body?.isSudden;
   const notes = body?.notes == null ? null : String(body.notes);
+  const correctionReason = parseCorrectionReason(body);
   if (!Number.isSafeInteger(sessionId) || sessionId < 1 ||
       !Number.isSafeInteger(programId) || programId < 1 ||
       typeof sessionDate !== 'string' || !isValidISODate(sessionDate) ||
@@ -696,6 +712,9 @@ export async function handleAdminUpdateSession(env, session, body) {
       !Number.isFinite(points) || points < 0 || points > 100 ||
       typeof isSudden !== 'boolean') {
     return new Response('Invalid update payload', { status: 400 });
+  }
+  if (!correctionReason) {
+    return new Response('Correction reason is required (maximum 1000 characters)', { status: 400 });
   }
 
   const [before, program] = await Promise.all([
@@ -712,7 +731,9 @@ export async function handleAdminUpdateSession(env, session, body) {
   await logScheduleHistory(
     env.DB, session.email, 'update', 'session', sessionId,
     `Updated "${before.program_name}" ${before.session_date} to ` +
-    `"${updated.program_name}" ${sessionDate} (${startTime || '—'}–${endTime || '—'})`
+    `"${updated.program_name}" ${sessionDate} (${startTime || '—'}–${endTime || '—'}); ` +
+    `points ${Number(before.points).toFixed(1)} -> ${Number(updated.points).toFixed(1)}; ` +
+    `reason: ${correctionReason}`
   );
   return Response.json({ success: true, session: updated });
 }

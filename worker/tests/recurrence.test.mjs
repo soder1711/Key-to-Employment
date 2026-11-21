@@ -210,6 +210,7 @@ test('future series edits atomically version the series and preserve exceptions 
     operation: 'edit', seriesId: 4, cutoffDate,
     weekday: 2, programId: 2, employeeId: 7, startTime: '10:00', endTime: '11:00',
     points: 3, isSudden: false, notes: null, replaceFutureExceptions: false,
+    correctionReason: 'Updated after review',
   });
 
   assert.equal(response.status, 200);
@@ -218,6 +219,24 @@ test('future series edits atomically version the series and preserve exceptions 
   assert.ok(statements[1].sql.includes('DELETE FROM recurring_schedule_versions'));
   assert.ok(statements[2].sql.includes('INSERT INTO recurring_schedule_versions'));
   assert.ok(statements[3].sql.includes('INSERT INTO schedule_history'));
+  assert.match(statements[3].values[2], /points 2\.0 -> 3\.0/);
+  assert.match(statements[3].values[2], /reason: Updated after review/);
   assert.equal(statements[0].values[0], cutoffDate);
   assert.ok(statements.every(item => !item.sql.includes('schedule_sessions')));
+});
+
+test('recurring series edits require a correction reason before database reads', async () => {
+  let queryCount = 0;
+  const response = await handleAdminRecurringTimetable(
+    { DB: { prepare() { queryCount++; } } },
+    { isAdmin: true, employeeId: 99, email: 'admin@example.com' },
+    {
+      operation: 'edit', seriesId: 4, cutoffDate: '2026-11-23',
+      replaceFutureExceptions: false,
+    },
+  );
+
+  assert.equal(response.status, 400);
+  assert.match(await response.text(), /Correction reason is required/);
+  assert.equal(queryCount, 0);
 });

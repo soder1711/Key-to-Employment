@@ -323,6 +323,11 @@
         </div>
         <label for="assign-notes" data-i18n="modal.notes">Notes</label>
         <input type="text" id="assign-notes" maxlength="1000" data-i18n-placeholder="modal.notesPlaceholder" placeholder="optional">
+        <div id="correction-reason-field" style="display:none;">
+          <label for="correction-reason" data-i18n="modal.correctionReason">Correction reason (required)</label>
+          <textarea id="correction-reason" maxlength="1000" rows="2"
+            data-i18n-placeholder="modal.correctionReasonPlaceholder"></textarea>
+        </div>
         <button id="assign-submit" type="submit" class="btn modal-submit" data-i18n="modal.add">Add task</button>
         <button id="assign-rule-stop" type="button" class="btn danger small" style="display:none;" data-i18n="schedule.endSeries">End series from date</button>
       </form>

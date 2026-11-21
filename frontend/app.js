@@ -444,6 +444,14 @@ document.getElementById('modal-assign-form').addEventListener('submit', async (e
   e.preventDefault();
   const btn = document.getElementById('assign-submit');
   if (btn.disabled) return;
+  const correctionReason = document.getElementById('correction-reason').value.trim();
+  const correctionReasonRequired = (editingSession && currentSession) ||
+    (editingTimetable && currentRule);
+  if (correctionReasonRequired && !correctionReason) {
+    showModalError(t('modal.correctionReasonRequired'));
+    document.getElementById('correction-reason').focus();
+    return;
+  }
   btn.disabled = true;
   try {
     const repeatOn = document.getElementById('assign-repeat').checked;
@@ -460,6 +468,7 @@ document.getElementById('modal-assign-form').addEventListener('submit', async (e
       points: Number(document.getElementById('assign-points').value),
       isSudden: document.getElementById('assign-sudden').checked,
       notes: document.getElementById('assign-notes').value || null,
+      ...(correctionReasonRequired ? { correctionReason } : {}),
     };
     if (editingTimetable) {
       await saveTimetableRule(payload);

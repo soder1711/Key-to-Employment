@@ -577,7 +577,8 @@ export async function createRecurringSeriesBatch(db, versions, createdBy, actorE
 }
 
 export async function updateRecurringSeriesFrom(
-  db, seriesId, currentVersion, version, cutoffDate, replaceFutureExceptions, createdBy, actorEmail
+  db, seriesId, currentVersion, version, cutoffDate, replaceFutureExceptions, createdBy, actorEmail,
+  correctionReason
 ) {
   const statements = [];
   if (cutoffDate > currentVersion.effective_from) {
@@ -621,7 +622,10 @@ export async function updateRecurringSeriesFrom(
     `INSERT INTO schedule_history (actor_email, action, entity, entity_id, details)
      VALUES (?, 'update', 'recurring-series', ?, ?)`
   ).bind(actorEmail, seriesId,
-    `Updated series from ${cutoffDate}; future exceptions ${replaceFutureExceptions ? 'replaced' : 'preserved'}`));
+    `Updated series from ${cutoffDate}; ` +
+    `points ${Number(currentVersion.points).toFixed(1)} -> ${Number(version.points).toFixed(1)}; ` +
+    `reason: ${correctionReason}; ` +
+    `future exceptions ${replaceFutureExceptions ? 'replaced' : 'preserved'}`));
   await db.batch(statements);
 }
 

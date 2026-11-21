@@ -7,6 +7,15 @@ let editingSession = false;
 let editingTimetable = false;
 let currentRule = null;
 
+function setCorrectionReasonRequired(required) {
+  const field = document.getElementById('correction-reason-field');
+  const input = document.getElementById('correction-reason');
+  field.style.display = required ? 'block' : 'none';
+  input.required = required;
+  input.disabled = !required;
+  input.value = '';
+}
+
 function scheduleChangeSummary(before, after) {
   const describe = item => {
     const program = adminPrograms.find(p => p.program_id === Number(item.programId ?? item.program_id));
@@ -102,6 +111,7 @@ function closeModal() {
   editingSession = false;
   editingTimetable = false;
   currentRule = null;
+  setCorrectionReasonRequired(false);
 }
 
 function showModalError(msg) {
@@ -184,6 +194,7 @@ function openRuleModal(weekday, rule = null) {
   currentSession = null;
   currentRule = rule;
   editingSession = false;
+  setCorrectionReasonRequired(!!rule);
   planPeriod = null;
   openModal('rule');
   populateRulePickers();
@@ -247,6 +258,10 @@ async function confirmRecurringRuleConflict(candidate, excludedSeriesId = null) 
 }
 
 async function saveTimetableRule(payload) {
+  if (currentRule && !payload.correctionReason?.trim()) {
+    showModalError(t('modal.correctionReasonRequired'));
+    return;
+  }
   const body = {
     ...payload, operation: currentRule ? 'edit' : 'create',
     weekday: Number(document.getElementById('assign-weekday').value),
@@ -281,6 +296,7 @@ function resetAssignRepeat() {
 
 function openAssignModal(employeeId, date) {
   editingSession = false;
+  setCorrectionReasonRequired(false);
   document.getElementById('assign-date-row').style.display = 'none';
   document.querySelector('label[for="assign-date"]').textContent = t('modal.date');
   document.getElementById('assign-repeat-option').style.display = 'block';
@@ -308,6 +324,7 @@ function openAssignModal(employeeId, date) {
 }
 
 function openDetailsModal(sessionId, seriesId = null, occurrenceDate = null) {
+  setCorrectionReasonRequired(false);
   const s = seriesId != null
     ? sessionByOccurrence.get(`${seriesId}:${occurrenceDate}`)
     : sessionById.get(sessionId);
@@ -337,6 +354,7 @@ function openDetailsModal(sessionId, seriesId = null, occurrenceDate = null) {
 function openSessionEdit() {
   if (!currentSession) return;
   editingSession = true;
+  setCorrectionReasonRequired(true);
   const s = currentSession;
   document.getElementById('modal-title').textContent = t('modal.editTitle');
   document.getElementById('assign-context').textContent =
@@ -370,6 +388,7 @@ function recurringSessionPayload(s) {
 
 function openSessionClone() {
   if (!currentSession) return;
+  setCorrectionReasonRequired(false);
   const monday = mondayOf(currentSession.session_date);
   const sourceDate = currentSession.session_date;
   const options = [];
