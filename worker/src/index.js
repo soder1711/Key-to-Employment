@@ -10,7 +10,7 @@ import {
   handleAdminReassignSession,
   handleAdminUpdateSession, handleAdminCloneSession, handleAdminCopyScheduleWeek,
   handleAdminSetWeeklyTimetable, handleAdminGetTimetable, handleAdminRecurringTimetable,
-  handleAdminListPrograms, handleAdminCreateProgram, handleAdminDeleteProgram,
+  handleAdminListPrograms, handleAdminCreateProgram, handleAdminUpdateProgram, handleAdminDeleteProgram,
 } from './api.js';
 
 // CORS: allow only your GitHub Pages origin
@@ -135,6 +135,10 @@ export default {
       else if (url.pathname === '/api/admin/programs' && request.method === 'POST') {
         const body = await request.json();
         response = await handleAdminCreateProgram(env, currentSession, body);
+      }
+      else if (url.pathname === '/api/admin/programs/update' && request.method === 'POST') {
+        const body = await request.json();
+        response = await handleAdminUpdateProgram(env, currentSession, body);
       }
       else if (url.pathname === '/api/admin/programs/delete' && request.method === 'POST') {
         const body = await request.json();

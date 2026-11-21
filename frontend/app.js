@@ -430,6 +430,14 @@ document.getElementById('session-delete').addEventListener('click', async () => 
   else alert(t('err.deleteFailed'));
 });
 
+document.getElementById('session-edit-task-info').addEventListener('click', async () => {
+  const programId = currentSession?.program_id;
+  if (!programId) return;
+  closeModal();
+  await openProgramModal();
+  openProgramEditor(programId);
+});
+
 document.getElementById('session-end-series').addEventListener('click', async () => {
   if (!currentSession?.is_recurring) return;
   const recurrenceDate = currentSession.recurrence_date || currentSession.session_date;
@@ -490,22 +498,24 @@ document.getElementById('program-submit').addEventListener('click', async (e) =>
 
   btn.disabled = true;
   try {
-    const res = await api('/api/admin/programs', {
+    const res = await api(editingProgramId
+      ? '/api/admin/programs/update'
+      : '/api/admin/programs', {
       method: 'POST',
-      body: JSON.stringify({ code, name, category, defaultPoints, defaultStart, defaultEnd }),
+      body: JSON.stringify(editingProgramId
+        ? { programId: editingProgramId, code, name, category, defaultPoints, defaultStart, defaultEnd }
+        : { code, name, category, defaultPoints, defaultStart, defaultEnd }),
     });
     if (!res.ok) {
       showProgramError(t('err.saveFailed') + (await res.text()));
     } else {
       const data = await res.json();
-      ['program-code', 'program-name', 'program-category'].forEach(
-        id => document.getElementById(id).value = '');
-      document.getElementById('program-points').value = 1;
-      document.getElementById('program-start').value = '';
-      document.getElementById('program-end').value = '';
+      resetProgramEditor();
       // Refresh the picker too; selects the new task if the assign form is open
       await refreshAdminPrograms(data.program?.program_id);
       renderProgramList();
+      if (planLoaded) await loadPlanBoard();
+      refreshScheduleViews();
     }
   } catch (err) {
     showProgramError(t('err.network') + err.message);
@@ -515,6 +525,11 @@ document.getElementById('program-submit').addEventListener('click', async (e) =>
 });
 
 document.getElementById('program-list').addEventListener('click', async (e) => {
+  const editBtn = e.target.closest('.pm-edit');
+  if (editBtn) {
+    openProgramEditor(Number(editBtn.dataset.programId));
+    return;
+  }
   const btn = e.target.closest('.pm-del');
   if (!btn) return;
   if (!confirm(t('confirm.programDelete'))) return;
