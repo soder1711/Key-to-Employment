@@ -203,9 +203,10 @@ GET /api/schedule/monthly?year=2026&month=10
 ```http
 GET /api/schedule/history?limit=50
 GET /api/schedule/history?before=42&limit=50
+GET /api/schedule/history?after=42&limit=100
 ```
 
-Returns `{ "entries": [ ... ], "hasMore": true }` in newest-first order. `limit` defaults to 50 and must be from 1 to 100. `before` is an optional history ID cursor for loading older entries. All authenticated staff can read the append-only audit history, including schedule, staff, and programme creation/deletion changes.
+Returns `{ "entries": [ ... ], "hasMore": true }` in newest-first order. `limit` defaults to 50 and must be from 1 to 100. `before` is an optional history ID cursor for loading older entries. `after` is an optional cursor for retrieving newer entries in ascending order; it cannot be combined with `before`. All authenticated staff can read the append-only audit history, including schedule, staff, and programme creation/deletion changes.
 
 ### Manage the staff directory
 

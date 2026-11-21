@@ -51,6 +51,20 @@ function fixture() {
 const submit = elements => elements.get('schedule-change-form').dispatchEvent(new Event('submit', { cancelable: true }));
 const input = elements => elements.get('schedule-change-form').dispatchEvent(new Event('input'));
 
+test('successful writes refresh the loaded history without refreshing the page', async () => {
+  const { context, run } = fixture();
+  const refreshes = [];
+  context.fetch = async () => ({ ok: true });
+  context.loadHistory = reset => refreshes.push(reset);
+  run('historyLoaded = true');
+
+  await run("api('/api/admin/programs', { method: 'POST' })");
+  assert.deepEqual(refreshes, [true]);
+
+  await run("api('/api/me')");
+  assert.deepEqual(refreshes, [true]);
+});
+
 test('admin Schedule and Plan open their distinct default assignment views', () => {
   const { elements, run } = fixture();
   assert.equal(run('scheduleViewMode'), 'timetable');

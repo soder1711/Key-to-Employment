@@ -374,8 +374,23 @@ test('history endpoint validates pagination and uses a descending cursor', async
   );
   assert.deepEqual(await lastPage.json(), { entries: [{ history_id: 4 }], hasMore: false });
 
+  historyRows = [{ history_id: 5 }, { history_id: 6 }];
+  const newer = await handleGetScheduleHistory(
+    env, new URL('https://worker.example/api/schedule/history?after=4&limit=2'),
+  );
+  assert.deepEqual(bindings, [4, 3]);
+  assert.match(query, /history_id > \? ORDER BY history_id ASC LIMIT \?/);
+  assert.deepEqual(await newer.json(), {
+    entries: [{ history_id: 5 }, { history_id: 6 }],
+    hasMore: false,
+  });
+
   const invalid = await handleGetScheduleHistory(
     env, new URL('https://worker.example/api/schedule/history?limit=101'),
   );
   assert.equal(invalid.status, 400);
+  const conflictingCursors = await handleGetScheduleHistory(
+    env, new URL('https://worker.example/api/schedule/history?before=9&after=4'),
+  );
+  assert.equal(conflictingCursors.status, 400);
 });

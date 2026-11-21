@@ -2,6 +2,9 @@
 
 let historyBefore = null;
 let historyHasMore = false;
+let historyNewestId = 0;
+let historyRequestInFlight = false;
+const HISTORY_REFRESH_INTERVAL_MS = 10_000;
 
 function fmtHistoryTime(value) {
   const raw = String(value);
@@ -14,7 +17,19 @@ function fmtHistoryTime(value) {
   }).format(timestamp);
 }
 
+function renderHistoryEntry(entry) {
+  return `<tr>
+    <td data-label="${escapeHtml(t('history.date'))}">${escapeHtml(fmtHistoryTime(entry.acted_at))}</td>
+    <td data-label="${escapeHtml(t('history.actor'))}">${escapeHtml(entry.actor_email)}</td>
+    <td data-label="${escapeHtml(t('history.action'))}">${escapeHtml(entry.action)}</td>
+    <td data-label="${escapeHtml(t('history.record'))}">${escapeHtml(entry.entity)}${entry.entity_id == null ? '' : ` #${escapeHtml(entry.entity_id)}`}</td>
+    <td data-label="${escapeHtml(t('history.details'))}">${escapeHtml(entry.details)}</td>
+  </tr>`;
+}
+
 async function loadHistory(reset = false) {
+  if (historyRequestInFlight) return;
+  historyRequestInFlight = true;
   const tbody = document.getElementById('history-entries');
   const loading = document.getElementById('history-loading');
   const empty = document.getElementById('history-empty');
@@ -23,6 +38,7 @@ async function loadHistory(reset = false) {
   if (reset) {
     historyBefore = null;
     historyHasMore = false;
+    historyNewestId = 0;
     tbody.innerHTML = '';
   }
   loading.style.display = tbody.children.length ? 'none' : 'block';
@@ -31,19 +47,13 @@ async function loadHistory(reset = false) {
   older.disabled = true;
   const query = historyBefore ? `?before=${historyBefore}` : '';
   try {
-    const response = await api(`/api/schedule/history${query}`);
+    const response = await api(`/api/schedule/history${query}`, { cache: 'no-store' });
     if (!response.ok) throw new Error(String(response.status));
     const { entries, hasMore } = await response.json();
     if (!Array.isArray(entries)) throw new Error('Invalid response');
-    tbody.insertAdjacentHTML('beforeend', entries.map(entry => `
-      <tr>
-        <td data-label="${escapeHtml(t('history.date'))}">${escapeHtml(fmtHistoryTime(entry.acted_at))}</td>
-        <td data-label="${escapeHtml(t('history.actor'))}">${escapeHtml(entry.actor_email)}</td>
-        <td data-label="${escapeHtml(t('history.action'))}">${escapeHtml(entry.action)}</td>
-        <td data-label="${escapeHtml(t('history.record'))}">${escapeHtml(entry.entity)}${entry.entity_id == null ? '' : ` #${escapeHtml(entry.entity_id)}`}</td>
-        <td data-label="${escapeHtml(t('history.details'))}">${escapeHtml(entry.details)}</td>
-      </tr>`).join(''));
+    tbody.insertAdjacentHTML('beforeend', entries.map(renderHistoryEntry).join(''));
     if (entries.length) historyBefore = entries[entries.length - 1].history_id;
+    if (reset) historyNewestId = entries.length ? Number(entries[0].history_id) : 0;
     historyHasMore = Boolean(hasMore);
     historyLoaded = true;
     empty.style.display = tbody.children.length ? 'none' : 'block';
@@ -55,8 +65,67 @@ async function loadHistory(reset = false) {
   } finally {
     loading.style.display = 'none';
     older.disabled = false;
+    historyRequestInFlight = false;
   }
 }
+
+async function refreshLatestHistory() {
+  if (!historyLoaded || historyRequestInFlight) return;
+  historyRequestInFlight = true;
+  const tbody = document.getElementById('history-entries');
+  const empty = document.getElementById('history-empty');
+  const error = document.getElementById('history-error');
+  try {
+    let after = historyNewestId;
+    let hasMore;
+    const newEntries = [];
+    do {
+      const response = await api(
+        `/api/schedule/history?after=${after}&limit=100`,
+        { cache: 'no-store' },
+      );
+      if (!response.ok) throw new Error(String(response.status));
+      const data = await response.json();
+      if (!Array.isArray(data.entries)) throw new Error('Invalid response');
+      if (!data.entries.length) break;
+      newEntries.push(...data.entries);
+      const lastId = Number(data.entries[data.entries.length - 1].history_id);
+      if (!Number.isSafeInteger(lastId) || lastId <= after) {
+        throw new Error('Invalid history cursor');
+      }
+      after = lastId;
+      hasMore = Boolean(data.hasMore);
+    } while (hasMore);
+
+    if (newEntries.length) {
+      historyNewestId = after;
+      tbody.insertAdjacentHTML('afterbegin', newEntries.reverse().map(renderHistoryEntry).join(''));
+      empty.style.display = 'none';
+    }
+    error.style.display = 'none';
+  } catch (err) {
+    error.textContent = t('history.loadError', { status: err.message || 'network error' });
+    error.style.display = 'block';
+  } finally {
+    historyRequestInFlight = false;
+  }
+}
+
+function isHistoryViewVisible() {
+  return document.getElementById('history-section').style.display !== 'none';
+}
+
+setInterval(() => {
+  if (document.visibilityState === 'visible' && isHistoryViewVisible()) {
+    refreshLatestHistory();
+  }
+}, HISTORY_REFRESH_INTERVAL_MS);
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && isHistoryViewVisible()) {
+    refreshLatestHistory();
+  }
+});
 
 async function loadStaffDirectory() {
   if (!currentUser?.isAdmin) return;

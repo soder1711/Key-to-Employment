@@ -496,11 +496,14 @@ function setLang(newLang) {
 }
 
 async function api(path, opts = {}) {
-  return fetch(`${WORKER}${path}`, {
+  const response = await fetch(`${WORKER}${path}`, {
     credentials: 'include',
     headers: { 'Content-Type': 'application/json', ...(opts.headers || {}) },
     ...opts,
   });
+  const method = (opts.method || 'GET').toUpperCase();
+  if (response.ok && method !== 'GET' && historyLoaded) loadHistory(true);
+  return response;
 }
 
 function escapeHtml(s) {

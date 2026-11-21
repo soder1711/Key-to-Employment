@@ -59,15 +59,18 @@ export async function deactivateEmployee(db, employeeId) {
   `).bind(employeeId).run();
 }
 
-export async function getScheduleHistory(db, beforeId, limit) {
-  const query = beforeId
+export async function getScheduleHistory(db, beforeId, limit, afterId = null) {
+  const query = afterId !== null
     ? `SELECT history_id, acted_at, actor_email, action, entity, entity_id, details
-       FROM schedule_history WHERE history_id < ? ORDER BY history_id DESC LIMIT ?`
-    : `SELECT history_id, acted_at, actor_email, action, entity, entity_id, details
-       FROM schedule_history ORDER BY history_id DESC LIMIT ?`;
+       FROM schedule_history WHERE history_id > ? ORDER BY history_id ASC LIMIT ?`
+    : beforeId !== null
+      ? `SELECT history_id, acted_at, actor_email, action, entity, entity_id, details
+         FROM schedule_history WHERE history_id < ? ORDER BY history_id DESC LIMIT ?`
+      : `SELECT history_id, acted_at, actor_email, action, entity, entity_id, details
+         FROM schedule_history ORDER BY history_id DESC LIMIT ?`;
   const statement = db.prepare(query);
-  const result = beforeId
-    ? await statement.bind(beforeId, limit).all()
+  const result = afterId !== null || beforeId !== null
+    ? await statement.bind(afterId ?? beforeId, limit).all()
     : await statement.bind(limit).all();
   return result.results;
 }

@@ -1141,15 +1141,20 @@ export async function handleAdminDeactivateEmployee(env, session, body) {
 }
 
 export async function handleGetScheduleHistory(env, url) {
+  const hasBefore = url.searchParams.has('before');
+  const hasAfter = url.searchParams.has('after');
   const before = url.searchParams.has('before')
     ? Number(url.searchParams.get('before'))
     : null;
+  const after = hasAfter ? Number(url.searchParams.get('after')) : null;
   const limit = url.searchParams.has('limit') ? Number(url.searchParams.get('limit')) : 50;
-  if ((before !== null && (!Number.isSafeInteger(before) || before < 1)) ||
+  if ((hasBefore && hasAfter) ||
+      (before !== null && (!Number.isSafeInteger(before) || before < 1)) ||
+      (after !== null && (!Number.isSafeInteger(after) || after < 0)) ||
       !Number.isSafeInteger(limit) || limit < 1 || limit > 100) {
     return new Response('Invalid history pagination', { status: 400 });
   }
-  const entries = await getScheduleHistory(env.DB, before, limit + 1);
+  const entries = await getScheduleHistory(env.DB, before, limit + 1, after);
   return Response.json({
     entries: entries.slice(0, limit),
     hasMore: entries.length > limit,
