@@ -59,7 +59,7 @@ async function loadMyTasks() {
     ...tasks.map(renderMyTaskRow),
     ...planSessions.map(s => `
       <tr>
-        <td class="cell-task" data-label="${escapeHtml(t('th.task'))}"><span class="task-name">${escapeHtml(s.program_name)}${scheduleBadge(s)}</span></td>
+        <td class="cell-task" data-label="${escapeHtml(t('th.task'))}"><span class="task-name">${escapeHtml(s.program_name)}${scheduleBadge(s)}${deletedProgramBadge(s)}</span></td>
         <td data-label="${escapeHtml(t('th.priority'))}"><span class="cat-tag ${escapeHtml(s.category)}">${escapeHtml(s.category)}</span></td>
         <td data-label="${escapeHtml(t('th.status'))}">${statusPill(s.status)}</td>
         <td class="cell-due" data-label="${escapeHtml(t('th.date'))}">${fmtCellDate(s.session_date)} · ${fmtTime(s.start_time)}${s.end_time ? '–' + fmtTime(s.end_time) : ''}</td>
@@ -79,7 +79,7 @@ async function loadMyTasks() {
 
 // ================= Sign-in / bootstrap =================
 
-async function load() {
+async function loadApp() {
   if (LOCAL_DEMO) {
     currentUser = { email: t('summary.demoUser'), isAdmin: true };
     document.getElementById('signin-section').style.display = 'none';
@@ -99,10 +99,10 @@ async function load() {
   const me = await api('/api/me');
 
   if (me.status === 401) {
-    document.getElementById('signin-section').style.display = 'flex';
-    document.getElementById('signin-link').href = `${WORKER}/auth/google`;
+    showSignIn();
     return;
   }
+  if (!me.ok) throw new Error(`Request failed (${me.status})`);
 
   const user = await me.json();
   currentUser = user;
@@ -139,4 +139,24 @@ async function load() {
     document.getElementById('manage-tasks-btn').style.display = 'inline-block';
   }
 }
+
+async function load() {
+  const error = document.getElementById('signin-error');
+  const retry = document.getElementById('signin-retry');
+  error.style.display = 'none';
+  retry.style.display = 'none';
+  try {
+    await loadApp();
+  } catch (err) {
+    currentUser = null;
+    document.getElementById('app').style.display = 'none';
+    document.getElementById('signin-section').style.display = 'flex';
+    document.getElementById('signin-link').href = `${WORKER}/auth/google`;
+    error.textContent = `${t('login.loadError')} ${err.message || ''}`.trim();
+    error.style.display = 'block';
+    retry.style.display = 'inline-block';
+  }
+}
+
+document.getElementById('signin-retry').addEventListener('click', load);
 

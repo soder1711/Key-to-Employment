@@ -102,17 +102,30 @@ function openModal(which) {
   document.getElementById('modal-details').style.display = which === 'details' ? 'block' : 'none';
   document.getElementById('session-clone-form').style.display = which === 'clone' ? 'block' : 'none';
   document.getElementById('modal-error').style.display = 'none';
-  modal.style.display = 'flex';
+  if (!modal.open) modal.showModal();
+  const focusTarget = editingTimetable
+    ? document.getElementById('assign-weekday')
+    : document.getElementById(which === 'details' ? 'session-edit' :
+      which === 'clone' ? 'clone-back' : 'assign-program');
+  focusTarget.focus();
 }
 
 function closeModal() {
-  modal.style.display = 'none';
+  if (modal.open) modal.close();
   currentSession = null;
   editingSession = false;
   editingTimetable = false;
   currentRule = null;
   setCorrectionReasonRequired(false);
 }
+
+modal.addEventListener('close', () => {
+  currentSession = null;
+  editingSession = false;
+  editingTimetable = false;
+  currentRule = null;
+  setCorrectionReasonRequired(false);
+});
 
 function showModalError(msg) {
   const el = document.getElementById('modal-error');
@@ -133,12 +146,15 @@ function populatePrograms(currentProgramId = null, currentSession = null) {
       code: currentSession.program_code,
       name: currentSession.program_name,
       category: currentSession.category,
-      default_points: currentSession.points,
+      default_points: currentSession.program_default_points ??
+        (currentSession.is_sudden ? Number(currentSession.points || 0) / 2 : currentSession.points),
+      is_deleted: Number(currentSession.program_is_active) === 0,
     });
   }
   sel.innerHTML = programs.map(p =>
     `<option value="${p.program_id}">${escapeHtml(p.code)} — ${escapeHtml(p.name)} ` +
-    `(${escapeHtml(p.category)}, ${Number(p.default_points).toFixed(1)} ${t('unit.pts')})</option>`).join('') +
+    `(${escapeHtml(p.category)}, ${Number(p.default_points).toFixed(1)} ${t('unit.pts')}` +
+    `${p.is_deleted ? `, ${t('programs.deletedTag')}` : ''})</option>`).join('') +
     newProgramOption();
 }
 
@@ -156,7 +172,14 @@ function updateAssignPeriodHint() {
 function refreshAssignDefaults() {
   const sel = document.getElementById('assign-program');
   if (sel.value === '__new__') { updateAssignPeriodHint(); return; }
-  const p = adminPrograms.find(x => x.program_id === Number(sel.value));
+  const p = adminPrograms.find(x => x.program_id === Number(sel.value)) ||
+    (currentRule && Number(currentRule.program_id) === Number(sel.value)
+      ? {
+          default_points: currentRule.program_default_points,
+          default_start: currentRule.start_time,
+          default_end: currentRule.end_time,
+        }
+      : null);
   if (!p) { updateAssignPeriodHint(); return; }
 
   // No period forcing any more: the program's default times are used as-is.
@@ -180,6 +203,18 @@ function refreshAssignDefaults() {
   ptsInput.readOnly = !editingSession && !editingTimetable;
 
   updateAssignPeriodHint();
+}
+
+function refreshTimetableDefaultPoints() {
+  const programId = Number(document.getElementById('assign-program').value);
+  const program = adminPrograms.find(item => item.program_id === programId);
+  const defaultPoints = program?.default_points ??
+    (currentRule && Number(currentRule.program_id) === programId
+      ? currentRule.program_default_points
+      : null);
+  if (defaultPoints == null) return;
+  document.getElementById('assign-points').value =
+    Number(defaultPoints) * (document.getElementById('assign-sudden').checked ? 2 : 1);
 }
 
 function populateRulePickers() {
@@ -338,7 +373,7 @@ function openDetailsModal(sessionId, seriesId = null, occurrenceDate = null) {
     : `<em>${escapeHtml(t('person.unassigned'))}</em>`;
   document.getElementById('modal-title').textContent = t('modal.detailsTitle');
   document.getElementById('detail-info').innerHTML = `
-    <strong>${escapeHtml(s.program_name)}</strong>${scheduleBadge(s)} (${escapeHtml(s.category)})<br>
+    <strong>${escapeHtml(s.program_name)}</strong>${scheduleBadge(s)}${deletedProgramBadge(s)} (${escapeHtml(s.category)})<br>
     ${people} · ${fmtCellDate(s.session_date)}<br>
     ${fmtTime(s.start_time)}${s.end_time ? '–' + fmtTime(s.end_time) : ''} ·
     ${Number(s.points).toFixed(1)} ${t('unit.pts')}${s.is_sudden ? ` · ${escapeHtml(t('tag.sudden'))}` : ''} ·

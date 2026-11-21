@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  handleAdminAssignSession,
   handleAdminCloneSession,
   handleAdminCopyScheduleWeek,
   handleAdminSetWeeklyTimetable,
@@ -125,6 +126,55 @@ test('session correction requires a reason before reading the session', async ()
   assert.equal(response.status, 400);
   assert.match(await response.text(), /Correction reason is required/);
   assert.equal(queryCount, 0);
+});
+
+test('one-off session updates reject recurring materialized sessions', async () => {
+  const { db, sessions, history } = mockDb([
+    makeSession({ recurring_series_id: 12, recurrence_date: '2026-10-19' }),
+  ]);
+  const response = await handleAdminUpdateSession({ DB: db }, admin, {
+    sessionId: 1, programId: 1, sessionDate: '2026-10-20', startTime: '11:00',
+    endTime: '12:00', points: 4.5, isSudden: true, notes: 'updated',
+    correctionReason: 'Corrected after review',
+  });
+  assert.equal(response.status, 400);
+  assert.equal(sessions[0].session_date, '2026-10-19');
+  assert.deepEqual(history, []);
+});
+
+test('session assignment rejects invalid calendar dates and reversed times', async () => {
+  for (const payload of [
+    { date: '2026-02-31', startTime: '09:00', endTime: '10:00' },
+    { date: '2026-02-28', startTime: '11:00', endTime: '10:00' },
+  ]) {
+    let queries = 0;
+    const response = await handleAdminAssignSession(
+      { DB: { prepare() { queries++; throw new Error('must not query'); } } },
+      admin,
+      { programId: 1, points: 2, ...payload },
+    );
+    assert.equal(response.status, 400);
+    assert.equal(queries, 0);
+  }
+});
+
+test('session assignment rejects inactive employees', async () => {
+  const response = await handleAdminAssignSession(
+    {
+      DB: {
+        prepare(sql) {
+          assert.match(sql, /FROM employees WHERE employee_id = \?/);
+          return { bind: () => ({ first: async () => ({ employee_id: 7, is_active: 0 }) }) };
+        },
+      },
+    },
+    admin,
+    {
+      employeeId: 7, programId: 1, date: '2026-02-28',
+      startTime: '09:00', endTime: '10:00', points: 2,
+    },
+  );
+  assert.equal(response.status, 400);
 });
 
 test('session edit rejects invalid calendar dates', async () => {

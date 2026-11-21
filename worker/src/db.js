@@ -274,6 +274,18 @@ export async function deactivateProgram(db, programId) {
   return result;
 }
 
+export async function reactivateProgram(db, programId) {
+  const result = await db.prepare(
+    `UPDATE programs SET is_active = 1 WHERE program_id = ? AND is_active = 0`
+  ).bind(programId).run();
+  if (result.meta.changes > 0) {
+    await db.prepare(
+      `UPDATE weekly_schedule_templates SET is_active = 1 WHERE program_id = ?`
+    ).bind(programId).run();
+  }
+  return result;
+}
+
 // Hard delete: only used when no session references the task
 export async function hardDeleteProgram(db, programId) {
   return await db.prepare(
@@ -318,6 +330,7 @@ const SESSION_SELECT = `
          ) AS assignees_json,
          rs.ended_from AS series_ended_from,
          p.code AS program_code, p.name AS program_name, p.category,
+         p.is_active AS program_is_active, p.default_points AS program_default_points,
          e.first_name, e.last_name, e.email AS employee_email
   FROM schedule_sessions s
   JOIN programs p ON p.program_id = s.program_id
@@ -410,10 +423,12 @@ export async function getRecurringOccurrencesBetween(db, startDate, endDate, emp
   const [versions, exceptions, sessions, assignments] = await Promise.all([
     db.prepare(`
       SELECT v.*, v.series_id, rs.ended_from, p.code AS program_code, p.name AS program_name,
-             p.category, e.first_name, e.last_name, e.email AS employee_email
+             p.category, p.is_active AS program_is_active,
+             p.default_points AS program_default_points,
+             e.first_name, e.last_name, e.email AS employee_email
       FROM recurring_schedule_versions v
       JOIN recurring_schedule_series rs ON rs.series_id = v.series_id
-      JOIN programs p ON p.program_id = v.program_id AND p.is_active = 1
+      LEFT JOIN programs p ON p.program_id = v.program_id
       LEFT JOIN employees e ON e.employee_id = v.employee_id
       WHERE v.effective_from <= ?
         AND (v.effective_to IS NULL OR v.effective_to > ?)
@@ -424,6 +439,7 @@ export async function getRecurringOccurrencesBetween(db, startDate, endDate, emp
              x.moved_date, x.start_time, x.end_time, x.points, x.is_sudden, x.notes,
                     rs.ended_from AS series_ended_from,
              p.code AS program_code, p.name AS program_name, p.category,
+             p.is_active AS program_is_active, p.default_points AS program_default_points,
              e.first_name, e.last_name, e.email AS employee_email
       FROM recurring_schedule_exceptions x
              JOIN recurring_schedule_series rs ON rs.series_id = x.series_id
@@ -447,10 +463,12 @@ export async function getRecurringOccurrenceByKey(db, seriesId, occurrenceDate) 
   const [versions, exceptions, sessions, assignments] = await Promise.all([
     db.prepare(`
       SELECT v.*, rs.ended_from, p.code AS program_code, p.name AS program_name,
-             p.category, e.first_name, e.last_name, e.email AS employee_email
+             p.category, p.is_active AS program_is_active,
+             p.default_points AS program_default_points,
+             e.first_name, e.last_name, e.email AS employee_email
       FROM recurring_schedule_versions v
       JOIN recurring_schedule_series rs ON rs.series_id = v.series_id
-      JOIN programs p ON p.program_id = v.program_id
+      LEFT JOIN programs p ON p.program_id = v.program_id
       LEFT JOIN employees e ON e.employee_id = v.employee_id
       WHERE v.series_id = ? AND v.effective_from <= ?
         AND (v.effective_to IS NULL OR v.effective_to > ?)
@@ -461,6 +479,7 @@ export async function getRecurringOccurrenceByKey(db, seriesId, occurrenceDate) 
              x.moved_date, x.start_time, x.end_time, x.points, x.is_sudden, x.notes,
              rs.ended_from AS series_ended_from,
              p.code AS program_code, p.name AS program_name, p.category,
+             p.is_active AS program_is_active, p.default_points AS program_default_points,
              e.first_name, e.last_name, e.email AS employee_email
       FROM recurring_schedule_exceptions x
       JOIN recurring_schedule_series rs ON rs.series_id = x.series_id
@@ -517,10 +536,11 @@ export async function getRecurringTimetable(db, today = vietnamDateISO()) {
            v.start_time, v.end_time, v.points, v.is_sudden, v.notes,
            v.start_date, v.end_date, v.effective_from,
            p.code AS program_code, p.name AS program_name, p.category,
+           p.is_active AS program_is_active, p.default_points AS program_default_points,
            e.first_name, e.last_name
     FROM recurring_schedule_versions v
     JOIN recurring_schedule_series rs ON rs.series_id = v.series_id
-    JOIN programs p ON p.program_id = v.program_id AND p.is_active = 1
+    LEFT JOIN programs p ON p.program_id = v.program_id
     LEFT JOIN employees e ON e.employee_id = v.employee_id
     WHERE v.effective_to IS NULL AND rs.ended_from IS NULL
       AND (v.end_date IS NULL OR v.end_date >= ?)

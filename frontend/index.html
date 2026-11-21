@@ -269,13 +269,15 @@
             <span data-i18n="login.google">Sign in with Google</span>
           </a>
           <p class="signin-hint" data-i18n="login.hint">Your access level is determined by your account.</p>
+          <p id="signin-error" class="error" role="alert" style="display:none;"></p>
+          <button id="signin-retry" type="button" class="btn small" data-i18n="login.retry" style="display:none;">Retry</button>
         </div>
       </div>
     </div>
     <p class="login-footer" data-i18n="app.footer">© 2026 Staff Scheduler</p>
   </div>
 
-  <div id="session-modal" class="modal-overlay" style="display:none;">
+  <dialog id="session-modal" class="modal-overlay" aria-labelledby="modal-title">
     <div class="modal">
       <div class="modal-head">
         <h3 id="modal-title">Assign session</h3>
@@ -361,12 +363,12 @@
 
       <p id="modal-error" class="error" style="display:none;"></p>
     </div>
-  </div>
+  </dialog>
 
-  <div id="program-modal" class="modal-overlay" style="display:none;">
+  <dialog id="program-modal" class="modal-overlay" aria-labelledby="program-modal-title">
     <div class="modal program-modal">
       <div class="modal-head">
-        <h3 data-i18n="programs.title">Programmes</h3>
+        <h3 id="program-modal-title" data-i18n="programs.title">Programmes</h3>
         <button id="program-modal-close" class="modal-x" aria-label="Close">✕</button>
       </div>
 
@@ -417,7 +419,7 @@
       <button id="program-submit" class="btn modal-submit" data-i18n="programs.create">Create programme</button>
       <p id="program-error" class="error" style="display:none;"></p>
     </div>
-  </div>
+  </dialog>
 
   <dialog id="schedule-change-dialog" class="modal change-dialog" aria-labelledby="schedule-change-title">
     <form id="schedule-change-form">

@@ -139,15 +139,31 @@ function renderMonthProgress(summary, label) {
 // ---------- Admin week grid ----------
 
 function slotChipHtml(s) {
+  const interactive = currentUser?.isAdmin;
+  const tag = interactive ? 'button' : 'span';
+  const status = t('status.' + s.status);
+  const programName = `${s.program_name}${Number(s.program_is_active) === 0
+    ? `, ${t('programs.deletedTag')}` : ''}`;
+  const label = t('schedule.openSession', {
+    program: programName,
+    status,
+    date: fmtCellDate(s.session_date),
+    time: fmtTime(s.start_time),
+    points: Number(s.points).toFixed(1),
+    unit: t('unit.pts'),
+  });
+  const statusCue = s.status === 'completed' ? '✓ ' : s.status === 'cancelled' ? '× ' : '';
   return `
-    <span class="slot-chip ${escapeHtml(s.status)}${s.is_sudden ? ' sudden' : ''}${s.is_recurring ? ' recurring' : ''}"
+    <${tag} ${interactive ? `type="button" aria-label="${escapeHtml(label)}"` : ''}
+          class="slot-chip ${escapeHtml(s.status)}${s.is_sudden ? ' sudden' : ''}${s.is_recurring ? ' recurring' : ''}${interactive ? '' : ' read-only'}"
           data-session-id="${s.session_id ?? ''}"
           data-series-id="${s.recurring_series_id ?? ''}"
           data-occurrence-date="${s.recurrence_date || s.session_date}"
           data-display-date="${s.session_date}" data-recurrence-date="${s.recurrence_date || s.session_date}"
-          title="${escapeHtml(s.program_name)} · ${fmtTime(s.start_time)} · ${Number(s.points).toFixed(1)} ${t('unit.pts')} · ${escapeHtml(t('status.' + s.status))}">
-      ${escapeHtml(s.program_code)}${s.start_time ? ' ' + fmtTime(s.start_time) : ''}${scheduleBadge(s)}
-    </span>`;
+          title="${escapeHtml(s.program_name)} · ${fmtTime(s.start_time)} · ${Number(s.points).toFixed(1)} ${t('unit.pts')} · ${escapeHtml(status)}">
+      <span>${escapeHtml(s.program_code)}${s.start_time ? ' ' + fmtTime(s.start_time) : ''}${scheduleBadge(s)}${deletedProgramBadge(s)}</span>
+      <span class="slot-status" ${interactive ? 'aria-hidden="true"' : ''}>${statusCue}${escapeHtml(status)}</span>
+    </${tag}>`;
 }
 
 async function loadAdminSchedule() {
@@ -183,7 +199,7 @@ function timetableChipHtml(entry) {
   const dates = t('schedule.ruleDates', { start: entry.start_date, end: entry.end_date || t('schedule.noEnd') });
   return `<button type="button" class="slot-chip recurring timetable-chip${entry.is_sudden ? ' sudden' : ''}"
     data-timetable-edit="${entry.series_id}">
-    <span>${escapeHtml(entry.program_name)} · ${escapeHtml(fmtTime(entry.start_time))}${entry.end_time ? `–${escapeHtml(fmtTime(entry.end_time))}` : ''}</span>
+    <span>${escapeHtml(entry.program_name)}${deletedProgramBadge(entry)} · ${escapeHtml(fmtTime(entry.start_time))}${entry.end_time ? `–${escapeHtml(fmtTime(entry.end_time))}` : ''}</span>
     <span class="mini-tag weekly-tag">${escapeHtml(t('schedule.weekly'))}</span>
     <small>${escapeHtml(dates)}</small><small>${escapeHtml(effective)}</small>
   </button>`;
@@ -233,6 +249,9 @@ function renderScheduleGrid(columns, employees, entries, timetable = false) {
         data-label="${escapeHtml(columnLabel)}"
         ${employeeId === null ? '' : `data-employee-id="${employeeId}"`} ${timetable ? `data-weekday="${column}"` : `data-date="${column}"`}>
         ${list.map(timetable ? timetableChipHtml : slotChipHtml).join('')}
+        ${!timetable && currentUser?.isAdmin ? `<button type="button" class="grid-add-session"
+          aria-label="${escapeHtml(t('schedule.addSessionFor', { employee: name, date: fmtCellDate(column) }))}"
+          title="${escapeHtml(t('schedule.addSessionFor', { employee: name, date: fmtCellDate(column) }))}">+</button>` : ''}
         ${timetable ? `<button type="button" class="add-task-btn" data-timetable-add="${column}">${escapeHtml(t('schedule.createEntry'))}</button>` : ''}</td>`;
     }
     html += `<td class="pts-cell" data-label="${escapeHtml(t(timetable ? 'plan.pointsTotal' : 'grid.pts'))}">${timetable || points ? points.toFixed(1) : ''}</td></tr>`;

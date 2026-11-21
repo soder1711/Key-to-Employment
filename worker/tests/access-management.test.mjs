@@ -7,6 +7,7 @@ import {
   handleAdminDeactivateEmployee,
   handleAdminCreateProgram,
   handleAdminDeleteProgram,
+  handleAdminReactivateProgram,
   handleAdminReactivateEmployee,
   handleGetScheduleHistory,
   handleUpdateProgress,
@@ -337,12 +338,12 @@ test('reactivation endpoint cannot change administrator accounts', async () => {
   assert.equal(updateAttempted, false);
 });
 
-function makeProgramTestEnv(referenceCount = 0) {
+function makeProgramTestEnv(referenceCount = 0, isActive = 1) {
   const statements = [];
   const program = {
     program_id: 42, code: 'NEWS', name: 'Morning news',
     category: 'news', default_points: 1, default_start: null,
-    default_end: null, is_active: 1,
+    default_end: null, is_active: isActive,
   };
   const env = {
     DB: {
@@ -407,6 +408,23 @@ test('programme deletions are recorded whether hidden or permanently removed', a
       'admin@example.com', 'delete', 'programme', 42, details,
     ]);
   }
+});
+
+test('programme reactivation restores it and its weekly timetable', async () => {
+  const { env, statements } = makeProgramTestEnv(2, 0);
+  const response = await handleAdminReactivateProgram(
+    env, { isAdmin: true, email: 'admin@example.com' }, { programId: 42 },
+  );
+  assert.equal(response.status, 200);
+  assert.ok(statements.some(item =>
+    item.sql.includes('UPDATE programs SET is_active = 1 WHERE program_id = ? AND is_active = 0')));
+  assert.ok(statements.some(item =>
+    item.sql.includes('UPDATE weekly_schedule_templates SET is_active = 1')));
+  const history = statements.find(item => item.sql.includes('INSERT INTO schedule_history'));
+  assert.deepEqual(history.values, [
+    'admin@example.com', 'reactivate', 'programme', 42,
+    'Reactivated programme "Morning news" (NEWS)',
+  ]);
 });
 
 test('history endpoint validates pagination and uses a descending cursor', async () => {

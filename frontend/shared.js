@@ -100,6 +100,8 @@ const I18N = {
     'schedule.adminHint': 'Click an empty cell to add a session; click a session to record completion or edit it.',
     'schedule.viewerHint': 'Read-only view of all staff sessions for the selected week.',
     'schedule.loadError': 'Failed to load schedule: {msg}',
+    'schedule.addSessionFor': 'Add a session for {employee} on {date}',
+    'schedule.openSession': 'Open session: {program}, {status}, {date}, {time}, {points} {unit}',
     'sth.date': 'Date', 'sth.program': 'Programme', 'sth.category': 'Category',
     'sth.time': 'Time', 'sth.points': 'Points', 'sth.status': 'Status',
     'grid.employee': 'Employee', 'grid.pts': 'Earned points',
@@ -128,6 +130,8 @@ const I18N = {
     'login.sub': 'Sign in with your work account to view schedules, workload reports, and history.',
     'login.google': 'Sign in with Google',
     'login.hint': 'Your access level is determined by your account.',
+    'login.loadError': 'Could not load the app. Check your connection and try again.',
+    'login.retry': 'Retry',
     'modal.task': 'Programme', 'modal.date': 'Date', 'modal.start': 'Start', 'modal.end': 'End',
     'modal.points': 'Points (calculated automatically)', 'modal.pointsEditable': 'Points',
     'modal.sudden': ' Sudden session (doubles the points)',
@@ -155,6 +159,7 @@ const I18N = {
     'programs.new': 'New programme', 'programs.create': 'Create programme',
     'programs.listEmpty': 'No programmes in the database yet.',
     'programs.deletedTag': 'deleted', 'programs.deleteBtn': 'Delete',
+    'programs.reactivateBtn': 'Reactivate',
     'pth.code': 'Code', 'pth.task': 'Programme', 'pth.category': 'Category',
     'pth.pts': 'Default pts', 'pth.time': 'Default time', 'pth.action': 'Action',
     'plabel.code': 'Code', 'plabel.category': 'Category', 'plabel.name': 'Name',
@@ -184,6 +189,7 @@ const I18N = {
     'confirm.copyWeek': 'Copy the schedule from {from} to {to}? Existing matching sessions will not be duplicated.',
     'confirm.deleteDay': 'Delete this session? The deletion is recorded in history.',
     'confirm.programDelete': 'Hide or delete this programme? Existing sessions are kept.',
+    'confirm.programReactivate': 'Reactivate this programme and its weekly timetable?',
     'alert.copyWeek': 'Copied {count} sessions to next week; {skipped} matching sessions were not duplicated.',
     'alert.assignRepeat': 'Session added to {n} weeks (same weekday, same time). Browse to later weeks to see it.',
     'dialog.notice': 'Notice', 'dialog.confirm': 'Confirm action',
@@ -294,6 +300,8 @@ const I18N = {
     'schedule.adminHint': 'Nhấp ô trống để thêm phiên; nhấp phiên để ghi nhận hoàn thành hoặc chỉnh sửa.',
     'schedule.viewerHint': 'Chế độ chỉ xem các phiên của toàn bộ nhân viên trong tuần đã chọn.',
     'schedule.loadError': 'Không tải được lịch: {msg}',
+    'schedule.addSessionFor': 'Thêm phiên cho {employee} vào ngày {date}',
+    'schedule.openSession': 'Mở phiên: {program}, {status}, {date}, {time}, {points} {unit}',
     'sth.date': 'Ngày', 'sth.program': 'Chương trình', 'sth.category': 'Danh mục',
     'sth.time': 'Giờ', 'sth.points': 'Điểm', 'sth.status': 'Trạng thái',
     'grid.employee': 'Nhân viên', 'grid.pts': 'Điểm đã đạt',
@@ -322,6 +330,8 @@ const I18N = {
     'login.sub': 'Đăng nhập bằng tài khoản công việc để xem lịch, báo cáo khối lượng và lịch sử.',
     'login.google': 'Đăng nhập bằng Google',
     'login.hint': 'Quyền truy cập của bạn được xác định theo tài khoản.',
+    'login.loadError': 'Không tải được ứng dụng. Hãy kiểm tra kết nối và thử lại.',
+    'login.retry': 'Thử lại',
     'modal.task': 'Chương trình', 'modal.date': 'Ngày', 'modal.start': 'Bắt đầu', 'modal.end': 'Kết thúc',
     'modal.points': 'Điểm (tính tự động)', 'modal.pointsEditable': 'Điểm',
     'modal.sudden': ' Phiên đột xuất (nhân đôi điểm)',
@@ -349,6 +359,7 @@ const I18N = {
     'programs.new': 'Chương trình mới', 'programs.create': 'Tạo chương trình',
     'programs.listEmpty': 'Chưa có chương trình nào trong cơ sở dữ liệu.',
     'programs.deletedTag': 'đã xóa', 'programs.deleteBtn': 'Xóa',
+    'programs.reactivateBtn': 'Kích hoạt lại',
     'pth.code': 'Mã', 'pth.task': 'Chương trình', 'pth.category': 'Danh mục',
     'pth.pts': 'Điểm mặc định', 'pth.time': 'Giờ mặc định', 'pth.action': 'Thao tác',
     'plabel.code': 'Mã', 'plabel.category': 'Danh mục', 'plabel.name': 'Tên',
@@ -378,6 +389,7 @@ const I18N = {
     'confirm.copyWeek': 'Sao chép lịch từ {from} sang {to}? Các phiên trùng khớp sẽ không bị sao chép thêm.',
     'confirm.deleteDay': 'Xóa phiên này? Thao tác sẽ được ghi lại trong lịch sử.',
     'confirm.programDelete': 'Ẩn hoặc xóa chương trình này? Các phiên hiện có vẫn được giữ lại.',
+    'confirm.programReactivate': 'Kích hoạt lại chương trình và thời khóa biểu hàng tuần?',
     'alert.copyWeek': 'Đã sao chép {count} phiên sang tuần sau; không sao chép {skipped} phiên trùng khớp.',
     'alert.assignRepeat': 'Phiên đã được thêm vào {n} tuần (cùng ngày, cùng giờ). Chuyển đến các tuần sau để xem.',
     'dialog.notice': 'Thông báo', 'dialog.confirm': 'Xác nhận thao tác',
@@ -423,6 +435,7 @@ const monthName = i => t(`month.${i + 1}`);
 
 function showAppDialog(message, confirmation = false) {
   const dialog = document.getElementById('app-message-dialog');
+  if (dialog.open) return Promise.resolve(false);
   const title = document.getElementById('app-message-title');
   const content = document.getElementById('app-message-content');
   const cancel = document.getElementById('app-message-cancel');
@@ -512,14 +525,29 @@ function setLang(newLang) {
 }
 
 async function api(path, opts = {}) {
-  const response = await fetch(`${WORKER}${path}`, {
-    credentials: 'include',
-    headers: { 'Content-Type': 'application/json', ...(opts.headers || {}) },
-    ...opts,
-  });
   const method = (opts.method || 'GET').toUpperCase();
-  if (response.ok && method !== 'GET' && historyLoaded) loadHistory(true);
+  const headers = new Headers(opts.headers || {});
+  if (opts.body != null && !headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json');
+  }
+  const response = await fetch(`${WORKER}${path}`, {
+    ...opts,
+    credentials: 'include',
+    headers,
+  });
+  if (response.status === 401 && path.startsWith('/api/')) showSignIn();
+  if (response.ok && method !== 'GET' && historyLoaded &&
+      typeof isHistoryViewVisible === 'function' && isHistoryViewVisible()) {
+    void refreshLatestHistory();
+  }
   return response;
+}
+
+function showSignIn() {
+  currentUser = null;
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('signin-section').style.display = 'flex';
+  document.getElementById('signin-link').href = `${WORKER}/auth/google`;
 }
 
 function escapeHtml(s) {
@@ -547,6 +575,11 @@ function scheduleBadge(item) {
   if (!item?.is_recurring) return '';
   const label = item.is_modified ? t('schedule.weeklyModified') : t('schedule.weekly');
   return ` <span class="mini-tag weekly-tag">${escapeHtml(label)}</span>`;
+}
+
+function deletedProgramBadge(item) {
+  if (item?.program_is_active == null || Number(item.program_is_active) !== 0) return '';
+  return ` <span class="mini-tag pm-deleted-tag">${escapeHtml(t('programs.deletedTag'))}</span>`;
 }
 
 function statusPill(status) {

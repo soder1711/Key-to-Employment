@@ -311,6 +311,13 @@ document.getElementById('schedule-copy-next').addEventListener('click', async (e
 
 document.getElementById('admin-schedule-grid').addEventListener('click', (e) => {
   if (!currentUser?.isAdmin) return;
+  const addButton = e.target.closest('.grid-add-session');
+  if (addButton) {
+    const cell = addButton.closest('.grid-cell');
+    const raw = cell.dataset.employeeId;
+    openAssignModal(raw === undefined || raw === '' ? null : Number(raw), cell.dataset.date);
+    return;
+  }
   const chip = e.target.closest('.slot-chip');
   if (chip) {
     openDetailsFromElement(chip);
@@ -350,7 +357,7 @@ document.addEventListener('keydown', (e) => {
   if (document.getElementById('plan-section').style.display !== 'block') return;
   if (planViewMode !== 'sessions') return;
   if (document.getElementById('schedule-change-dialog').open) return;
-  if (modal.style.display === 'flex' || programModal.style.display === 'flex') return;
+  if (modal.open || programModal.open) return;
   if (document.activeElement?.closest?.('.nav-jump')) return;
   const tag = ((document.activeElement && document.activeElement.tagName) || '').toUpperCase();
   if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
@@ -429,8 +436,7 @@ document.getElementById('assign-program').addEventListener('change', (e) => {
 });
 document.getElementById('assign-sudden').addEventListener('change', () => {
   if (!editingTimetable) { refreshAssignDefaults(); return; }
-  const input = document.getElementById('assign-points');
-  input.value = Number(input.value) * (document.getElementById('assign-sudden').checked ? 2 : 0.5);
+  refreshTimetableDefaultPoints();
 });
 
 // Live allocation hint while the start time is edited
@@ -694,12 +700,15 @@ document.getElementById('program-submit').addEventListener('click', async (e) =>
 });
 
 document.getElementById('program-list').addEventListener('click', async (e) => {
-  const btn = e.target.closest('.pm-del');
+  const btn = e.target.closest('.pm-del, .pm-reactivate');
   if (!btn) return;
-  if (!await confirmAction(t('confirm.programDelete'))) return;
+  const reactivating = btn.matches('.pm-reactivate');
+  if (!await confirmAction(t(reactivating ? 'confirm.programReactivate' : 'confirm.programDelete'))) return;
   document.getElementById('program-error').style.display = 'none';
   try {
-    const res = await api('/api/admin/programs/delete', {
+    const res = await api(reactivating
+      ? '/api/admin/programs/reactivate'
+      : '/api/admin/programs/delete', {
       method: 'POST',
       body: JSON.stringify({ programId: Number(btn.dataset.programId) }),
     });

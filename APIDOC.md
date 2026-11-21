@@ -133,6 +133,15 @@ Projected occurrences include `is_recurring: true`, `is_projected: true`, `recur
 
 Write endpoints require `isAdmin: true`. Read-only workforce endpoints are available to all authenticated active staff, despite retaining the `/api/admin/` route prefix for compatibility.
 
+### Reactivate a hidden programme
+
+```http
+POST /api/admin/programs/reactivate
+Content-Type: application/json
+```
+
+Request: `{ "programId": 4 }`. Reactivates the programme and its weekly timetable templates.
+
 ### List all staff tasks
 
 ```http

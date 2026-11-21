@@ -12,18 +12,20 @@ function recurringVersion() {
     notes: null, start_date: '2026-11-02', end_date: null,
     effective_from: '2026-11-02', effective_to: null,
     program_code: 'TASK', program_name: 'Weekly task', category: 'general',
+    program_is_active: 1, program_default_points: 3,
   };
 }
 
-function scheduleDb({ assignees = [], oneOff = null } = {}) {
+function scheduleDb({ assignees = [], oneOff = null, programIsActive = 1, queries = [] } = {}) {
   return {
     prepare(sql) {
+      queries.push(sql);
       return {
         bind() {
           return {
             all: async () => {
               if (sql.includes('FROM recurring_schedule_versions')) {
-                return { results: [recurringVersion()] };
+                return { results: [{ ...recurringVersion(), program_is_active: programIsActive }] };
               }
               if (sql.includes('SELECT oa.recurring_series_id')) return { results: assignees };
               if (sql.includes('WHERE s.session_date >= ? AND s.session_date <= ?')) {
@@ -56,8 +58,24 @@ test('recurring timetable filters by the Vietnam calendar date', async () => {
   await getRecurringTimetable(db, '2026-11-22');
 
   assert.match(query, /v\.end_date IS NULL OR v\.end_date >= \?/);
+  assert.match(query, /LEFT JOIN programs p ON p\.program_id = v\.program_id/);
+  assert.doesNotMatch(query, /p\.is_active\s*=\s*1/);
   assert.doesNotMatch(query, /date\('now'\)/);
   assert.deepEqual(bindings, ['2026-11-22']);
+});
+
+test('recurring occurrences remain visible after their programme is hidden', async () => {
+  const queries = [];
+  const rows = await getScheduleBetween(
+    scheduleDb({ programIsActive: 0, queries }),
+    '2026-11-16',
+    '2026-11-22',
+  );
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].program_is_active, 0);
+  const versionQuery = queries.find(sql => sql.includes('FROM recurring_schedule_versions'));
+  assert.match(versionQuery, /LEFT JOIN programs p ON p\.program_id = v\.program_id/);
+  assert.doesNotMatch(versionQuery, /p\.is_active\s*=\s*1/);
 });
 
 test('recurring occurrences distinguish unassigned, single, and multiple employees', async () => {

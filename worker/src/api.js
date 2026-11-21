@@ -11,7 +11,7 @@ import {
   updateRecurringSeriesFrom, endRecurringSeriesFrom, endRecurringTimetableFrom,
   setRecurringException, saveRecurringOccurrence,
   setOccurrenceAssignment, getAllPrograms, getProgramById, getProgramByCode,
-  createProgram, deactivateProgram, hardDeleteProgram, countProgramReferences,
+  createProgram, deactivateProgram, reactivateProgram, hardDeleteProgram, countProgramReferences,
   getEmployeeDirectory, findEmployeeByCodeOrEmail, createEmployee,
   getManagedEmployee, deactivateEmployee, reactivateEmployee, getScheduleHistory,
 } from './db.js';
@@ -237,6 +237,42 @@ export async function handleAdminDeleteProgram(env, session, body) {
     (hasReferences
       ? 'hidden; existing schedule records retained'
       : 'removed; no schedule records referenced it')
+  );
+  return Response.json({ success: true });
+}
+
+/**
+ * @api {post} /api/admin/programs/reactivate Restore a hidden programme
+ * @apiName AdminReactivateProgram
+ * @apiGroup AdminTasks
+ * @apiHeader {String} Cookie Encrypted admin session cookie.
+ * @apiBody {Number} programId Programme identifier.
+ * @apiSuccess {Boolean} success Whether the programme was reactivated.
+ * @apiError 400 Invalid programme identifier.
+ * @apiError 403 Admin access required.
+ * @apiError 404 Programme not found.
+ */
+export async function handleAdminReactivateProgram(env, session, body) {
+  const denied = requireAdmin(session);
+  if (denied) return denied;
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return new Response('Invalid programme identifier', { status: 400 });
+  }
+
+  const programId = Number(body.programId);
+  if (!Number.isSafeInteger(programId) || programId < 1) {
+    return new Response('Invalid programme identifier', { status: 400 });
+  }
+  const program = await getProgramById(env.DB, programId);
+  if (!program) return new Response('Programme not found', { status: 404 });
+  if (Number(program.is_active) !== 0) {
+    return Response.json({ success: true, alreadyActive: true });
+  }
+
+  await reactivateProgram(env.DB, programId);
+  await logScheduleHistory(
+    env.DB, session.email, 'reactivate', 'programme', programId,
+    `Reactivated programme "${program.name}" (${program.code})`
   );
   return Response.json({ success: true });
 }
@@ -593,6 +629,9 @@ export async function handleAdminRecurringTimetable(env, session, body) {
 export async function handleAdminAssignSession(env, session, body) {
   const denied = requireAdmin(session);
   if (denied) return denied;
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return new Response('Invalid assignment payload', { status: 400 });
+  }
 
   const {
     employeeId: requestedEmployeeId,
@@ -603,7 +642,7 @@ export async function handleAdminAssignSession(env, session, body) {
     ? null
     : Number(requestedEmployeeId);
   const parsedProgramId = Number(programId);
-  const sessionDate = typeof date === 'string' ? date.slice(0, 10) : '';
+  const sessionDate = typeof date === 'string' ? date : '';
   const invalidFields = [];
   if (employeeId !== null && (!Number.isSafeInteger(employeeId) || employeeId < 1)) {
     invalidFields.push('employeeId');
@@ -611,7 +650,7 @@ export async function handleAdminAssignSession(env, session, body) {
   if (!Number.isSafeInteger(parsedProgramId) || parsedProgramId < 1) {
     invalidFields.push('programId');
   }
-  if (!DATE_RE.test(sessionDate)) {
+  if (!isValidISODate(sessionDate)) {
     invalidFields.push('date');
   }
   if (invalidFields.length) {
@@ -620,8 +659,22 @@ export async function handleAdminAssignSession(env, session, body) {
       { status: 400 }
     );
   }
-  if (startTime && !TIME_RE.test(startTime)) return new Response('Invalid start time', { status: 400 });
-  if (endTime && !TIME_RE.test(endTime)) return new Response('Invalid end time', { status: 400 });
+  const validOptionalTime = value => value == null || value === '' ||
+    (typeof value === 'string' && TIME_RE.test(value) &&
+      Number(value.slice(0, 2)) <= 23 && Number(value.slice(3, 5)) <= 59);
+  if (!validOptionalTime(startTime)) return new Response('Invalid start time', { status: 400 });
+  if (!validOptionalTime(endTime)) return new Response('Invalid end time', { status: 400 });
+  if (startTime && endTime && endTime <= startTime) {
+    return new Response('End time must be after start time', { status: 400 });
+  }
+  if (employeeId !== null) {
+    const employee = await env.DB.prepare(
+      `SELECT employee_id, is_active FROM employees WHERE employee_id = ?`
+    ).bind(employeeId).first();
+    if (!employee || !employee.is_active) {
+      return new Response('Unknown or inactive employee', { status: 400 });
+    }
+  }
 
   let repeat = Number(repeatWeeks);
   if (!Number.isInteger(repeat) || repeat < 1) repeat = 1;
@@ -717,11 +770,12 @@ export async function handleAdminUpdateSession(env, session, body) {
     return new Response('Correction reason is required (maximum 1000 characters)', { status: 400 });
   }
 
-  const [before, program] = await Promise.all([
-    getSessionById(env.DB, sessionId),
-    getProgramById(env.DB, programId),
-  ]);
+  const before = await getSessionById(env.DB, sessionId);
   if (!before) return new Response('Session not found', { status: 404 });
+  if (before.recurring_series_id != null) {
+    return new Response('Use the recurring timetable endpoint to edit recurring sessions', { status: 400 });
+  }
+  const program = await getProgramById(env.DB, programId);
   if (!program) return new Response('Task type not found', { status: 404 });
 
   await updateSession(env.DB, sessionId, {

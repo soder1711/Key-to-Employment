@@ -11,6 +11,7 @@ import {
   handleAdminUpdateSession, handleAdminCloneSession, handleAdminCopyScheduleWeek,
   handleAdminSetWeeklyTimetable, handleAdminGetTimetable, handleAdminRecurringTimetable,
   handleAdminListPrograms, handleAdminCreateProgram, handleAdminDeleteProgram,
+  handleAdminReactivateProgram,
   handleAdminListEmployees, handleAdminCreateEmployee, handleAdminDeactivateEmployee,
   handleAdminReactivateEmployee,
   handleGetScheduleHistory,
@@ -160,6 +161,10 @@ export default {
       else if (url.pathname === '/api/admin/programs/delete' && request.method === 'POST') {
         const body = await request.json();
         response = await handleAdminDeleteProgram(env, currentSession, body);
+      }
+      else if (url.pathname === '/api/admin/programs/reactivate' && request.method === 'POST') {
+        const body = await request.json();
+        response = await handleAdminReactivateProgram(env, currentSession, body);
       }
       else if (url.pathname === '/api/admin/employees' && request.method === 'GET') {
         response = await handleAdminListEmployees(env, currentSession);

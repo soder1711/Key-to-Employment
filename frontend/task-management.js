@@ -30,7 +30,8 @@ function renderProgramList() {
       ? `${fmtTime(p.default_start)}–${fmtTime(p.default_end)}` : '—';
     const action = p.is_active
       ? `<button type="button" class="btn small danger pm-del" data-program-id="${p.program_id}">${escapeHtml(t('programs.deleteBtn'))}</button>`
-      : `<span class="mini-tag pm-deleted-tag">${escapeHtml(t('programs.deletedTag'))}</span>`;
+      : `<span class="mini-tag pm-deleted-tag">${escapeHtml(t('programs.deletedTag'))}</span>
+         <button type="button" class="btn small ghost pm-reactivate" data-program-id="${p.program_id}">${escapeHtml(t('programs.reactivateBtn'))}</button>`;
     return `<tr${p.is_active ? '' : ' class="cancelled-row"'}>
       <td class="pm-code" data-label="${escapeHtml(t('pth.code'))}">${escapeHtml(p.code)}</td>
       <td data-label="${escapeHtml(t('pth.task'))}">${escapeHtml(p.name)}</td>
@@ -50,12 +51,12 @@ function showProgramError(msg) {
 
 async function openProgramModal() {
   document.getElementById('program-error').style.display = 'none';
-  programModal.style.display = 'flex';
+  if (!programModal.open) programModal.showModal();
   await refreshAdminPrograms();
   renderProgramList();
 }
 
 function closeProgramModal() {
-  programModal.style.display = 'none';
+  if (programModal.open) programModal.close();
 }
 

@@ -30,7 +30,7 @@ function fixture() {
   const focus = new Element();
   const browserWindow = { location: { search: '', hostname: 'localhost' } };
   const context = vm.createContext({
-    URLSearchParams, Date, console,
+    URLSearchParams, Date, Headers, console,
     window: browserWindow,
     localStorage: { getItem: () => 'en' }, navigator: { language: 'en' },
     document: {
@@ -52,18 +52,112 @@ function fixture() {
 const submit = elements => elements.get('schedule-change-form').dispatchEvent(new Event('submit', { cancelable: true }));
 const input = elements => elements.get('schedule-change-form').dispatchEvent(new Event('input'));
 
-test('successful writes refresh the loaded history without refreshing the page', async () => {
+test('API headers avoid GET preflights and writes refresh visible history incrementally', async () => {
   const { context, run } = fixture();
   const refreshes = [];
-  context.fetch = async () => ({ ok: true });
-  context.loadHistory = reset => refreshes.push(reset);
+  const requests = [];
+  context.fetch = async (_url, options) => {
+    requests.push(options);
+    return { ok: true, status: 200 };
+  };
+  context.refreshLatestHistory = () => refreshes.push('latest');
+  context.isHistoryViewVisible = () => false;
   run('historyLoaded = true');
 
-  await run("api('/api/admin/programs', { method: 'POST' })");
-  assert.deepEqual(refreshes, [true]);
-
   await run("api('/api/me')");
-  assert.deepEqual(refreshes, [true]);
+  assert.equal(requests[0].headers.has('Content-Type'), false);
+
+  await run("api('/api/admin/programs', { method: 'POST', headers: { 'X-Test': 'kept' }, body: '{}' })");
+  assert.equal(requests[1].headers.get('Content-Type'), 'application/json');
+  assert.equal(requests[1].headers.get('X-Test'), 'kept');
+  assert.deepEqual(refreshes, []);
+
+  context.isHistoryViewVisible = () => true;
+  await run("api('/api/admin/programs', { method: 'POST', body: '{}' })");
+  assert.deepEqual(refreshes, ['latest']);
+});
+
+test('a 401 clears the signed-in state and displays the sign-in view', async () => {
+  const { elements, context, run } = fixture();
+  elements.get('app').style.display = 'block';
+  context.fetch = async () => ({ ok: false, status: 401 });
+  run('currentUser = { email: "expired@example.com" }');
+
+  await run("api('/api/admin/schedule')");
+
+  assert.equal(run('currentUser'), null);
+  assert.equal(elements.get('app').style.display, 'none');
+  assert.equal(elements.get('signin-section').style.display, 'flex');
+  assert.match(elements.get('signin-link').href, /\/auth\/google$/);
+});
+
+test('boot network failures show a retry action instead of leaving a blank app', async () => {
+  const { elements, context, run } = fixture();
+  const myTasks = readFileSync(new URL('../my-tasks.js', import.meta.url), 'utf8');
+  vm.runInContext(myTasks, context, { filename: 'my-tasks.js' });
+  context.api = async () => { throw new Error('offline'); };
+
+  await run('load()');
+
+  assert.equal(elements.get('app').style.display, 'none');
+  assert.equal(elements.get('signin-section').style.display, 'flex');
+  assert.equal(elements.get('signin-error').style.display, 'block');
+  assert.match(elements.get('signin-error').textContent, /offline/);
+  assert.equal(elements.get('signin-retry').style.display, 'inline-block');
+});
+
+test('app dialog refuses a second simultaneous message dialog', async () => {
+  const { elements, run } = fixture();
+  let showCount = 0;
+  const dialog = elements.get('app-message-dialog');
+  dialog.open = true;
+  dialog.showModal = () => { showCount++; };
+
+  const result = await run("showAppDialog('another message')");
+
+  assert.equal(result, false);
+  assert.equal(showCount, 0);
+});
+
+test('session modal opens and closes through the native dialog API', () => {
+  const { elements, run } = fixture();
+  run("openModal('assign')");
+  assert.equal(elements.get('session-modal').open, true);
+  run('closeModal()');
+  assert.equal(elements.get('session-modal').open, false);
+  const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  assert.match(html, /<dialog id="session-modal"[\s\S]*?<\/dialog>/);
+  assert.match(html, /<dialog id="program-modal"[\s\S]*?program-submit[\s\S]*?<\/dialog>/);
+});
+
+test('sudden timetable changes always recalculate from programme defaults', () => {
+  const { elements, run } = fixture();
+  elements.get('assign-program').value = '1';
+  elements.get('assign-points').value = '7';
+  elements.get('assign-sudden').checked = true;
+  run('adminPrograms = [{ program_id: 1, default_points: 3 }]; refreshTimetableDefaultPoints()');
+  assert.equal(elements.get('assign-points').value, 6);
+
+  elements.get('assign-points').value = '7';
+  elements.get('assign-sudden').checked = false;
+  run('refreshTimetableDefaultPoints()');
+  assert.equal(elements.get('assign-points').value, 3);
+});
+
+test('dated schedule chips and add controls are keyboard-operable and announce status', () => {
+  const { run } = fixture();
+  const chip = run(`slotChipHtml({
+    session_id: 2, session_date: '2026-11-16', status: 'completed', points: 3,
+    program_code: 'NEWS', program_name: 'News', program_is_active: 0,
+    start_time: '09:00'
+  })`);
+  assert.match(chip, /^\s*<button/);
+  assert.match(chip, /aria-label="Open session: News, deleted, completed/);
+  assert.match(chip, /✓ completed/);
+  assert.match(chip, /deleted/);
+  const grid = run("renderScheduleGrid(['2026-11-16'], [{employee_id:1, first_name:'A', last_name:'B'}], [])");
+  assert.match(grid, /class="grid-add-session"/);
+  assert.match(grid, /Add a session for A B/);
 });
 
 test('viewer My week shows personal monthly progress', async () => {

@@ -458,14 +458,26 @@ button { font-family: inherit; }
 .slot-chip {
   display: inline-flex; align-items: center; margin: 2px; padding: 2px 7px;
   border-radius: 6px; font-size: 0.72rem; font-weight: 700;
+  border: 0; font-family: inherit; text-align: left;
   cursor: pointer; background: var(--blue-600); color: #fff;
 }
+.slot-chip:not(.timetable-chip) { flex-direction: column; align-items: flex-start; }
+.slot-status { font-size: 0.64rem; font-weight: 600; line-height: 1.2; }
 .slot-chip.timetable-chip { display: flex; flex-direction: column; align-items: flex-start; gap: 0.2rem; text-align: left; white-space: normal; font: inherit; font-size: 0.72rem; width: calc(100% - 4px); }
 .timetable-chip small { font-weight: 400; }
 .slot-chip.completed { background: #16a34a; }
 .slot-chip.cancelled { background: #94a3b8; text-decoration: line-through; }
 .slot-chip.sudden { outline: 2px dashed #b45309; outline-offset: -2px; }
-.slot-chip:hover { filter: brightness(1.1); }
+.slot-chip.read-only { cursor: default; }
+.slot-chip:not(.read-only):hover { filter: brightness(1.1); }
+.slot-chip:focus-visible, .grid-add-session:focus-visible {
+  outline: 3px solid #f59e0b; outline-offset: 2px;
+}
+.grid-add-session {
+  margin: 2px; padding: 1px 7px; border: 1px dashed var(--blue-600);
+  border-radius: 6px; background: #fff; color: var(--blue-700);
+  font: inherit; font-size: 0.78rem; font-weight: 700; cursor: pointer;
+}
 
 .assignment-matrix { min-width: 0; table-layout: fixed; }
 .assignment-day-head { min-width: 0; padding: 0.45rem; text-align: center; background: #f8fafc; overflow-wrap: anywhere; }
@@ -674,9 +686,12 @@ button { font-family: inherit; }
 
 /* ---------- Modal ---------- */
 .modal-overlay {
-  position: fixed; inset: 0; background: rgba(15, 23, 42, 0.45);
-  display: flex; align-items: center; justify-content: center; z-index: 50; padding: 1rem;
+  position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+  width: 100%; height: 100%; max-width: none; max-height: none; margin: 0;
+  padding: 1rem; border: 0; background: transparent; color: inherit; overflow: auto;
 }
+.modal-overlay:not([open]) { display: none; }
+.modal-overlay::backdrop { background: rgba(15, 23, 42, 0.45); }
 .modal {
   background: #fff; border-radius: 14px; width: 100%; max-width: 430px;
   padding: 1.4rem; box-shadow: 0 24px 60px rgba(15, 23, 42, 0.25);
@@ -733,7 +748,7 @@ button { font-family: inherit; }
   .topbar { flex-wrap: wrap; }
 }
 
-@media (max-width: 760px) {
+@media (max-width: 960px) {
   .plan-workspace { grid-template-columns: minmax(0, 1fr); gap: 0.75rem; }
   .people-pool { height: 190px; min-height: 0; }
   .plan-board-scroll { height: min(58vh, 540px); min-height: 280px; }
@@ -796,7 +811,7 @@ button { font-family: inherit; }
   .program-list-wrap { overflow-x: hidden; }
 }
 
-@media (max-width: 1440px) {
+@media (max-width: 960px) {
   .grid-scroll { overflow: visible; border: 0; }
   .sched-grid {
     display: block; width: 100%; min-width: 0; border-collapse: separate;
@@ -837,7 +852,7 @@ button { font-family: inherit; }
   .assignment-cell.empty-slot { color: var(--muted); }
 }
 
-@media (max-width: 1100px) {
+@media (max-width: 960px) {
   #monthly-summary-wrap { overflow-x: visible; }
   .monthly-summary-table {
     display: block; width: 100%; min-width: 0; border-collapse: separate;
