@@ -143,7 +143,6 @@ const I18N = {
       'already has scheduled sessions only hides it (the sessions are kept); a task with no ' +
       'sessions is removed from the database.',
     'programs.new': 'New task', 'programs.create': 'Create task',
-    'programs.edit': 'Edit task', 'programs.editInfo': 'Edit task info',
     'programs.listEmpty': 'No tasks in the database yet.',
     'programs.deletedTag': 'deleted', 'programs.deleteBtn': 'Delete',
     'pth.code': 'Code', 'pth.task': 'Task', 'pth.category': 'Category',
@@ -310,7 +309,6 @@ const I18N = {
     'programs.context': 'Tạo nhiệm vụ mới hoặc xóa khỏi danh sách. Xóa nhiệm vụ đã có phiên lên lịch ' +
       'thì chỉ ẩn đi (các phiên được giữ); nhiệm vụ chưa có phiên sẽ bị xóa khỏi cơ sở dữ liệu.',
     'programs.new': 'Nhiệm vụ mới', 'programs.create': 'Tạo nhiệm vụ',
-    'programs.edit': 'Sửa nhiệm vụ', 'programs.editInfo': 'Sửa thông tin nhiệm vụ',
     'programs.listEmpty': 'Chưa có nhiệm vụ nào trong cơ sở dữ liệu.',
     'programs.deletedTag': 'đã xóa', 'programs.deleteBtn': 'Xóa',
     'pth.code': 'Mã', 'pth.task': 'Nhiệm vụ', 'pth.category': 'Danh mục',

@@ -191,16 +191,6 @@ export async function createProgram(db, p) {
          p.defaultStart || null, p.defaultEnd || null).run();
 }
 
-export async function updateProgram(db, programId, p) {
-  return await db.prepare(
-    `UPDATE programs
-       SET code = ?, name = ?, category = ?, default_points = ?,
-           default_start = ?, default_end = ?
-     WHERE program_id = ?`
-  ).bind(p.code, p.name, p.category, p.defaultPoints,
-         p.defaultStart || null, p.defaultEnd || null, programId).run();
-}
-
 // Soft delete: hides the task from pickers but keeps existing sessions intact
 export async function deactivateProgram(db, programId) {
   const result = await db.prepare(

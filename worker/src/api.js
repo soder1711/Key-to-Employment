@@ -11,7 +11,7 @@ import {
   updateRecurringSeriesFrom, endRecurringSeriesFrom, endRecurringTimetableFrom,
   setRecurringException, saveRecurringOccurrence,
   setOccurrenceAssignment, getAllPrograms, getProgramById, getProgramByCode,
-  createProgram, updateProgram, deactivateProgram, hardDeleteProgram, countProgramReferences,
+  createProgram, deactivateProgram, hardDeleteProgram, countProgramReferences,
 } from './db.js';
 import { monthlyDateRange } from './monthly-summary.js';
 
@@ -193,55 +193,6 @@ export async function handleAdminCreateProgram(env, session, body) {
   return Response.json({ program }, { status: 201 });
 }
 
-/**
- * @api {post} /api/admin/programs/update Update a task type
- */
-export async function handleAdminUpdateProgram(env, session, body) {
-  const denied = requireAdmin(session);
-  if (denied) return denied;
-  if (!body || typeof body !== 'object' || Array.isArray(body)) {
-    return new Response('Invalid task type', { status: 400 });
-  }
-
-  const programId = Number(body.programId);
-  if (!Number.isSafeInteger(programId) || programId < 1) {
-    return new Response('Invalid task type identifier', { status: 400 });
-  }
-  const existing = await getProgramById(env.DB, programId);
-  if (!existing) {
-    return new Response('Task type not found', { status: 404 });
-  }
-
-  const code = typeof body.code === 'string' ? body.code.trim() : '';
-  const name = typeof body.name === 'string' ? body.name.trim() : '';
-  const category = typeof body.category === 'string' && body.category.trim()
-    ? body.category.trim()
-    : 'general';
-  const defaultPoints = Number(body.defaultPoints ?? 1);
-  const defaultStart = body.defaultStart || null;
-  const defaultEnd = body.defaultEnd || null;
-  const validTime = value => value === null ||
-    (typeof value === 'string' && /^\d{2}:\d{2}$/.test(value) &&
-      Number(value.slice(0, 2)) <= 23 && Number(value.slice(3, 5)) <= 59);
-
-  if (!code || code.length > 16 || !name || name.length > 120 ||
-      category.length > 32 || !Number.isFinite(defaultPoints) ||
-      defaultPoints < 0 || defaultPoints > 100 ||
-      !validTime(defaultStart) || !validTime(defaultEnd)) {
-    return new Response('Invalid task type', { status: 400 });
-  }
-
-  const codeOwner = await getProgramByCode(env.DB, code);
-  if (codeOwner && codeOwner.program_id !== programId) {
-    return new Response('Task code already exists', { status: 409 });
-  }
-
-  await updateProgram(env.DB, programId, {
-    code, name, category, defaultPoints, defaultStart, defaultEnd,
-  });
-  const program = await getProgramById(env.DB, programId);
-  return Response.json({ program });
-}
 
 /**
  * @api {post} /api/admin/programs/delete Delete a task type
