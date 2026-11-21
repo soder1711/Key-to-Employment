@@ -88,7 +88,7 @@ function switchView(view) {
     monthlySummaryLoaded = true;
     loadMonthlySummary();
   }
-  if (showHistory && !historyLoaded) loadHistory();
+  if (showHistory) loadHistory(true);
   if (showStaff) loadStaffDirectory();
   if (showTasks) loadMyTasks();
   if (showSchedule) {
