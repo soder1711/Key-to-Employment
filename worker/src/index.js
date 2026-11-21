@@ -29,10 +29,29 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     const origin = request.headers.get('Origin');
+    const allowedOrigin = new URL(env.FRONTEND_URL).origin;
 
     // Handle preflight
     if (request.method === 'OPTIONS') {
+      if (origin !== allowedOrigin) {
+        return new Response(null, { status: 403 });
+      }
       return new Response(null, { status: 204, headers: corsHeaders(env) });
+    }
+
+    if (request.method !== 'GET') {
+      if (origin !== allowedOrigin) {
+        return new Response(JSON.stringify({ error: 'Forbidden' }), {
+          status: 403,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      if (!/^application\/json(?:\s*;|$)/i.test(request.headers.get('Content-Type') || '')) {
+        return new Response(JSON.stringify({ error: 'Expected application/json' }), {
+          status: 415,
+          headers: { ...corsHeaders(env), 'Content-Type': 'application/json' },
+        });
+      }
     }
 
     // -------- Public auth routes --------

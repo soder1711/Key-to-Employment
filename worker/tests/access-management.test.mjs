@@ -46,12 +46,78 @@ test('Worker rechecks the staff record and blocks viewer writes', async () => {
   };
   const response = await worker.fetch(new Request('https://worker.example/api/progress', {
     method: 'POST',
-    headers: { Cookie: `session=${cookie}`, 'Content-Type': 'application/json' },
+    headers: {
+      Cookie: `session=${cookie}`,
+      Origin: 'https://frontend.example',
+      'Content-Type': 'application/json',
+    },
     body: JSON.stringify({ assignmentId: 1, percentage: 50 }),
   }), env);
 
   assert.equal(response.status, 403);
   assert.equal(queries.length, 1);
+});
+
+test('Worker rejects state-changing requests from untrusted or missing origins', async () => {
+  let queryCount = 0;
+  const env = {
+    FRONTEND_URL: 'https://frontend.example/path',
+    SESSION_SECRET: 'test-session-secret',
+    DB: {
+      prepare() {
+        queryCount++;
+        throw new Error('must not query');
+      },
+    },
+  };
+  const cookie = await createSession({ employeeId: 7, isAdmin: true }, env.SESSION_SECRET);
+  for (const origin of ['https://attacker.example', null]) {
+    const headers = {
+      Cookie: `session=${cookie}`,
+      'Content-Type': 'text/plain',
+    };
+    if (origin) headers.Origin = origin;
+    const response = await worker.fetch(new Request('https://worker.example/api/admin/schedule/delete', {
+      method: 'POST',
+      headers,
+      body: '{"sessionId":1}',
+    }), env);
+    assert.equal(response.status, 403);
+  }
+  assert.equal(queryCount, 0);
+});
+
+test('Worker rejects unsafe content types and untrusted preflights', async () => {
+  const env = {
+    FRONTEND_URL: 'https://frontend.example/path',
+    DB: { prepare() { throw new Error('must not query'); } },
+  };
+  const invalidType = await worker.fetch(new Request('https://worker.example/api/admin/schedule/delete', {
+    method: 'POST',
+    headers: { Origin: 'https://frontend.example', 'Content-Type': 'text/plain' },
+    body: '{"sessionId":1}',
+  }), env);
+  assert.equal(invalidType.status, 415);
+
+  const invalidPreflight = await worker.fetch(new Request('https://worker.example/api/admin/schedule/delete', {
+    method: 'OPTIONS',
+    headers: {
+      Origin: 'https://attacker.example',
+      'Access-Control-Request-Method': 'POST',
+    },
+  }), env);
+  assert.equal(invalidPreflight.status, 403);
+  assert.equal(invalidPreflight.headers.get('Access-Control-Allow-Origin'), null);
+
+  const allowedPreflight = await worker.fetch(new Request('https://worker.example/api/admin/schedule/delete', {
+    method: 'OPTIONS',
+    headers: {
+      Origin: 'https://frontend.example',
+      'Access-Control-Request-Method': 'POST',
+    },
+  }), env);
+  assert.equal(allowedPreflight.status, 204);
+  assert.equal(allowedPreflight.headers.get('Access-Control-Allow-Origin'), 'https://frontend.example');
 });
 
 test('active viewers can read workforce monthly reports and history', async () => {
@@ -79,7 +145,7 @@ test('active viewers can read workforce monthly reports and history', async () =
   assert.equal(monthly.status, 200);
 
   const history = await worker.fetch(new Request('https://worker.example/api/schedule/history', {
-    headers: { Cookie: `session=${cookie}` },
+    headers: { Cookie: `session=${cookie}`, Origin: 'https://frontend.example' },
   }), env);
   assert.equal(history.status, 200);
 });

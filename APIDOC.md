@@ -36,6 +36,7 @@ Unauthenticated or inactive users return `401 Unauthorized`. Non-admin write req
 
 - API responses are JSON on successful requests.
 - `POST` request bodies must use `Content-Type: application/json`.
+- State-changing requests must include an `Origin` exactly matching the configured `FRONTEND_URL` origin; missing or different origins return `403 Forbidden`.
 - CORS allows only the configured `FRONTEND_URL` origin and supports credentials.
 - Dates use `YYYY-MM-DD` in the `Asia/Ho_Chi_Minh` timezone.
 - Times use `HH:MM`.
