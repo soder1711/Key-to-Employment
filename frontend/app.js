@@ -21,10 +21,19 @@ function renderHistoryEntry(entry) {
   return `<tr>
     <td data-label="${escapeHtml(t('history.date'))}">${escapeHtml(fmtHistoryTime(entry.acted_at))}</td>
     <td data-label="${escapeHtml(t('history.actor'))}">${escapeHtml(entry.actor_email)}</td>
-    <td data-label="${escapeHtml(t('history.action'))}">${escapeHtml(entry.action)}</td>
+    <td data-label="${escapeHtml(t('history.action'))}">${escapeHtml(historyActionLabel(entry))}</td>
     <td data-label="${escapeHtml(t('history.record'))}">${escapeHtml(entry.entity)}${entry.entity_id == null ? '' : ` #${escapeHtml(entry.entity_id)}`}</td>
     <td data-label="${escapeHtml(t('history.details'))}">${escapeHtml(entry.details)}</td>
   </tr>`;
+}
+
+function historyActionLabel(entry) {
+  const action = entry.entity === 'session'
+    ? ({ create: 'add', delete: 'remove' }[entry.action] || entry.action)
+    : entry.action;
+  return action === 'add' || action === 'remove'
+    ? t(`history.action.${action}`)
+    : entry.action;
 }
 
 async function loadHistory(reset = false) {
