@@ -141,6 +141,7 @@ button { font-family: inherit; }
 
 .container { max-width: 960px; margin: 0 auto; padding: 1.5rem 1rem 3rem; }
 .container.schedule-workspace { max-width: 1440px; }
+.container.plan-page-workspace { max-width: 1440px; }
 
 .card {
   background: var(--card);

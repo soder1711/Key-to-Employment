@@ -72,6 +72,7 @@ function switchView(view) {
   const container = document.querySelector('.container');
   container.classList.toggle('schedule-workspace', showSchedule);
   container.classList.toggle('monthly-summary-workspace', showMonthlySummary);
+  container.classList.toggle('plan-page-workspace', showPlan);
 
   if (showPlan && !planLoaded) initPlan();
   if (showMonthlySummary) {
