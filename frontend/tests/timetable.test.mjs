@@ -598,6 +598,15 @@ test('future changes preserve exceptions unless explicitly replaced', async () =
   assert.equal((await next).replaceFutureExceptions, true);
 });
 
+test('historical recurring edits warn that completed credits will be updated', async () => {
+  const { elements, run } = fixture();
+  const pending = run("requestScheduleChange({title:'Edit', summary:'Historical edit', date:'2000-01-01', minDate:'2000-01-01', allowReplace:true})");
+  assert.match(elements.get('schedule-change-impact').textContent,
+    /completed recurring-session credits are updated/);
+  elements.get('schedule-change-dialog').close();
+  assert.equal(await pending, null);
+});
+
 test('occurrence scope uses the original date and cannot replace future exceptions', async () => {
   const { elements, run } = fixture();
   const pending = run("requestScheduleChange({title:'Move', summary:'Change', date:'2099-01-01', occurrenceDate:'2026-11-16', allowOccurrence:true, allowReplace:true})");

@@ -193,6 +193,7 @@ test('future series edits atomically version the series and preserve exceptions 
               if (sql.includes('FROM employees')) return { employee_id: 7 };
               throw new Error(`Unexpected query: ${sql}`);
             },
+            all: async () => ({ results: [] }),
             run: async () => ({ meta: { changes: 1 } }),
             statement: { sql, values },
           };
@@ -225,7 +226,7 @@ test('future series edits atomically version the series and preserve exceptions 
   assert.ok(statements.every(item => !item.sql.includes('schedule_sessions')));
 });
 
-test('series edits can start at a past cutoff without rewriting completed sessions', async () => {
+test('past series edits update and audit completed credits from the cutoff', async () => {
   const statements = [];
   const db = {
     prepare(sql) {
@@ -246,7 +247,7 @@ test('series edits can start at a past cutoff without rewriting completed sessio
       statements.push(...batchStatements.map(item => item.statement));
     },
   };
-  const cutoffDate = '2026-11-16';
+  const cutoffDate = new Date(Date.now() - 14 * 86400000).toISOString().slice(0, 10);
   const response = await handleAdminRecurringTimetable({ DB: db }, {
     isAdmin: true, employeeId: 99, email: 'admin@example.com',
   }, {
@@ -260,8 +261,14 @@ test('series edits can start at a past cutoff without rewriting completed sessio
   assert.equal(statements[0].values[0], cutoffDate);
   assert.ok(statements[2].sql.includes('INSERT INTO recurring_schedule_versions'));
   assert.equal(statements[2].values[11], cutoffDate);
-  assert.match(statements[3].values[2], /reason not provided/);
-  assert.ok(statements.every(item => !item.sql.includes('schedule_sessions')));
+  assert.match(statements[3].sql, /INSERT INTO schedule_history[\s\S]*FROM schedule_sessions/);
+  assert.match(statements[3].sql, /status = 'completed' AND points <> \?/);
+  assert.deepEqual(statements[3].values, [
+    'admin@example.com', 4, 5, 'reason not provided', 4, cutoffDate, 5,
+  ]);
+  assert.match(statements[4].sql, /UPDATE schedule_sessions[\s\S]*status = 'completed'/);
+  assert.deepEqual(statements[4].values, [5, 4, cutoffDate, 5]);
+  assert.match(statements[5].values[2], /completed credits updated/);
 });
 
 test('recurring series edits reject an overlong optional correction reason before database reads', async () => {

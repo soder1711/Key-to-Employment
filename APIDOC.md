@@ -302,7 +302,7 @@ New recurring definitions are unassigned. `weekday` uses JavaScript numbering (S
 }
 ```
 
-`correctionReason` is optional and, when provided, must be at most 1000 characters. The schedule-history record always includes the old and new points and states whether a reason was provided. Future occurrence exceptions are preserved unless `replaceFutureExceptions` is explicitly `true`. The update and its schedule-history record are applied atomically. Existing completed sessions retain their recorded values.
+`correctionReason` is optional and, when provided, must be at most 1000 characters. The schedule-history record always includes the old and new points and states whether a reason was provided. Occurrence exceptions from the cutoff date onward are preserved unless `replaceFutureExceptions` is explicitly `true`. Completed recurring sessions from the cutoff date onward also have their credited points updated to match the new rule; their status, notes, and assignments remain unchanged. The rule update, completed-credit updates, and their history records are applied atomically.
 
 ### Modify or cancel one occurrence; end a series
 

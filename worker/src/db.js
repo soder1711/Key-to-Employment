@@ -687,6 +687,26 @@ export async function updateRecurringSeriesFrom(
        WHERE series_id = ? AND occurrence_date >= ?`
     ).bind(seriesId, cutoffDate));
   }
+  if (cutoffDate < vietnamDateISO()) {
+    statements.push(db.prepare(`
+      INSERT INTO schedule_history (actor_email, action, entity, entity_id, details)
+      SELECT ?, 'update', 'recurring-occurrence', ?,
+        'Updated completed occurrence ' || recurrence_date ||
+        ': credited points ' || printf('%.1f', points) || ' -> ' ||
+        printf('%.1f', ?) || '; ' || ?
+      FROM schedule_sessions
+      WHERE recurring_series_id = ? AND recurrence_date >= ?
+        AND status = 'completed' AND points <> ?
+    `).bind(actorEmail, seriesId, version.points,
+      correctionReason ? `reason: ${correctionReason}` : 'reason not provided',
+      seriesId, cutoffDate, version.points));
+    statements.push(db.prepare(`
+      UPDATE schedule_sessions
+      SET points = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE recurring_series_id = ? AND recurrence_date >= ?
+        AND status = 'completed' AND points <> ?
+    `).bind(version.points, seriesId, cutoffDate, version.points));
+  }
   statements.push(db.prepare(
     `INSERT INTO schedule_history (actor_email, action, entity, entity_id, details)
      VALUES (?, 'update', 'recurring-series', ?, ?)`
@@ -694,6 +714,7 @@ export async function updateRecurringSeriesFrom(
     `Updated series from ${cutoffDate}; ` +
     `points ${Number(currentVersion.points).toFixed(1)} -> ${Number(version.points).toFixed(1)}; ` +
     `${correctionReason ? `reason: ${correctionReason}; ` : 'reason not provided; '}` +
+    `${cutoffDate < vietnamDateISO() ? 'completed credits updated; ' : ''}` +
     `occurrence exceptions from cutoff ${replaceFutureExceptions ? 'replaced' : 'preserved'}`));
   await db.batch(statements);
 }

@@ -58,8 +58,9 @@ function requestScheduleChange({ title, summary, date = todayISO(), occurrenceDa
     dateInput.disabled = !future;
     document.getElementById('schedule-change-date-wrap').style.display = future ? 'block' : 'none';
     document.getElementById('schedule-change-replace-wrap').style.display = future && allowReplace ? 'flex' : 'none';
+    const pastCutoff = dateInput.value < todayISO();
     document.getElementById('schedule-change-impact').textContent = impact || (future
-      ? t('schedule.futureImpact', { date: dateInput.value,
+      ? t(pastCutoff ? 'schedule.historicalFutureImpact' : 'schedule.futureImpact', { date: dateInput.value,
           policy: t(replace.checked && allowReplace ? 'schedule.exceptionReplaced' : 'schedule.exceptionPreserved') })
       : t('schedule.occurrenceImpact', { date: occurrenceDate }));
   };
