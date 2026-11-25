@@ -1,3 +1,9 @@
+import { vietnamDateISO } from '../date.js';
+
+const RECURRING_VERSION_COLUMNS = `
+  weekday, program_id, employee_id, start_time, end_time, points, is_sudden,
+  notes, start_date, end_date, effective_from, created_by`;
+
 function recurringVersionValues(version, createdBy) {
   return [version.weekday, version.programId, version.employeeId,
     version.startTime, version.endTime, version.points, version.isSudden ? 1 : 0,

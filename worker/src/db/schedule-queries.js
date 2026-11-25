@@ -289,7 +289,3 @@ export async function getRecurringVersionAt(db, seriesId, date) {
     ORDER BY effective_from DESC LIMIT 1
   `).bind(seriesId, date, date).first();
 }
-
-const RECURRING_VERSION_COLUMNS = `
-  weekday, program_id, employee_id, start_time, end_time, points, is_sudden,
-  notes, start_date, end_date, effective_from, created_by`;
