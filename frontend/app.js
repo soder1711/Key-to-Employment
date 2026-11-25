@@ -383,7 +383,15 @@ document.getElementById('plan-days').addEventListener('click', (e) => {
     return;
   }
   const taskLink = e.target.closest('.task-link');
-  if (taskLink) { openDetailsFromElement(taskLink); return; }
+  if (taskLink) {
+    if (taskLink.dataset.seriesId) {
+      openRecurringRuleFromOccurrence(taskLink.dataset.seriesId,
+        taskLink.dataset.recurrenceDate || taskLink.dataset.occurrenceDate);
+    } else {
+      openDetailsFromElement(taskLink);
+    }
+    return;
+  }
   const chip = e.target.closest('.person-chip.assigned');
   if (chip) openDetailsFromElement(chip);
 });
@@ -396,6 +404,10 @@ function handleTimetableGridClick(event) {
   }
   const editButton = event.target.closest('[data-timetable-edit]');
   if (editButton) {
+    if (editButton.dataset.occurrenceDate) {
+      openRecurringRuleFromOccurrence(editButton.dataset.timetableEdit, editButton.dataset.occurrenceDate);
+      return;
+    }
     const rule = recurringEntries.find(item => Number(item.series_id) === Number(editButton.dataset.timetableEdit));
     if (rule) openRuleModal(rule.weekday, rule);
     return;

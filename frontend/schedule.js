@@ -356,9 +356,19 @@ function renderScheduleAssignmentMatrix() {
     for (const occurrence of day.occurrences) {
       const statusClass = occurrence.status === 'cancelled' ? ' cancelled' : '';
       html += `<th class="assignment-slot-head${statusClass}" title="${escapeHtml(occurrence.program_name)} · ${fmtTime(occurrence.start_time)} · ${Number(occurrence.points).toFixed(1)} ${t('unit.pts')}">
-        <button type="button" class="assignment-task" data-timetable-edit="${occurrence.recurring_series_id}" title="${escapeHtml(t('schedule.timetableEdit'))}">${escapeHtml(occurrence.program_name)}</button>
-        <span>${escapeHtml(fmtTimeRange(occurrence.start_time, occurrence.end_time))} · ${Number(occurrence.points).toFixed(1)} ${escapeHtml(t('unit.pts'))}</span>
-        ${scheduleBadge(occurrence)}
+        <button type="button" class="assignment-task" data-timetable-edit="${occurrence.recurring_series_id}"
+          data-occurrence-date="${occurrence.recurrence_date || occurrence.session_date}"
+          aria-label="${escapeHtml(t('schedule.openSession', {
+            program: occurrence.program_name, status: t(`status.${occurrence.status}`),
+            date: fmtCellDate(occurrence.session_date),
+            time: fmtTimeRange(occurrence.start_time, occurrence.end_time),
+            points: Number(occurrence.points).toFixed(1), unit: t('unit.pts'),
+          }))}"
+          title="${escapeHtml(t('schedule.timetableEdit'))}">
+          <span>${escapeHtml(occurrence.program_name)}</span>
+          <span>${escapeHtml(fmtTimeRange(occurrence.start_time, occurrence.end_time))} · ${Number(occurrence.points).toFixed(1)} ${escapeHtml(t('unit.pts'))}</span>
+          ${scheduleBadge(occurrence)}
+        </button>
       </th>`;
     }
   }

@@ -289,6 +289,7 @@ test('Schedule matrix groups this week\'s timetable occurrences by date and mark
   assert.ok(html.includes('Morning task'));
   assert.ok(html.includes('09:00–10:00 · 3.0 pts'));
   assert.ok(html.includes('data-timetable-edit="8"'));
+  assert.match(html, /data-occurrence-date="2026-11-16"[\s\S]*?Morning task[\s\S]*?09:00–10:00 · 3\.0/);
   assert.ok(html.includes('Ava Nguyen'));
   assert.ok(html.includes('Unassigned task'));
   assert.ok(html.includes('Unassigned'));
@@ -476,7 +477,37 @@ test('Plan renders timetable occurrences using their dated assignment links', ()
   assert.ok(board.includes('Two Person'));
   assert.ok(board.includes('data-series-id="8"'));
   assert.ok(board.includes('data-recurrence-date="2026-11-16"'));
+  assert.match(board, /class="task-link"[^>]*title="Edit weekly timetable"/);
   assert.ok(!board.includes('Unknown'));
+});
+
+test('editing a recurring occurrence defaults to its rule and can target only that occurrence', async () => {
+  const { context, elements, run } = fixture();
+  const rule = { series_id: 8, weekday: 1, program_id: 4, program_name: 'Weekly task',
+    points: 2, start_time: '09:00', end_time: '10:00', start_date: '2026-11-16',
+    effective_from: '2026-11-16', end_date: null };
+  const writes = [];
+  context.api = async (_path, options) => {
+    if (!options) return { ok: true, json: async () => ({ entries: [rule] }) };
+    writes.push(JSON.parse(options.body));
+    return { ok: true };
+  };
+  context.refreshScheduleViews = () => {};
+
+  await run("openRecurringRuleFromOccurrence(8, '2026-11-16')");
+  assert.equal(run('currentRule.series_id'), 8);
+  assert.equal(run('currentRuleOccurrence.occurrenceDate'), '2026-11-16');
+  const pending = run("saveTimetableRule({programId:4,points:5,correctionReason:'Corrected plan'})");
+  assert.equal(elements.get('schedule-change-scope').value, 'future');
+  elements.get('schedule-change-scope').value = 'occurrence';
+  submit(elements);
+  await pending;
+
+  assert.equal(writes[0].operation, 'exception');
+  assert.equal(writes[0].action, 'modify');
+  assert.equal(writes[0].seriesId, 8);
+  assert.equal(writes[0].occurrenceDate, '2026-11-16');
+  assert.equal(writes[0].points, 5);
 });
 
 test('dropping an assigned employee removes only that one-off occurrence link', async () => {

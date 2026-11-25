@@ -74,7 +74,7 @@ function planCells(s, period) {
               data-series-id="${s.recurring_series_id ?? ''}"
               data-occurrence-date="${s.recurrence_date || s.session_date}"
               data-display-date="${s.session_date}" data-recurrence-date="${s.recurrence_date || s.session_date}"
-              title="${escapeHtml(t('plan.clickOptions'))}">${escapeHtml(s.program_name)}${scheduleBadge(s)}${deletedProgramBadge(s)}</button>`
+              title="${escapeHtml(s.recurring_series_id != null ? t('schedule.timetableEdit') : t('plan.clickOptions'))}">${escapeHtml(s.program_name)}${scheduleBadge(s)}${deletedProgramBadge(s)}</button>`
     : `<span>${escapeHtml(s.program_name)}${scheduleBadge(s)}${deletedProgramBadge(s)}</span>`;
   return `
     <td class="cell-task" data-label="${taskLabel}">

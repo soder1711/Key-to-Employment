@@ -6,6 +6,7 @@ const programModal = document.getElementById('program-modal');
 let editingSession = false;
 let editingTimetable = false;
 let currentRule = null;
+let currentRuleOccurrence = null;
 
 function setCorrectionReasonRequired(required) {
   const field = document.getElementById('correction-reason-field');
@@ -116,6 +117,7 @@ function closeModal() {
   editingSession = false;
   editingTimetable = false;
   currentRule = null;
+  currentRuleOccurrence = null;
   setCorrectionReasonRequired(false);
 }
 
@@ -124,6 +126,7 @@ modal.addEventListener('close', () => {
   editingSession = false;
   editingTimetable = false;
   currentRule = null;
+  currentRuleOccurrence = null;
   setCorrectionReasonRequired(false);
 });
 
@@ -225,9 +228,10 @@ function populateRulePickers() {
   if (dayValue) weekday.value = dayValue;
 }
 
-function openRuleModal(weekday, rule = null) {
+function openRuleModal(weekday, rule = null, occurrence = null) {
   currentSession = null;
   currentRule = rule;
+  currentRuleOccurrence = occurrence;
   editingSession = false;
   setCorrectionReasonRequired(!!rule);
   planPeriod = null;
@@ -316,18 +320,38 @@ async function saveTimetableRule(payload) {
     return;
   }
   if (currentRule) {
+    const occurrenceDate = currentRuleOccurrence?.occurrenceDate || null;
     const change = await requestScheduleChange({ title: t('schedule.saveEntry'),
-      summary: scheduleChangeSummary(currentRule, body),
-      date: currentRule.effective_from > todayISO() ? currentRule.effective_from : todayISO(), allowReplace: true });
+      summary: scheduleChangeSummary(currentRule, body), occurrenceDate,
+      date: currentRule.effective_from > todayISO() ? currentRule.effective_from : todayISO(),
+      allowOccurrence: !!occurrenceDate, allowReplace: true });
     if (!change) return;
-    Object.assign(body, { seriesId: currentRule.series_id, cutoffDate: change.cutoffDate,
-      replaceFutureExceptions: change.replaceFutureExceptions });
+    if (change.scope === 'occurrence') {
+      Object.assign(body, { operation: 'exception', action: 'modify',
+        seriesId: currentRule.series_id, cutoffDate: occurrenceDate,
+        occurrenceDate, movedDate: occurrenceDate });
+    } else {
+      Object.assign(body, { seriesId: currentRule.series_id, cutoffDate: change.cutoffDate,
+        replaceFutureExceptions: change.replaceFutureExceptions });
+    }
   }
   if (!await confirmRecurringRuleConflict({ ...body, effectiveFrom: body.cutoffDate || body.startDate }, currentRule?.series_id)) return;
   const response = await api('/api/admin/schedule/timetable', { method: 'POST', body: JSON.stringify(body) });
   if (!response.ok) throw new Error(await response.text());
   closeModal();
   refreshScheduleViews();
+}
+
+async function openRecurringRuleFromOccurrence(seriesId, occurrenceDate) {
+  if (!currentUser?.isAdmin) return;
+  try {
+    await loadRecurringEntries();
+    const rule = recurringEntries.find(item => Number(item.series_id) === Number(seriesId));
+    if (!rule) throw new Error('Recurring entry not found');
+    openRuleModal(rule.weekday, rule, { occurrenceDate });
+  } catch (err) {
+    await showNotice(t('schedule.loadError', { msg: err.message }));
+  }
 }
 
 function resetAssignRepeat() {

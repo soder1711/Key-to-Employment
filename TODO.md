@@ -1,17 +1,4 @@
 ~~todo: point calc fix, widen UI, review past materials, many per job (?)~~
-## Hot patch: enhance weekly timetable v2
-
-- [x] Add distinct default assignment views for admins:
-  - [x] **Schedule:** default to a weekly grid of fixed recurring task definitions (weekday, task, time, points); new rules have no default assignee.
-  - [x] **Plan:** default to the selected week's dated occurrences. Dragging employees assigns them to that occurrence's timetable task, not to the recurring rule.
-- [x] Implement the distinct visual layouts (the default routing/assignment behavior above is already in place):
-  - [x] **Schedule:** render the attached mockup as a weekly assignment matrix: fixed timetable task slots grouped by weekday as columns, employees as rows, with occurrence assignments visible in the corresponding cells.
-  - [x] **Plan:** retain the dated-sessions look, but build each day's fixed task list from the timetable and show/edit assignees from the occurrence-assignment data. Changes in Plan apply to that date only; do not edit the recurring timetable.
-- [x] Store assignments as employee-to-occurrence links: no rows means unassigned; one or more rows means the occurrence's assignees. Reuse the timetable task/occurrence rather than creating duplicate task or session records per employee. Support one-off timed sessions as well as projected recurring occurrences.
-- [x] Keep completion/status shared on the single dated occurrence. Award the full session points to each assignee when completed; show estimated points per employee as a separate projection assuming all assigned sessions are completed. Combined employee points may exceed the session's points.
-- [x] Make Plan drag/drop add or remove an employee's assignment for that date only; do not modify the recurring task definition or assignments on other dates. Update employee-specific schedule/task reads to use these links.
-- [x] Add minimal schema/API support for occurrence assignment links and migrate existing employee assignments without changing who is assigned to existing occurrences. New recurring task definitions remain unassigned by default.
-- [x] Add focused tests for unassigned/single/multiple assignees, dated-vs-recurring isolation, migration preservation, and estimated/credited point totals; update README guidance.
 
 ## Refactor
 - [x] Split frontend into multiple modules
@@ -19,9 +6,10 @@
 - [x] Editable individual tasks
 - [ ] More edit options:
   - [x] Clone for other weekdays
-  - [ ] Add/remove multiple people per task
+  - [x] Add/remove multiple people per task
 - [x] Default clone week task to next week (not yearly repeated write)
 - [ ] Auto completed task on creation (completion can be unset later on) (?)
+- [ ] Edit past points (log)
 ## Employee
 - [ ] Employee features:
   - [ ] Add new emp
