@@ -538,7 +538,10 @@ export async function getRecurringOccurrenceByKey(db, seriesId, occurrenceDate) 
   ), assignments);
   if (occurrence) return occurrence;
   const session = sessions.results[0];
-  return session ? { ...addSessionAssignees(session), is_recurring: true, is_projected: false } : null;
+  return session ? {
+    ...addSessionAssignees(session), is_recurring: true,
+    is_old_recurring: true, is_projected: false,
+  } : null;
 }
 
 export async function getScheduleBetween(db, startDate, endDate, employeeId = null) {
@@ -550,9 +553,11 @@ export async function getScheduleBetween(db, startDate, endDate, employeeId = nu
     `${row.recurring_series_id}:${row.recurrence_date}`));
   const unmatchedRecords = sessions.filter(session => session.recurring_series_id != null &&
     !projectedKeys.has(`${session.recurring_series_id}:${session.recurrence_date}`) &&
+    session.status !== 'scheduled' &&
     (session.status === 'completed' || !session.series_ended_from ||
       session.recurrence_date < session.series_ended_from))
-    .map(session => ({ ...session, is_recurring: true, is_projected: false }));
+    .map(session => ({ ...session, is_recurring: true,
+      is_old_recurring: true, is_projected: false }));
   return [
     ...sessions.filter(session => session.recurring_series_id == null),
     ...occurrences,

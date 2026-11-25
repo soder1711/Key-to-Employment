@@ -543,6 +543,32 @@ test('editing a recurring occurrence defaults to its rule and can target only th
   assert.equal(writes[1].points, 6);
 });
 
+test('old recurring occurrences show their historical rule values when edited', async () => {
+  const { context, elements, run } = fixture();
+  context.oldOccurrence = {
+    recurring_series_id: 8, recurrence_date: '2026-11-16', session_date: '2026-11-16',
+    is_recurring: true, is_old_recurring: true, program_id: 4,
+    program_name: 'Old Monday task', program_code: 'OLD', category: 'general',
+    points: 3, is_sudden: false, start_time: '09:00', end_time: '10:00',
+    start_date: '2020-01-06', end_date: null, effective_from: '2020-01-06',
+    program_default_points: 2, notes: null,
+  };
+  context.currentRuleForSeries = { ...context.oldOccurrence, weekday: 2,
+    program_name: 'Current Tuesday task', points: 6, start_time: '10:00',
+    effective_from: '2026-11-17', is_old_recurring: false };
+  context.api = async () => ({ ok: true, json: async () => ({ entries: [context.currentRuleForSeries] }) });
+  run("sessionByOccurrence = new Map([['8:2026-11-16', oldOccurrence]])");
+  assert.match(run('scheduleBadge(oldOccurrence)'), /Weekly - Old/);
+
+  await run("openRecurringRuleFromOccurrence(8, '2026-11-16')");
+
+  assert.equal(run('currentRule.weekday'), 1);
+  assert.equal(run('currentRule.program_name'), 'Old Monday task');
+  assert.equal(elements.get('assign-weekday').value, '1');
+  assert.equal(elements.get('assign-points').value, 3);
+  assert.equal(elements.get('assign-start').value, '09:00');
+});
+
 test('dropping an assigned employee removes only that one-off occurrence link', async () => {
   const { context, run } = fixture();
   context.testSessions = [{ session_id: 42, session_date: '2026-11-16', employee_id: null,

@@ -26,6 +26,7 @@ test('effective-dated versions switch at the exact cutoff without rewriting prio
     ['2026-11-02', '09:00'], ['2026-11-09', '09:00'],
     ['2026-11-17', '10:00'], ['2026-11-24', '10:00'],
   ]);
+  assert.deepEqual(occurrences.map(row => row.is_old_recurring), [true, true, false, false]);
 });
 
 test('series IDs isolate otherwise identical entries and exceptions can move one occurrence', () => {
@@ -173,6 +174,47 @@ test('schedule reads project occurrences without issuing writes', async () => {
   assert.equal(rows.length, 1);
   assert.equal(rows[0].is_projected, true);
   assert.equal(rows[0].session_id, 'recurring:4:2026-11-02');
+});
+
+test('schedule reads retain completed old occurrences but hide stale scheduled weekday rows', async () => {
+  const sessions = [
+    { session_id: 40, recurring_series_id: 4, recurrence_date: '2026-11-23',
+      session_date: '2026-11-23', program_id: 2, program_name: 'Test task',
+      start_time: '09:00', end_time: '10:00', status: 'completed', points: 2,
+      assignees_json: '[]', employee_id: null },
+    { session_id: 41, recurring_series_id: 4, recurrence_date: '2026-11-30',
+      session_date: '2026-11-30', program_id: 2, program_name: 'Test task',
+      start_time: '09:00', end_time: '10:00', status: 'scheduled', points: 2,
+      assignees_json: '[]', employee_id: null },
+  ];
+  const activeVersion = version({ weekday: 2, start_time: '10:00',
+    effective_from: '2026-11-17', effective_to: null });
+  const db = {
+    prepare(sql) {
+      return {
+        bind() {
+          return {
+            all: async () => {
+              if (sql.includes('FROM recurring_schedule_versions v')) return { results: [activeVersion] };
+              if (sql.includes('FROM schedule_sessions s')) return { results: sessions };
+              if (sql.includes('FROM recurring_schedule_exceptions x') ||
+                  sql.includes('FROM schedule_occurrence_assignments oa')) return { results: [] };
+              throw new Error(`Unexpected query: ${sql}`);
+            },
+          };
+        },
+      };
+    },
+  };
+
+  const rows = await getScheduleBetween(db, '2026-11-23', '2026-11-30');
+  const completedOld = rows.find(row => row.session_id === 40);
+
+  assert.equal(completedOld.status, 'completed');
+  assert.equal(completedOld.is_old_recurring, true);
+  assert.ok(!rows.some(row => row.session_id === 41));
+  const newTuesday = rows.find(row => row.recurrence_date === '2026-11-24');
+  assert.equal(newTuesday.is_old_recurring, false);
 });
 
 test('future series edits atomically version the series and preserve exceptions by default', async () => {

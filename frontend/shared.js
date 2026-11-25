@@ -88,6 +88,7 @@ const I18N = {
     'schedule.assigned': 'Assigned', 'schedule.notAssigned': 'Not assigned', 'schedule.unassigned': 'Unassigned',
     'schedule.noTaskOnDay': 'No fixed sessions',
     'schedule.weekly': 'Weekly', 'schedule.weeklyModified': 'Weekly - Modified',
+    'schedule.weeklyOld': 'Weekly - Old',
     'schedule.day': 'Weekday', 'schedule.assignee': 'Assigned person',
     'schedule.editScope': 'Apply edit to',
     'schedule.thisFuture': 'This and future occurrences', 'schedule.onlyThis': 'Only this occurrence',
@@ -314,6 +315,7 @@ const I18N = {
     'schedule.assigned': 'Đã phân công', 'schedule.notAssigned': 'Chưa phân công', 'schedule.unassigned': 'Chưa giao',
     'schedule.noTaskOnDay': 'Không có phiên cố định',
     'schedule.weekly': 'Hàng tuần', 'schedule.weeklyModified': 'Hàng tuần - Đã sửa',
+    'schedule.weeklyOld': 'Hàng tuần - Cũ',
     'schedule.day': 'Ngày trong tuần', 'schedule.assignee': 'Người được giao',
     'schedule.editScope': 'Áp dụng chỉnh sửa cho',
     'schedule.thisFuture': 'Lần này và các lần sau', 'schedule.onlyThis': 'Chỉ lần này',
@@ -628,7 +630,8 @@ function progressBar(pct) {
 
 function scheduleBadge(item) {
   if (!item?.is_recurring) return '';
-  const label = item.is_modified ? t('schedule.weeklyModified') : t('schedule.weekly');
+  const label = item.is_modified ? t('schedule.weeklyModified') :
+    item.is_old_recurring ? t('schedule.weeklyOld') : t('schedule.weekly');
   return ` <span class="mini-tag weekly-tag">${escapeHtml(label)}</span>`;
 }
 

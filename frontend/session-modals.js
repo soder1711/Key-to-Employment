@@ -344,9 +344,22 @@ async function openRecurringRuleFromOccurrence(seriesId, occurrenceDate) {
   if (!currentUser?.isAdmin) return;
   try {
     await loadRecurringEntries();
-    const rule = recurringEntries.find(item => Number(item.series_id) === Number(seriesId));
+    const occurrence = sessionByOccurrence.get(`${seriesId}:${occurrenceDate}`);
+    const rule = recurringEntries.find(item => Number(item.series_id) === Number(seriesId)) || occurrence;
     if (!rule) throw new Error('Recurring entry not found');
-    openRuleModal(rule.weekday, rule, { occurrenceDate });
+    const editRule = { ...rule };
+    if (occurrence?.is_old_recurring) {
+      const fields = ['weekday', 'program_id', 'program_name', 'program_code', 'category',
+        'program_is_active', 'program_default_points', 'points', 'is_sudden', 'start_time',
+        'end_time', 'notes', 'start_date', 'end_date', 'effective_from'];
+      for (const field of fields) {
+        if (occurrence[field] !== undefined) editRule[field] = occurrence[field];
+      }
+      editRule.series_id = Number(seriesId);
+      editRule.weekday = occurrence.weekday ??
+        new Date(`${occurrenceDate}T00:00:00Z`).getUTCDay();
+    }
+    openRuleModal(editRule.weekday, editRule, { occurrenceDate });
   } catch (err) {
     await showNotice(t('schedule.loadError', { msg: err.message }));
   }

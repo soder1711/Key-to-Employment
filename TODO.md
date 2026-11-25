@@ -9,10 +9,12 @@
   - [x] Add/remove multiple people per task
 - [x] Default clone week task to next week (not yearly repeated write)
 - [ ] Auto completed task on creation (completion can be unset later on) (?)
-- [ ] Edit past points (log)
+- [~] Edit past points (log)
+- [ ] Unify edit behavior
+- [ ] Clear split, transition between weekly and timed sessions 
 ## Employee
 - [ ] Employee features:
-  - [ ] Add new emp
+  - [x] Add new emp
   - [ ] Gender
 # Main project requirements
 
