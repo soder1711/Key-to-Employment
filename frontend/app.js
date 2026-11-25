@@ -3,7 +3,6 @@
 let historyPage = 1;
 let historyPageCount = 1;
 let historyRequestInFlight = false;
-const HISTORY_REFRESH_INTERVAL_MS = 10_000;
 
 function fmtHistoryTime(value) {
   const raw = String(value);
@@ -24,11 +23,6 @@ function renderHistoryEntry(entry) {
     <td data-label="${escapeHtml(t('history.record'))}">${escapeHtml(entry.entity)}${entry.entity_id == null ? '' : ` #${escapeHtml(entry.entity_id)}`}</td>
     <td data-label="${escapeHtml(t('history.details'))}">${escapeHtml(entry.details)}</td>
   </tr>`;
-}
-
-function historyFiltersAreEmpty() {
-  return ['history-staff-filter', 'history-record-filter', 'history-from-filter', 'history-to-filter']
-    .every(id => !document.getElementById(id).value.trim());
 }
 
 async function loadHistory(page = 1) {
@@ -67,7 +61,6 @@ async function loadHistory(page = 1) {
     document.getElementById('history-page').max = String(historyPageCount);
     document.getElementById('history-page-count').textContent =
       t('history.pageOf', { count: historyPageCount });
-    historyLoaded = true;
     empty.style.display = entries.length ? 'none' : 'block';
     previous.disabled = historyPage <= 1;
     next.disabled = historyPage >= historyPageCount;
@@ -83,21 +76,6 @@ async function loadHistory(page = 1) {
   }
 }
 
-async function refreshLatestHistory() {
-  if (!historyLoaded || historyPage !== 1 || !historyFiltersAreEmpty()) return;
-  loadHistory(1);
-}
-
-function isHistoryViewVisible() {
-  return document.getElementById('history-section').style.display !== 'none';
-}
-
-setInterval(() => {
-  if (document.visibilityState === 'visible' && isHistoryViewVisible()) {
-    refreshLatestHistory();
-  }
-}, HISTORY_REFRESH_INTERVAL_MS);
-
 document.getElementById('history-filter-apply').addEventListener('click', () => loadHistory(1));
 document.getElementById('history-prev').addEventListener('click', () => {
   if (historyPage > 1) loadHistory(historyPage - 1);
@@ -112,12 +90,6 @@ document.getElementById('history-page').addEventListener('change', event => {
 });
 document.getElementById('history-page').addEventListener('keydown', event => {
   if (event.key === 'Enter') event.currentTarget.dispatchEvent(new Event('change'));
-});
-
-document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible' && isHistoryViewVisible()) {
-    refreshLatestHistory();
-  }
 });
 
 async function loadStaffDirectory() {

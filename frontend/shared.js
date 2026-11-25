@@ -5,7 +5,6 @@ const LOCAL_DEMO = new URLSearchParams(window.location.search).get('demo') === '
   ['localhost', '127.0.0.1', '[::1]'].includes(window.location.hostname);
 
 let currentUser = null;
-let historyLoaded = false;
 let staffLoaded = false;
 
 // ================= Internationalization (EN / VI) =================
@@ -570,7 +569,6 @@ function setLang(newLang) {
         translateRuleModal();
       }
       if (planLoaded) loadPlanBoard();
-      if (historyLoaded) loadHistory(1);
       if (staffLoaded && currentUser.isAdmin) loadStaffDirectory();
     }
     if (monthlySummaryLoaded) loadMonthlySummary();
@@ -582,7 +580,6 @@ function setLang(newLang) {
 }
 
 async function api(path, opts = {}) {
-  const method = (opts.method || 'GET').toUpperCase();
   const headers = new Headers(opts.headers || {});
   if (opts.body != null && !headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json');
@@ -593,10 +590,6 @@ async function api(path, opts = {}) {
     headers,
   });
   if (response.status === 401 && path.startsWith('/api/')) showSignIn();
-  if (response.ok && method !== 'GET' && historyLoaded &&
-      typeof isHistoryViewVisible === 'function' && isHistoryViewVisible()) {
-    void refreshLatestHistory();
-  }
   return response;
 }
 
