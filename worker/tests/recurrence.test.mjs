@@ -225,6 +225,45 @@ test('future series edits atomically version the series and preserve exceptions 
   assert.ok(statements.every(item => !item.sql.includes('schedule_sessions')));
 });
 
+test('series edits can start at a past cutoff without rewriting completed sessions', async () => {
+  const statements = [];
+  const db = {
+    prepare(sql) {
+      return {
+        bind(...values) {
+          return {
+            first: async () => {
+              if (sql.includes('FROM recurring_schedule_versions')) return version();
+              if (sql.includes('FROM programs')) return { is_active: 1 };
+              throw new Error(`Unexpected query: ${sql}`);
+            },
+            statement: { sql, values },
+          };
+        },
+      };
+    },
+    async batch(batchStatements) {
+      statements.push(...batchStatements.map(item => item.statement));
+    },
+  };
+  const cutoffDate = '2026-11-16';
+  const response = await handleAdminRecurringTimetable({ DB: db }, {
+    isAdmin: true, employeeId: 99, email: 'admin@example.com',
+  }, {
+    operation: 'edit', seriesId: 4, cutoffDate,
+    weekday: 1, programId: 2, employeeId: null, startTime: '09:00', endTime: '10:00',
+    points: 5, isSudden: false, notes: null, replaceFutureExceptions: false,
+    correctionReason: 'Corrected historical timetable',
+  });
+
+  assert.equal(response.status, 200);
+  assert.equal((await response.json()).cutoffDate, cutoffDate);
+  assert.equal(statements[0].values[0], cutoffDate);
+  assert.ok(statements[2].sql.includes('INSERT INTO recurring_schedule_versions'));
+  assert.equal(statements[2].values[11], cutoffDate);
+  assert.ok(statements.every(item => !item.sql.includes('schedule_sessions')));
+});
+
 test('recurring series edits require a correction reason before database reads', async () => {
   let queryCount = 0;
   const response = await handleAdminRecurringTimetable(

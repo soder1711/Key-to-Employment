@@ -323,7 +323,8 @@ async function saveTimetableRule(payload) {
     const occurrenceDate = currentRuleOccurrence?.occurrenceDate || null;
     const change = await requestScheduleChange({ title: t('schedule.saveEntry'),
       summary: scheduleChangeSummary(currentRule, body), occurrenceDate,
-      date: currentRule.effective_from > todayISO() ? currentRule.effective_from : todayISO(),
+      date: occurrenceDate || (currentRule.effective_from > todayISO() ? currentRule.effective_from : todayISO()),
+      minDate: occurrenceDate ? currentRule.start_date : todayISO(),
       allowOccurrence: !!occurrenceDate, allowReplace: true });
     if (!change) return;
     if (change.scope === 'occurrence') {

@@ -576,9 +576,6 @@ export async function handleAdminRecurringTimetable(env, session, body) {
   const current = await getRecurringVersionAt(env.DB, seriesId, cutoffDate);
   if (!current) return new Response('Recurring entry not found for cutoff date', { status: 404 });
   if (operation === 'edit') {
-    if (cutoffDate < vietnamDateISO()) {
-      return new Response('Recurring schedule edits must start today or later', { status: 400 });
-    }
     const version = recurringInput(body, current, cutoffDate);
     if (!version) return new Response('Invalid recurring entry', { status: 400 });
     const invalid = await validateRecurringAssignment(env, version);

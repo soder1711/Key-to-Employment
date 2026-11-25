@@ -694,7 +694,7 @@ export async function updateRecurringSeriesFrom(
     `Updated series from ${cutoffDate}; ` +
     `points ${Number(currentVersion.points).toFixed(1)} -> ${Number(version.points).toFixed(1)}; ` +
     `reason: ${correctionReason}; ` +
-    `future exceptions ${replaceFutureExceptions ? 'replaced' : 'preserved'}`));
+    `occurrence exceptions from cutoff ${replaceFutureExceptions ? 'replaced' : 'preserved'}`));
   await db.batch(statements);
 }
 

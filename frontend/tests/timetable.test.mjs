@@ -499,6 +499,8 @@ test('editing a recurring occurrence defaults to its rule and can target only th
   assert.equal(run('currentRuleOccurrence.occurrenceDate'), '2026-11-16');
   const pending = run("saveTimetableRule({programId:4,points:5,correctionReason:'Corrected plan'})");
   assert.equal(elements.get('schedule-change-scope').value, 'future');
+  assert.equal(elements.get('schedule-change-date').value, '2026-11-16');
+  assert.equal(elements.get('schedule-change-date').min, '2026-11-16');
   elements.get('schedule-change-scope').value = 'occurrence';
   submit(elements);
   await pending;
@@ -508,6 +510,16 @@ test('editing a recurring occurrence defaults to its rule and can target only th
   assert.equal(writes[0].seriesId, 8);
   assert.equal(writes[0].occurrenceDate, '2026-11-16');
   assert.equal(writes[0].points, 5);
+
+  await run("openRecurringRuleFromOccurrence(8, '2026-11-16')");
+  const futureChange = run("saveTimetableRule({programId:4,points:6,correctionReason:'Corrected plan'})");
+  assert.equal(elements.get('schedule-change-scope').value, 'future');
+  assert.equal(elements.get('schedule-change-date').value, '2026-11-16');
+  submit(elements);
+  await futureChange;
+  assert.equal(writes[1].operation, 'edit');
+  assert.equal(writes[1].cutoffDate, '2026-11-16');
+  assert.equal(writes[1].points, 6);
 });
 
 test('dropping an assigned employee removes only that one-off occurrence link', async () => {
