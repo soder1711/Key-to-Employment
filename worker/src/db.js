@@ -693,7 +693,7 @@ export async function updateRecurringSeriesFrom(
   ).bind(actorEmail, seriesId,
     `Updated series from ${cutoffDate}; ` +
     `points ${Number(currentVersion.points).toFixed(1)} -> ${Number(version.points).toFixed(1)}; ` +
-    `reason: ${correctionReason}; ` +
+    `${correctionReason ? `reason: ${correctionReason}; ` : 'reason not provided; '}` +
     `occurrence exceptions from cutoff ${replaceFutureExceptions ? 'replaced' : 'preserved'}`));
   await db.batch(statements);
 }

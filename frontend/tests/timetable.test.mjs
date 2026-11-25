@@ -396,7 +396,7 @@ test('new recurring rules remain unassigned and clear rule mode before one-off c
   assert.equal(elements.get('assign-points').readOnly, true);
 });
 
-test('editing a session requires a correction reason', () => {
+test('editing a session shows an optional correction reason', () => {
   const { run, elements } = fixture();
   run(`adminPrograms = [{program_id:1,name:'Task',code:'TASK',category:'general',default_points:2}];
     currentSession = {session_id:1,program_id:1,program_name:'Task',program_code:'TASK',
@@ -405,7 +405,7 @@ test('editing a session requires a correction reason', () => {
     openSessionEdit()`);
 
   assert.equal(elements.get('correction-reason-field').style.display, 'block');
-  assert.equal(elements.get('correction-reason').required, true);
+  assert.equal(elements.get('correction-reason').required, false);
 });
 
 test('shared rule save uses series endpoints and validates date ranges without writes', async () => {
@@ -436,6 +436,27 @@ test('shared rule save uses series endpoints and validates date ranges without w
   assert.equal(writes[1].replaceFutureExceptions, false);
   assert.equal(writes[1].employeeId, null);
   assert.equal(writes[1].correctionReason, 'Updated after review');
+});
+
+test('editing a recurring rule allows an omitted correction reason', async () => {
+  const { context, run, elements } = fixture();
+  context.requestBody = null;
+  context.api = async (_path, options) => {
+    context.requestBody = JSON.parse(options.body);
+    return { ok: true };
+  };
+  context.refreshScheduleViews = () => {};
+  context.rule = { series_id: 7, weekday: 1, program_id: 1, program_name: 'Task',
+    points: 2, start_time: '09:00', end_time: '10:00', start_date: '2026-11-16',
+    effective_from: '2099-01-01', end_date: null };
+  run('adminPrograms = [{program_id:1,name:"Task",code:"TASK",category:"general",default_points:2}]; openRuleModal(1, rule)');
+  const pending = run('saveTimetableRule({programId:1,points:3})');
+  submit(elements);
+  await pending;
+
+  assert.equal(context.requestBody.operation, 'edit');
+  assert.equal(context.requestBody.points, 3);
+  assert.equal('correctionReason' in context.requestBody, false);
 });
 
 test('Plan shows multiple assignees and separates estimated from earned points', () => {

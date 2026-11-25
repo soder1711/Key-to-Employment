@@ -348,9 +348,11 @@ const TIME_RE = /^\d{2}:\d{2}$/;
 const MAX_CORRECTION_REASON_LENGTH = 1000;
 
 function parseCorrectionReason(body) {
-  if (typeof body?.correctionReason !== 'string') return null;
+  if (body?.correctionReason === undefined || body.correctionReason === null) return undefined;
+  if (typeof body.correctionReason !== 'string') return null;
   const reason = body.correctionReason.trim();
-  return reason && reason.length <= MAX_CORRECTION_REASON_LENGTH ? reason : null;
+  if (!reason) return undefined;
+  return reason.length <= MAX_CORRECTION_REASON_LENGTH ? reason : null;
 }
 
 function isValidISODate(value) {
@@ -546,9 +548,8 @@ export async function handleAdminRecurringTimetable(env, session, body) {
 
   const operation = body.operation;
   const correctionReason = parseCorrectionReason(body);
-  if ((operation === 'edit' ||
-       (operation === 'exception' && body.action === 'modify')) && !correctionReason) {
-    return new Response('Correction reason is required (maximum 1000 characters)', { status: 400 });
+  if (correctionReason === null) {
+    return new Response('Invalid correction reason (maximum 1000 characters)', { status: 400 });
   }
   if (operation === 'create') {
     const effectiveFrom = body.startDate;
@@ -625,7 +626,7 @@ export async function handleAdminRecurringTimetable(env, session, body) {
       await logScheduleHistory(env.DB, session.email, 'modify', 'recurring-occurrence', seriesId,
         `Modified series ${seriesId} occurrence ${occurrenceDate}; ` +
         `points ${Number(occurrence.points).toFixed(1)} -> ${Number(version.points).toFixed(1)}; ` +
-        `reason: ${correctionReason}`);
+        (correctionReason ? `reason: ${correctionReason}` : 'reason not provided'));
       return Response.json({ success: true, occurrenceDate, modified: true });
     }
     return new Response('Invalid occurrence action', { status: 400 });
@@ -766,7 +767,7 @@ export async function handleAdminAssignSession(env, session, body) {
  * @apiBody {String} [endTime] End time in HH:MM format.
  * @apiBody {Number} points Credited points from 0 to 100.
  * @apiBody {Boolean} isSudden Whether this is a sudden session.
- * @apiBody {String} correctionReason Required reason for editing the session (1-1000 characters).
+ * @apiBody {String} [correctionReason] Optional reason for editing the session (maximum 1000 characters).
  * @apiBody {String} [notes] Optional notes.
  * @apiSuccess {Boolean} success Always true when updated.
  * @apiError 400 Invalid update payload.
@@ -796,8 +797,8 @@ export async function handleAdminUpdateSession(env, session, body) {
       typeof isSudden !== 'boolean') {
     return new Response('Invalid update payload', { status: 400 });
   }
-  if (!correctionReason) {
-    return new Response('Correction reason is required (maximum 1000 characters)', { status: 400 });
+  if (correctionReason === null) {
+    return new Response('Invalid correction reason (maximum 1000 characters)', { status: 400 });
   }
 
   const before = await getSessionById(env.DB, sessionId);
@@ -817,7 +818,7 @@ export async function handleAdminUpdateSession(env, session, body) {
     `Updated "${before.program_name}" ${before.session_date} to ` +
     `"${updated.program_name}" ${sessionDate} (${startTime || '—'}–${endTime || '—'}); ` +
     `points ${Number(before.points).toFixed(1)} -> ${Number(updated.points).toFixed(1)}; ` +
-    `reason: ${correctionReason}`
+    (correctionReason ? `reason: ${correctionReason}` : 'reason not provided')
   );
   return Response.json({ success: true, session: updated });
 }

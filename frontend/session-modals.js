@@ -8,12 +8,12 @@ let editingTimetable = false;
 let currentRule = null;
 let currentRuleOccurrence = null;
 
-function setCorrectionReasonRequired(required) {
+function setCorrectionReasonVisible(visible) {
   const field = document.getElementById('correction-reason-field');
   const input = document.getElementById('correction-reason');
-  field.style.display = required ? 'block' : 'none';
-  input.required = required;
-  input.disabled = !required;
+  field.style.display = visible ? 'block' : 'none';
+  input.required = false;
+  input.disabled = !visible;
   input.value = '';
 }
 
@@ -118,7 +118,7 @@ function closeModal() {
   editingTimetable = false;
   currentRule = null;
   currentRuleOccurrence = null;
-  setCorrectionReasonRequired(false);
+  setCorrectionReasonVisible(false);
 }
 
 modal.addEventListener('close', () => {
@@ -127,7 +127,7 @@ modal.addEventListener('close', () => {
   editingTimetable = false;
   currentRule = null;
   currentRuleOccurrence = null;
-  setCorrectionReasonRequired(false);
+  setCorrectionReasonVisible(false);
 });
 
 function showModalError(msg) {
@@ -233,7 +233,7 @@ function openRuleModal(weekday, rule = null, occurrence = null) {
   currentRule = rule;
   currentRuleOccurrence = occurrence;
   editingSession = false;
-  setCorrectionReasonRequired(!!rule);
+  setCorrectionReasonVisible(!!rule);
   planPeriod = null;
   openModal('rule');
   populateRulePickers();
@@ -304,10 +304,6 @@ async function confirmRecurringRuleConflict(candidate, excludedSeriesId = null) 
 }
 
 async function saveTimetableRule(payload) {
-  if (currentRule && !payload.correctionReason?.trim()) {
-    showModalError(t('modal.correctionReasonRequired'));
-    return;
-  }
   const body = {
     ...payload, operation: currentRule ? 'edit' : 'create',
     weekday: Number(document.getElementById('assign-weekday').value),
@@ -363,7 +359,7 @@ function resetAssignRepeat() {
 
 function openAssignModal(employeeId, date) {
   editingSession = false;
-  setCorrectionReasonRequired(false);
+  setCorrectionReasonVisible(false);
   document.getElementById('assign-date-row').style.display = 'none';
   document.querySelector('label[for="assign-date"]').textContent = t('modal.date');
   document.getElementById('assign-repeat-option').style.display = 'block';
@@ -391,7 +387,7 @@ function openAssignModal(employeeId, date) {
 }
 
 function openDetailsModal(sessionId, seriesId = null, occurrenceDate = null) {
-  setCorrectionReasonRequired(false);
+  setCorrectionReasonVisible(false);
   const s = seriesId != null
     ? sessionByOccurrence.get(`${seriesId}:${occurrenceDate}`)
     : sessionById.get(sessionId);
@@ -430,7 +426,7 @@ function openDetailsModal(sessionId, seriesId = null, occurrenceDate = null) {
 function openSessionEdit() {
   if (!currentSession) return;
   editingSession = true;
-  setCorrectionReasonRequired(true);
+  setCorrectionReasonVisible(true);
   const s = currentSession;
   document.getElementById('modal-title').textContent = t('modal.editTitle');
   document.getElementById('assign-context').textContent =
@@ -464,7 +460,7 @@ function recurringSessionPayload(s) {
 
 function openSessionClone() {
   if (!currentSession) return;
-  setCorrectionReasonRequired(false);
+  setCorrectionReasonVisible(false);
   const monday = mondayOf(currentSession.session_date);
   const sourceDate = currentSession.session_date;
   const options = [];

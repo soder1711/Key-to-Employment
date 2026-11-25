@@ -133,18 +133,30 @@ test('admin edits one session without changing its assignee or status', async ()
   assert.match(history[0][4], /reason: Corrected after review/);
 });
 
-test('session correction requires a reason before reading the session', async () => {
+test('session edits allow an omitted correction reason', async () => {
+  const { db, history } = mockDb();
+  const response = await handleAdminUpdateSession({ DB: db }, admin, {
+    sessionId: 1, programId: 1, sessionDate: '2026-10-20',
+    points: 4.5, isSudden: false,
+  });
+
+  assert.equal(response.status, 200);
+  assert.match(history[0][4], /points 2\.0 -> 4\.5/);
+  assert.match(history[0][4], /reason not provided/);
+});
+
+test('session edits reject an overlong optional correction reason before reading the session', async () => {
   let queryCount = 0;
   const response = await handleAdminUpdateSession(
     { DB: { prepare() { queryCount++; } } }, admin,
     {
       sessionId: 1, programId: 1, sessionDate: '2026-10-20',
-      points: 4.5, isSudden: false,
+      points: 4.5, isSudden: false, correctionReason: 'x'.repeat(1001),
     },
   );
 
   assert.equal(response.status, 400);
-  assert.match(await response.text(), /Correction reason is required/);
+  assert.match(await response.text(), /Invalid correction reason/);
   assert.equal(queryCount, 0);
 });
 

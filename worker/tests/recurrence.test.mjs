@@ -253,7 +253,6 @@ test('series edits can start at a past cutoff without rewriting completed sessio
     operation: 'edit', seriesId: 4, cutoffDate,
     weekday: 1, programId: 2, employeeId: null, startTime: '09:00', endTime: '10:00',
     points: 5, isSudden: false, notes: null, replaceFutureExceptions: false,
-    correctionReason: 'Corrected historical timetable',
   });
 
   assert.equal(response.status, 200);
@@ -261,21 +260,22 @@ test('series edits can start at a past cutoff without rewriting completed sessio
   assert.equal(statements[0].values[0], cutoffDate);
   assert.ok(statements[2].sql.includes('INSERT INTO recurring_schedule_versions'));
   assert.equal(statements[2].values[11], cutoffDate);
+  assert.match(statements[3].values[2], /reason not provided/);
   assert.ok(statements.every(item => !item.sql.includes('schedule_sessions')));
 });
 
-test('recurring series edits require a correction reason before database reads', async () => {
+test('recurring series edits reject an overlong optional correction reason before database reads', async () => {
   let queryCount = 0;
   const response = await handleAdminRecurringTimetable(
     { DB: { prepare() { queryCount++; } } },
     { isAdmin: true, employeeId: 99, email: 'admin@example.com' },
     {
       operation: 'edit', seriesId: 4, cutoffDate: '2026-11-23',
-      replaceFutureExceptions: false,
+      replaceFutureExceptions: false, correctionReason: 'x'.repeat(1001),
     },
   );
 
   assert.equal(response.status, 400);
-  assert.match(await response.text(), /Correction reason is required/);
+  assert.match(await response.text(), /Invalid correction reason/);
   assert.equal(queryCount, 0);
 });
