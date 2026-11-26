@@ -739,6 +739,30 @@ button { font-family: inherit; }
 .check-row input { width: auto !important; }
 .modal-submit { margin-top: 1.1rem; width: 100%; }
 .modal-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 1rem; }
+.session-actions { margin-top: 1.25rem; padding-top: 1rem; border-top: 1px solid var(--line); }
+.session-actions-title {
+  margin: 0 0 0.65rem; color: var(--muted); font-size: 0.75rem;
+  font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase;
+}
+.occurrence-notes-section {
+  margin-bottom: 0.9rem; padding: 0.75rem;
+  border: 1px solid var(--line); border-radius: 10px; background: #f8fafc;
+}
+.occurrence-notes-section label { margin: 0 0 0.4rem; }
+.occurrence-notes-section textarea {
+  display: block; width: 100%; min-height: 4.5rem; padding: 0.5rem 0.6rem;
+  border: 1px solid var(--line); border-radius: 8px; font: inherit; font-size: 0.9rem;
+  resize: vertical;
+}
+.occurrence-notes-footer { display: flex; justify-content: flex-end; margin-top: 0.5rem; }
+.session-action-buttons { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.5rem; }
+.session-action-buttons .btn { width: 100%; min-height: 2.5rem; padding: 0.45rem 0.55rem; }
+.session-action-buttons .session-action-cancel,
+.session-action-buttons .session-action-delete {
+  border: 1px solid #fecaca; background: #fff; color: #b91c1c;
+}
+.session-action-buttons .session-action-cancel:hover,
+.session-action-buttons .session-action-delete:hover { background: #fef2f2; }
 .btn.danger { background: #dc2626; }
 .btn.danger:hover { background: #b91c1c; }
 .modal-context {

@@ -370,21 +370,24 @@
         <button id="assign-rule-stop" type="button" class="btn danger small" style="display:none;" data-i18n="schedule.endSeries">End series from date</button>
       </form>
 
-      <div id="session-actions" style="display:none;">
-        <div id="occurrence-notes-section" style="display:none;">
+      <section id="session-actions" class="session-actions" aria-labelledby="session-actions-title" style="display:none;">
+        <h4 id="session-actions-title" class="session-actions-title" data-i18n="modal.sessionActions">Session actions</h4>
+        <div id="occurrence-notes-section" class="occurrence-notes-section" style="display:none;">
           <label for="occurrence-notes" data-i18n="schedule.actualNote">Actual session note</label>
           <textarea id="occurrence-notes" rows="2"></textarea>
-          <button id="occurrence-notes-save" type="button" class="btn small ghost" data-i18n="schedule.noteSave">Save occurrence note</button>
+          <div class="occurrence-notes-footer">
+            <button id="occurrence-notes-save" type="button" class="btn small ghost" data-i18n="schedule.noteSave">Save occurrence note</button>
+          </div>
         </div>
-        <div class="modal-actions">
+        <div class="session-action-buttons">
           <button id="session-clone" type="button" class="btn small ghost" data-i18n="action.cloneWeekdays">Clone to weekdays</button>
           <button type="button" class="btn small" data-status="completed" data-i18n="action.complete">✓ Complete</button>
           <button type="button" class="btn small ghost" data-status="scheduled" data-i18n="action.reopen">↺ Reopen</button>
-          <button type="button" class="btn small ghost" data-status="cancelled" data-i18n="action.cancel">✕ Cancel</button>
-          <button id="session-delete" type="button" class="btn small danger" data-i18n="action.deleteDay">Delete this day</button>
+          <button type="button" class="btn small session-action-cancel" data-status="cancelled" data-i18n="action.cancel">✕ Cancel</button>
+          <button id="session-delete" type="button" class="btn small session-action-delete" data-i18n="action.deleteDay">Delete this day</button>
           <button id="session-end-series" type="button" class="btn small danger" style="display:none;" data-i18n="schedule.endSeries">End series from date</button>
         </div>
-      </div>
+      </section>
 
       <div id="session-clone-form" style="display:none;">
         <p class="modal-context" data-i18n="clone.chooseDays">Choose other weekdays in this week:</p>
