@@ -4,6 +4,7 @@ import worker from '../src/index.js';
 import {
   handleAdminMonthlySummary,
   handleAdminCreateEmployee,
+  handleAdminUpdateEmployee,
   handleAdminDeactivateEmployee,
   handleAdminCreateProgram,
   handleAdminDeleteProgram,
@@ -216,6 +217,80 @@ test('new employees are created as non-admin and logged', async () => {
   assert.match(insert.sql, /VALUES \(\?, \?, \?, \?, 0, 1\)/);
   assert.equal(insert.values[3], 'mai@example.com');
   assert.ok(statements.some(item => item.sql.includes('INSERT INTO schedule_history')));
+});
+
+test('staff updates require an administrator and validated fields', async () => {
+  let queryCount = 0;
+  const env = { DB: { prepare() { queryCount++; throw new Error('must not query'); } } };
+  const denied = await handleAdminUpdateEmployee(env, { isAdmin: false }, {
+    employeeId: 42, employeeCode: 'STAFF-42', firstName: 'Mai', lastName: 'Nguyen', email: 'mai@example.com',
+  });
+  assert.equal(denied.status, 403);
+  const invalid = await handleAdminUpdateEmployee(env, { isAdmin: true }, {
+    employeeId: 42, employeeCode: 'STAFF-42', firstName: '', lastName: 'Nguyen', email: 'not-an-email',
+  });
+  assert.equal(invalid.status, 400);
+  assert.equal(queryCount, 0);
+});
+
+test('staff updates reject duplicates and persist normalized data with a privacy-safe audit entry', async () => {
+  const statements = [];
+  let conflict = true;
+  const employee = {
+    employee_id: 42, employee_code: 'STAFF-42', first_name: 'Mai',
+    last_name: 'Nguyen', email: 'mai@example.com', is_active: 1, is_admin: 0,
+  };
+  const env = {
+    DB: {
+      prepare(sql) {
+        return {
+          bind(...values) {
+            statements.push({ sql, values });
+            if (sql.includes('WHERE (employee_code = ? OR email = ?) AND employee_id != ?')) {
+              return { first: async () => conflict ? { employee_id: 9 } : null };
+            }
+            if (sql.includes('SELECT employee_id, employee_code') && sql.includes('FROM employees')) {
+              return { first: async () => employee };
+            }
+            if (sql.trimStart().startsWith('UPDATE employees')) {
+              return {
+                run: async () => {
+                  employee.employee_code = values[0];
+                  employee.first_name = values[1];
+                  employee.last_name = values[2];
+                  employee.email = values[3];
+                  return { meta: { changes: 1 } };
+                },
+              };
+            }
+            return { run: async () => ({ meta: { changes: 1 } }) };
+          },
+        };
+      },
+    },
+  };
+  const session = { isAdmin: true, email: 'admin@example.com' };
+  const body = {
+    employeeId: 42, employeeCode: 'STAFF-NEW', firstName: ' Mai ',
+    lastName: 'Nguyen', email: ' MAI@EXAMPLE.COM ',
+  };
+
+  const duplicate = await handleAdminUpdateEmployee(env, session, body);
+  assert.equal(duplicate.status, 409);
+  assert.equal(statements.some(item => item.sql.trimStart().startsWith('UPDATE employees')), false);
+
+  conflict = false;
+  statements.length = 0;
+  const response = await handleAdminUpdateEmployee(env, session, body);
+  assert.equal(response.status, 200);
+  assert.equal((await response.json()).employee.email, 'mai@example.com');
+  const update = statements.find(item => item.sql.trimStart().startsWith('UPDATE employees'));
+  assert.deepEqual(update.values, ['STAFF-NEW', 'Mai', 'Nguyen', 'mai@example.com', 42]);
+  assert.doesNotMatch(update.sql, /cf_sub/);
+  const history = statements.find(item => item.sql.includes('INSERT INTO schedule_history'));
+  assert.deepEqual(history.values, [
+    'admin@example.com', 'update', 'employee', 42, 'Updated staff ID, name, or work email',
+  ]);
 });
 
 test('administrators cannot be deactivated', async () => {

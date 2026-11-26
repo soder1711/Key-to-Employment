@@ -429,6 +429,14 @@ button { font-family: inherit; }
   border-radius: 8px; font: inherit; background: #fff;
 }
 .staff-add-form button { margin-top: 0.8rem; }
+.staff-edit-form .modal-row { flex-wrap: wrap; }
+.staff-edit-form .modal-row > div { min-width: 180px; flex: 1 1 180px; }
+.staff-edit-form label { display: block; margin: 0.5rem 0 0.25rem; color: var(--muted); font-size: 0.8rem; }
+.staff-edit-form input {
+  width: 100%; padding: 0.6rem 0.7rem; border: 1px solid var(--line);
+  border-radius: 8px; font: inherit; background: #fff;
+}
+.staff-edit-form .modal-actions { margin-top: 1rem; }
 @media (max-width: 640px) {
   #session-modal #assign-rule-fields .modal-row { grid-template-columns: 1fr; }
 }

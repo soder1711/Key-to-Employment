@@ -34,6 +34,15 @@ export async function findEmployeeByCodeOrEmail(db, employeeCode, email) {
   `).bind(employeeCode, email).first();
 }
 
+export async function findEmployeeConflictForUpdate(db, employeeCode, email, employeeId) {
+  return await db.prepare(`
+    SELECT employee_id
+    FROM employees
+    WHERE (employee_code = ? OR email = ?) AND employee_id != ?
+    LIMIT 1
+  `).bind(employeeCode, email, employeeId).first();
+}
+
 export async function createEmployee(db, employee) {
   return await db.prepare(`
     INSERT INTO employees (employee_code, first_name, last_name, email, is_admin, is_active)
@@ -43,6 +52,20 @@ export async function createEmployee(db, employee) {
     employee.firstName,
     employee.lastName,
     employee.email,
+  ).run();
+}
+
+export async function updateEmployee(db, employeeId, employee) {
+  return await db.prepare(`
+    UPDATE employees
+    SET employee_code = ?, first_name = ?, last_name = ?, email = ?
+    WHERE employee_id = ?
+  `).bind(
+    employee.employeeCode,
+    employee.firstName,
+    employee.lastName,
+    employee.email,
+    employeeId,
   ).run();
 }
 

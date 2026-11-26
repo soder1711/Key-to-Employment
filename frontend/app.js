@@ -113,12 +113,14 @@ async function loadStaffDirectory() {
         : active
           ? `<button class="btn danger small" type="button" data-deactivate-employee="${Number(employee.employee_id)}">${escapeHtml(t('staff.deactivate'))}</button>`
           : `<button class="btn small" type="button" data-reactivate-employee="${Number(employee.employee_id)}">${escapeHtml(t('staff.reactivate'))}</button>`;
+      const edit = `<button class="btn ghost small" type="button" data-edit-employee-id="${Number(employee.employee_id)}" data-employee-code="${escapeHtml(employee.employee_code)}" data-first-name="${escapeHtml(employee.first_name)}" data-last-name="${escapeHtml(employee.last_name)}" data-email="${escapeHtml(employee.email)}">${escapeHtml(t('staff.edit'))}</button>`;
       return `<tr>
         <td data-label="${escapeHtml(t('staff.code'))}">${escapeHtml(employee.employee_code)}</td>
         <td data-label="${escapeHtml(t('summary.employee'))}">${escapeHtml(name)}${Number(employee.is_admin) === 1 ? ` (${escapeHtml(t('plan.adminTag'))})` : ''}</td>
         <td data-label="${escapeHtml(t('staff.email'))}">${escapeHtml(employee.email)}</td>
-        <td data-label="${escapeHtml(t('staff.status'))}">${escapeHtml(status)}</td>
         <td data-label="${escapeHtml(t('staff.action'))}">${action}</td>
+        <td data-label="${escapeHtml(t('staff.edit'))}">${edit}</td>
+        <td data-label="${escapeHtml(t('staff.status'))}">${escapeHtml(status)}</td>
       </tr>`;
     }).join('');
     empty.style.display = employees.length ? 'none' : 'block';
@@ -734,9 +736,59 @@ document.getElementById('staff-add-form').addEventListener('submit', async event
   }
 });
 
+const staffEditDialog = document.getElementById('staff-edit-dialog');
+const staffEditForm = document.getElementById('staff-edit-form');
+
+document.getElementById('staff-edit-close').addEventListener('click', () => staffEditDialog.close());
+document.getElementById('staff-edit-cancel').addEventListener('click', () => staffEditDialog.close());
+
+staffEditForm.addEventListener('submit', async event => {
+  event.preventDefault();
+  if (!currentUser?.isAdmin) return;
+  const error = document.getElementById('staff-edit-error');
+  const saveButton = document.getElementById('staff-edit-save');
+  error.style.display = 'none';
+  saveButton.disabled = true;
+  const body = {
+    employeeId: Number(staffEditForm.dataset.employeeId),
+    employeeCode: document.getElementById('staff-edit-code').value.trim(),
+    firstName: document.getElementById('staff-edit-first-name').value.trim(),
+    lastName: document.getElementById('staff-edit-last-name').value.trim(),
+    email: document.getElementById('staff-edit-email').value.trim(),
+  };
+  try {
+    const response = await api('/api/admin/employees/update', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    });
+    if (!response.ok) throw new Error(String(response.status));
+    staffEditDialog.close();
+    await loadStaffDirectory();
+    const status = document.getElementById('staff-status');
+    status.textContent = t('staff.updated');
+    status.className = 'summary-status summary-status-success';
+    status.style.display = 'block';
+  } catch (err) {
+    error.textContent = t('staff.updateError', { status: err.message || 'network error' });
+    error.style.display = 'block';
+  } finally {
+    saveButton.disabled = false;
+  }
+});
+
 document.getElementById('staff-entries').addEventListener('click', async event => {
-  const button = event.target.closest('[data-deactivate-employee], [data-reactivate-employee]');
+  const button = event.target.closest('[data-edit-employee-id], [data-deactivate-employee], [data-reactivate-employee]');
   if (!button || !currentUser?.isAdmin) return;
+  if (button.hasAttribute('data-edit-employee-id')) {
+    staffEditForm.dataset.employeeId = button.dataset.editEmployeeId;
+    document.getElementById('staff-edit-code').value = button.dataset.employeeCode;
+    document.getElementById('staff-edit-first-name').value = button.dataset.firstName;
+    document.getElementById('staff-edit-last-name').value = button.dataset.lastName;
+    document.getElementById('staff-edit-email').value = button.dataset.email;
+    document.getElementById('staff-edit-error').style.display = 'none';
+    staffEditDialog.showModal();
+    return;
+  }
   const deactivating = button.hasAttribute('data-deactivate-employee');
   const action = deactivating ? 'deactivate' : 'reactivate';
   const employeeId = Number(button.dataset.deactivateEmployee ?? button.dataset.reactivateEmployee);

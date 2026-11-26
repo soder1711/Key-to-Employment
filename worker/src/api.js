@@ -21,6 +21,7 @@ export {
 } from './api/schedule-reports.js';
 export {
   handleAdminListEmployees, handleAdminCreateEmployee,
+  handleAdminUpdateEmployee,
   handleAdminDeactivateEmployee, handleAdminReactivateEmployee,
 } from './api/employees.js';
 export { handleGetScheduleHistory } from './api/schedule-history.js';

@@ -1,5 +1,6 @@
 import {
-  logScheduleHistory, getEmployeeDirectory, findEmployeeByCodeOrEmail, createEmployee, getManagedEmployee, deactivateEmployee, reactivateEmployee
+  logScheduleHistory, getEmployeeDirectory, findEmployeeByCodeOrEmail, findEmployeeConflictForUpdate,
+  createEmployee, updateEmployee, getManagedEmployee, deactivateEmployee, reactivateEmployee
 } from '../db.js';
 import { requireAdmin } from './authorization.js';
 
@@ -16,6 +17,7 @@ export async function handleAdminCreateEmployee(env, session, body) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) {
     return new Response('Invalid employee', { status: 400 });
   }
+
   const employeeCode = typeof body.employeeCode === 'string' ? body.employeeCode.trim() : '';
   const firstName = typeof body.firstName === 'string' ? body.firstName.trim() : '';
   const lastName = typeof body.lastName === 'string' ? body.lastName.trim() : '';
@@ -37,6 +39,41 @@ export async function handleAdminCreateEmployee(env, session, body) {
     `Added ${employee.first_name} ${employee.last_name} (${employee.employee_code})`
   );
   return Response.json({ employee }, { status: 201 });
+}
+
+export async function handleAdminUpdateEmployee(env, session, body) {
+  const denied = requireAdmin(session);
+  if (denied) return denied;
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return new Response('Invalid employee', { status: 400 });
+  }
+  const employeeId = Number(body.employeeId);
+  const employeeCode = typeof body.employeeCode === 'string' ? body.employeeCode.trim() : '';
+  const firstName = typeof body.firstName === 'string' ? body.firstName.trim() : '';
+  const lastName = typeof body.lastName === 'string' ? body.lastName.trim() : '';
+  const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
+  if (!Number.isSafeInteger(employeeId) || employeeId < 1 ||
+      !employeeCode || employeeCode.length > 32 ||
+      !firstName || firstName.length > 100 ||
+      !lastName || lastName.length > 100 ||
+      email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return new Response('Invalid employee', { status: 400 });
+  }
+
+  const employee = await getManagedEmployee(env.DB, employeeId);
+  if (!employee) return new Response('Employee not found', { status: 404 });
+  if (await findEmployeeConflictForUpdate(env.DB, employeeCode, email, employeeId)) {
+    return new Response('Employee code or email already exists', { status: 409 });
+  }
+
+  const result = await updateEmployee(env.DB, employeeId, { employeeCode, firstName, lastName, email });
+  if (result.meta.changes === 0) return new Response('Employee not found', { status: 404 });
+  const updatedEmployee = await getManagedEmployee(env.DB, employeeId);
+  await logScheduleHistory(
+    env.DB, session.email, 'update', 'employee', employeeId,
+    'Updated staff ID, name, or work email'
+  );
+  return Response.json({ employee: updatedEmployee });
 }
 
 export async function handleAdminDeactivateEmployee(env, session, body) {

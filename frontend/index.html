@@ -227,14 +227,37 @@
               <th data-i18n="staff.code">Staff ID</th>
               <th data-i18n="summary.employee">Employee</th>
               <th data-i18n="staff.email">Work email</th>
-              <th data-i18n="staff.status">Status</th>
               <th data-i18n="staff.action">Action</th>
+              <th data-i18n="staff.edit">Edit</th>
+              <th data-i18n="staff.status">Status</th>
             </tr></thead>
             <tbody id="staff-entries"></tbody>
           </table>
         </div>
         <p id="staff-empty" class="empty" style="display:none;" data-i18n="staff.empty">No staff records found.</p>
       </section>
+
+      <dialog id="staff-edit-dialog" class="modal-overlay" aria-labelledby="staff-edit-title">
+        <div class="modal">
+          <div class="modal-head">
+            <h3 id="staff-edit-title" data-i18n="staff.editTitle">Edit staff member</h3>
+            <button id="staff-edit-close" class="modal-x" type="button" aria-label="Close">✕</button>
+          </div>
+          <form id="staff-edit-form" class="staff-edit-form">
+            <div class="modal-row">
+              <div><label for="staff-edit-code" data-i18n="staff.code">Staff ID</label><input id="staff-edit-code" type="text" maxlength="32" required></div>
+              <div><label for="staff-edit-first-name" data-i18n="staff.firstName">First name</label><input id="staff-edit-first-name" type="text" maxlength="100" required></div>
+              <div><label for="staff-edit-last-name" data-i18n="staff.lastName">Last name</label><input id="staff-edit-last-name" type="text" maxlength="100" required></div>
+              <div><label for="staff-edit-email" data-i18n="staff.email">Work email</label><input id="staff-edit-email" type="email" maxlength="254" required></div>
+            </div>
+            <p id="staff-edit-error" class="error" style="display:none;" role="alert"></p>
+            <div class="modal-actions">
+              <button id="staff-edit-cancel" class="btn ghost" type="button" data-i18n="schedule.cancelEdit">Cancel</button>
+              <button id="staff-edit-save" class="btn" type="submit" data-i18n="staff.save">Save changes</button>
+            </div>
+          </form>
+        </div>
+      </dialog>
 
       <!-- ===== Admin: dated weekly plan board ===== -->
       <section id="plan-section" class="card" style="display:none;">

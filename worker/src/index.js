@@ -13,7 +13,7 @@ import {
   handleAdminListPrograms, handleAdminCreateProgram, handleAdminDeleteProgram,
   handleAdminUpdateProgram, handleAdminReactivateProgram,
   handleAdminListEmployees, handleAdminCreateEmployee, handleAdminDeactivateEmployee,
-  handleAdminReactivateEmployee,
+  handleAdminUpdateEmployee, handleAdminReactivateEmployee,
   handleGetScheduleHistory,
   handleAdminQuarterlySummary, handleAdminMonthlySessions,
 } from './api.js';
@@ -177,6 +177,10 @@ export default {
       else if (url.pathname === '/api/admin/employees' && request.method === 'POST') {
         const body = await request.json();
         response = await handleAdminCreateEmployee(env, currentSession, body);
+      }
+      else if (url.pathname === '/api/admin/employees/update' && request.method === 'POST') {
+        const body = await request.json();
+        response = await handleAdminUpdateEmployee(env, currentSession, body);
       }
       else if (url.pathname === '/api/admin/employees/deactivate' && request.method === 'POST') {
         const body = await request.json();
