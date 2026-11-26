@@ -555,7 +555,7 @@ test('clicking a one-off task opens its editor directly', () => {
 
   assert.equal(run('currentSession.session_id'), 41);
   assert.equal(elements.get('session-modal').open, true);
-  assert.equal(elements.get('modal-assign-form').style.display, 'block');
+  assert.equal(elements.get('modal-assign-form').style.display, 'grid');
   assert.equal(elements.get('session-actions').style.display, 'block');
   assert.equal(elements.get('assign-context').textContent, 'One-off task · Mon 16 November');
   assert.equal(readFileSync(new URL('../index.html', import.meta.url), 'utf8').includes('id="modal-details"'), false);
@@ -580,7 +580,7 @@ test('clicking a recurring task opens its rule editor with occurrence actions', 
   assert.equal(run('currentRule.series_id'), 8);
   assert.equal(run('currentSession.session_id'), 42);
   assert.equal(elements.get('session-modal').open, true);
-  assert.equal(elements.get('modal-assign-form').style.display, 'block');
+  assert.equal(elements.get('modal-assign-form').style.display, 'grid');
   assert.equal(elements.get('session-actions').style.display, 'block');
   assert.equal(elements.get('occurrence-notes-section').style.display, 'block');
   assert.equal(elements.get('occurrence-notes').value, 'Done as planned');

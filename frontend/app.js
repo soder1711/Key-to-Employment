@@ -423,9 +423,6 @@ document.getElementById('assign-sudden').addEventListener('change', () => {
   refreshTimetableDefaultPoints();
 });
 
-// Live allocation hint while the start time is edited
-document.getElementById('assign-start').addEventListener('input', updateAssignPeriodHint);
-
 document.getElementById('assign-repeat').addEventListener('change', (e) => {
   document.getElementById('assign-repeat-row').style.display = e.target.checked ? 'block' : 'none';
 });

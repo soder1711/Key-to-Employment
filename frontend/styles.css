@@ -430,7 +430,7 @@ button { font-family: inherit; }
 }
 .staff-add-form button { margin-top: 0.8rem; }
 @media (max-width: 640px) {
-  #assign-rule-fields .modal-row { flex-direction: column; }
+  #session-modal #assign-rule-fields .modal-row { grid-template-columns: 1fr; }
 }
 .modal input[type="date"] {
   width: 100%; min-width: 0; padding: 0.45rem 0.55rem; border: 1px solid var(--line);
@@ -721,32 +721,69 @@ button { font-family: inherit; }
   padding: 1.4rem; box-shadow: 0 24px 60px rgba(15, 23, 42, 0.25);
   max-height: 90vh; overflow-y: auto;
 }
+#session-modal .modal {
+  max-width: 500px; padding: 1.4rem; border: 1px solid #e2e8f0;
+  border-radius: 18px; max-height: min(90vh, 800px);
+}
 .program-modal { max-width: 760px; }
 .monthly-sessions-modal { max-width: 900px; }
 .modal-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.9rem; }
 .modal-head h3 { margin: 0; font-size: 1.05rem; }
 .modal-x { border: none; background: transparent; font-size: 1.05rem; cursor: pointer; color: var(--muted); }
+#session-modal .modal-head {
+  margin: -0.1rem 0 1rem; padding-bottom: 0.8rem; border-bottom: 1px solid #e8edf4;
+}
+#session-modal .modal-head h3 { color: #0f172a; font-size: 1.2rem; letter-spacing: -0.02em; }
+#session-modal .modal-x {
+  width: 2rem; height: 2rem; border-radius: 8px; font-size: 0.95rem;
+}
+#session-modal .modal-x:hover { background: #f1f5f9; color: #0f172a; }
 .modal label { display: block; font-size: 0.78rem; font-weight: 600; color: var(--muted); margin: 0.7rem 0 0.25rem; }
 .modal select, .modal input[type="time"], .modal input[type="number"], .modal input[type="text"] {
   width: 100%; padding: 0.45rem 0.55rem; border: 1px solid var(--line);
   border-radius: 8px; font: inherit; font-size: 0.9rem;
 }
+#session-modal #modal-assign-form { display: grid; gap: 0.75rem; }
+#session-modal #modal-assign-form > label { margin: 0; }
+#session-modal .modal-field label,
+#session-modal .modal-row > div > label { margin: 0 0 0.35rem; color: #475569; font-size: 0.8rem; }
+#session-modal .modal-field select,
+#session-modal .modal-field input,
+#session-modal .modal-row input:not([type="checkbox"]) {
+  min-height: 2.65rem; padding: 0.55rem 0.7rem; border-radius: 9px;
+}
+#session-modal .modal-field select:focus,
+#session-modal .modal-field input:focus,
+#session-modal .modal-row input:not([type="checkbox"]):focus {
+  outline: 3px solid #bfdbfe; border-color: #60a5fa;
+}
 .modal input[readonly] { background: var(--blue-50); color: var(--blue-700); font-weight: 700; }
 .modal-row { display: flex; gap: 0.7rem; }
 .modal-row > div { flex: 1; }
+#session-modal .modal-row {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.75rem;
+}
+#session-modal #assign-rule-fields > .modal-row + .modal-row { margin-top: 0.75rem; }
+#session-modal .modal-points-row { align-items: end; }
+#session-modal .modal-points-row .check-row {
+  min-height: 2.65rem; margin: 0; padding: 0.45rem 0.7rem;
+  border: 1px solid #e2e8f0; border-radius: 9px; background: #f8fafc;
+}
+#session-modal .modal-points-row .check-row input { min-height: auto; accent-color: #2563eb; }
 .clone-date-options { display: grid; gap: 0.4rem; margin-top: 0.75rem; }
 .check-row { display: flex !important; align-items: center; gap: 0.5rem; font-size: 0.85rem !important; color: var(--ink) !important; }
 .check-row input { width: auto !important; }
 .modal-submit { margin-top: 1.1rem; width: 100%; }
+#session-modal .modal-submit { margin-top: 0.1rem; min-height: 2.75rem; border-radius: 10px; font-size: 0.95rem; font-weight: 700; }
 .modal-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 1rem; }
-.session-actions { margin-top: 1.25rem; padding-top: 1rem; border-top: 1px solid var(--line); }
+.session-actions { margin-top: 1rem; padding: 1rem 0 0; border-top: 1px solid #e8edf4; }
 .session-actions-title {
-  margin: 0 0 0.65rem; color: var(--muted); font-size: 0.75rem;
+  margin: 0 0 0.65rem; color: #64748b; font-size: 0.72rem;
   font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase;
 }
 .occurrence-notes-section {
-  margin-bottom: 0.9rem; padding: 0.75rem;
-  border: 1px solid var(--line); border-radius: 10px; background: #f8fafc;
+  margin-bottom: 0.9rem; padding: 0.8rem;
+  border: 1px solid #e2e8f0; border-radius: 12px; background: #f8fafc;
 }
 .occurrence-notes-section label { margin: 0 0 0.4rem; }
 .occurrence-notes-section textarea {
@@ -755,8 +792,8 @@ button { font-family: inherit; }
   resize: vertical;
 }
 .occurrence-notes-footer { display: flex; justify-content: flex-end; margin-top: 0.5rem; }
-.session-action-buttons { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.5rem; }
-.session-action-buttons .btn { width: 100%; min-height: 2.5rem; padding: 0.45rem 0.55rem; }
+.session-action-buttons { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.55rem; }
+.session-action-buttons .btn { width: 100%; min-height: 2.6rem; padding: 0.45rem 0.55rem; border-radius: 9px; }
 .session-action-buttons .session-action-cancel,
 .session-action-buttons .session-action-delete {
   border: 1px solid #fecaca; background: #fff; color: #b91c1c;
@@ -769,9 +806,12 @@ button { font-family: inherit; }
   background: var(--blue-50); border: 1px solid var(--blue-100); border-radius: 8px;
   padding: 0.55rem 0.7rem; font-size: 0.85rem; color: var(--blue-700); margin: 0;
 }
+#session-modal .modal-context { padding: 0.55rem 0.75rem; border-radius: 10px; }
 
 /* ---------- Repeat weekly (assign modal) ---------- */
-#assign-repeat-row { margin-top: 0.25rem; }
+#assign-repeat-option { padding: 0.65rem 0.75rem; border: 1px solid #e2e8f0; border-radius: 10px; background: #f8fafc; }
+#assign-repeat-option > .check-row { margin: 0; }
+#assign-repeat-row { margin-top: 0.55rem; }
 .assign-repeat-note { color: var(--muted); font-size: 0.78rem; margin: 0.25rem 0 0; }
 
 /* ---------- Task types modal (create / delete programs) ---------- */

@@ -6,7 +6,7 @@
   <title data-i18n="app.name">Staff Scheduler</title>
   <link rel="icon" type="image/png" href="favicon.png">
   <link rel="shortcut icon" type="image/png" href="favicon.png">
-  <link rel="stylesheet" href="styles.css?v=13b86d5">
+  <link rel="stylesheet" href="styles.css?v=13b86d5-modal">
 </head>
 <body>
   <div id="app" class="app-shell" style="display:none;">
@@ -330,12 +330,14 @@
             <div><label for="assign-rule-end" data-i18n="schedule.endDate">Ends on (optional)</label><input id="assign-rule-end" type="date" disabled></div>
           </div>
         </div>
-        <div id="assign-date-row" style="display:none;">
+        <div id="assign-date-row" class="modal-field" style="display:none;">
           <label for="assign-date" data-i18n="modal.date">Date</label>
           <input type="date" id="assign-date">
         </div>
-        <label for="assign-program" data-i18n="modal.task">Task</label>
-        <select id="assign-program"></select>
+        <div class="modal-field">
+          <label for="assign-program" data-i18n="modal.task">Task</label>
+          <select id="assign-program"></select>
+        </div>
         <div class="modal-row">
           <div>
             <label for="assign-start" data-i18n="modal.start">Start</label>
@@ -346,11 +348,13 @@
             <input type="time" id="assign-end">
           </div>
         </div>
-        <p id="assign-period-hint" class="assign-repeat-note"></p>
-        <p class="assign-repeat-note" data-i18n="modal.overnightHint">An end time earlier than the start means the session ends the next day.</p>
-        <label for="assign-points" data-i18n="modal.points">Points (calculated automatically)</label>
-        <input type="number" id="assign-points" min="0" max="100" step="0.5" readonly>
-        <label class="check-row"><input type="checkbox" id="assign-sudden"><span data-i18n="modal.sudden"> Sudden session (doubles the points)</span></label>
+        <div class="modal-row modal-points-row">
+          <div class="modal-field">
+            <label for="assign-points" data-i18n="modal.points">Points</label>
+            <input type="number" id="assign-points" min="0" max="100" step="0.5" readonly>
+          </div>
+          <label class="check-row"><input type="checkbox" id="assign-sudden"><span data-i18n="modal.sudden"> Sudden session (doubles the points)</span></label>
+        </div>
         <div id="assign-repeat-option">
           <label class="check-row"><input type="checkbox" id="assign-repeat"><span data-i18n="modal.repeat"> Repeat every week (same weekday &amp; time)</span></label>
           <div id="assign-repeat-row" style="display:none;">
@@ -504,14 +508,14 @@
   </dialog>
 
   <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js"></script>
-  <script src="shared.js?v=13b86d5" defer></script>
+  <script src="shared.js?v=13b86d5-modal" defer></script>
   <script src="my-tasks.js" defer></script>
   <script src="schedule.js?v=13b86d5" defer></script>
   <script src="monthly-summary.js" defer></script>
   <script src="quarterly-report.js" defer></script>
   <script src="plan.js?v=13b86d5" defer></script>
-  <script src="session-modals.js?v=13b86d5" defer></script>
+  <script src="session-modals.js?v=13b86d5-modal" defer></script>
   <script src="task-management.js" defer></script>
-  <script src="app.js?v=13b86d5" defer></script>
+  <script src="app.js?v=13b86d5-modal" defer></script>
 </body>
 </html>

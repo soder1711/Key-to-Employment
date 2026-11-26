@@ -100,7 +100,7 @@ function openModal(which) {
   document.getElementById('assign-program').required = editingTimetable;
   document.getElementById('assign-points').required = editingTimetable;
   document.getElementById('modal-assign-form').style.display =
-    which === 'assign' || which === 'edit' || editingTimetable ? 'block' : 'none';
+    which === 'assign' || which === 'edit' || editingTimetable ? 'grid' : 'none';
   const hasSession = !!currentSession;
   document.getElementById('session-actions').style.display =
     hasSession && (which === 'edit' || editingTimetable) ? 'block' : 'none';
@@ -171,20 +171,9 @@ function populatePrograms(currentProgramId = null, currentSession = null) {
     newProgramOption();
 }
 
-// Automatic allocation: tells (live) which column the task will appear in,
-// decided purely by the start time.
-function updateAssignPeriodHint() {
-  const el = document.getElementById('assign-period-hint');
-  if (!el) return;
-  const start = document.getElementById('assign-start').value;
-  el.textContent = start
-    ? t('period.hint', { period: start < '12:00' ? t('plan.morning') : t('plan.afternoon') })
-    : '';
-}
-
 function refreshAssignDefaults() {
   const sel = document.getElementById('assign-program');
-  if (sel.value === '__new__') { updateAssignPeriodHint(); return; }
+  if (sel.value === '__new__') return;
   const p = adminPrograms.find(x => x.program_id === Number(sel.value)) ||
     (currentRule && Number(currentRule.program_id) === Number(sel.value)
       ? {
@@ -193,7 +182,7 @@ function refreshAssignDefaults() {
           default_end: currentRule.end_time,
         }
       : null);
-  if (!p) { updateAssignPeriodHint(); return; }
+  if (!p) return;
 
   // No period forcing any more: the program's default times are used as-is.
   // The "+ Add task…" buttons only prefill fallback times when the program
@@ -215,7 +204,6 @@ function refreshAssignDefaults() {
   ptsInput.value = pts;
   ptsInput.readOnly = !editingSession && !editingTimetable;
 
-  updateAssignPeriodHint();
 }
 
 function refreshTimetableDefaultPoints() {
@@ -434,7 +422,6 @@ function openSessionEdit() {
   document.getElementById('assign-sudden').checked = !!s.is_sudden;
   document.getElementById('assign-notes').value = s.notes || '';
   document.getElementById('assign-submit').textContent = t('action.saveChanges');
-  updateAssignPeriodHint();
   openModal('edit');
 }
 
