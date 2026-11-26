@@ -101,14 +101,23 @@ function openModal(which) {
   document.getElementById('assign-points').required = editingTimetable;
   document.getElementById('modal-assign-form').style.display =
     which === 'assign' || which === 'edit' || editingTimetable ? 'block' : 'none';
-  document.getElementById('modal-details').style.display = which === 'details' ? 'block' : 'none';
+  const hasSession = !!currentSession;
+  document.getElementById('session-actions').style.display =
+    hasSession && (which === 'edit' || editingTimetable) ? 'block' : 'none';
+  document.getElementById('occurrence-notes-section').style.display =
+    hasSession && currentSession.is_recurring ? 'block' : 'none';
+  document.getElementById('occurrence-notes').value = hasSession
+    ? currentSession.occurrence_notes || '' : '';
+  document.getElementById('session-clone').style.display =
+    hasSession && !currentSession.is_recurring ? 'inline-block' : 'none';
+  document.getElementById('session-end-series').style.display =
+    hasSession && currentSession.is_recurring ? 'inline-block' : 'none';
   document.getElementById('session-clone-form').style.display = which === 'clone' ? 'block' : 'none';
   document.getElementById('modal-error').style.display = 'none';
   if (!modal.open) modal.showModal();
   const focusTarget = editingTimetable
     ? document.getElementById('assign-weekday')
-    : document.getElementById(which === 'details' ? 'session-edit' :
-      which === 'clone' ? 'clone-back' : 'assign-program');
+    : document.getElementById(which === 'clone' ? 'clone-back' : 'assign-program');
   focusTarget.focus();
 }
 
@@ -230,7 +239,9 @@ function populateRulePickers() {
 }
 
 function openRuleModal(weekday, rule = null, occurrence = null) {
-  currentSession = null;
+  currentSession = occurrence?.occurrenceDate
+    ? sessionByOccurrence.get(`${rule?.series_id}:${occurrence.occurrenceDate}`) || null
+    : null;
   currentRule = rule;
   currentRuleOccurrence = occurrence;
   editingSession = false;
@@ -398,43 +409,6 @@ function openAssignModal(employeeId, date) {
   resetAssignRepeat();
   refreshAssignDefaults();
   openModal('assign');
-}
-
-function openDetailsModal(sessionId, seriesId = null, occurrenceDate = null) {
-  setCorrectionReasonVisible(false);
-  const s = seriesId != null
-    ? sessionByOccurrence.get(`${seriesId}:${occurrenceDate}`)
-    : sessionById.get(sessionId);
-  if (!s) return;
-  currentSession = s;
-  const assignees = s.assignees || (s.employee_id == null ? [] : [{
-    first_name: s.first_name, last_name: s.last_name,
-  }]);
-  const people = assignees.length
-    ? assignees.map(person => `${escapeHtml(person.first_name)} ${escapeHtml(person.last_name)}`).join(', ')
-    : `<em>${escapeHtml(t('person.unassigned'))}</em>`;
-  document.getElementById('modal-title').textContent = t('modal.detailsTitle');
-  document.getElementById('detail-info').innerHTML = `
-    <strong>${escapeHtml(s.program_name)}</strong>${scheduleBadge(s)}${deletedProgramBadge(s)} (${escapeHtml(s.category)})<br>
-    ${people} · ${fmtCellDate(s.session_date)}<br>
-    ${escapeHtml(fmtTimeRange(s.start_time, s.end_time))} ·
-    ${Number(s.points).toFixed(1)} ${t('unit.pts')}${s.is_sudden ? ` · ${escapeHtml(t('tag.sudden'))}` : ''} ·
-    <span class="status-pill ${escapeHtml(s.status)}">${escapeHtml(t('status.' + s.status))}</span>
-    ${(s.occurrence_notes || s.notes) ? `<br>${escapeHtml(t('modal.notesPrefix'))}${escapeHtml(s.occurrence_notes || s.notes)}` : ''}`;
-  document.getElementById('recurring-details').style.display = s.is_recurring ? 'block' : 'none';
-  document.getElementById('occurrence-notes').value = s.occurrence_notes || '';
-  document.getElementById('session-clone').style.display = s.is_recurring ? 'none' : 'inline-block';
-  document.getElementById('session-end-series').style.display = s.is_recurring ? 'inline-block' : 'none';
-  document.querySelectorAll('#modal-details .modal-actions button').forEach(button => {
-    button.style.display = currentUser?.isAdmin ? '' : 'none';
-  });
-  document.getElementById('session-delete').style.display =
-    currentUser?.isAdmin ? 'inline-block' : 'none';
-  document.getElementById('session-clone').style.display =
-    currentUser?.isAdmin && !s.is_recurring ? 'inline-block' : 'none';
-  document.getElementById('session-end-series').style.display =
-    currentUser?.isAdmin && s.is_recurring ? 'inline-block' : 'none';
-  openModal('details');
 }
 
 function openSessionEdit() {

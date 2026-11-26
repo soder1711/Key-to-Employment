@@ -404,10 +404,16 @@ function renderScheduleAssignmentMatrix() {
   return html + '</tbody>';
 }
 
-function openDetailsFromElement(element) {
+function openTaskEditorFromElement(element) {
+  if (!currentUser?.isAdmin) return;
   const seriesId = Number(element.dataset.seriesId);
   const date = element.dataset.recurrenceDate || element.dataset.occurrenceDate;
-  if (seriesId && date) openDetailsModal(null, seriesId, date);
-  else openDetailsModal(Number(element.dataset.sessionId));
+  if (seriesId && date) {
+    return openRecurringRuleFromOccurrence(seriesId, date);
+  }
+  const session = sessionById.get(Number(element.dataset.sessionId));
+  if (!session) return;
+  currentSession = session;
+  openSessionEdit();
 }
 

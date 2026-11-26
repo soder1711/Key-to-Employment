@@ -370,21 +370,19 @@
         <button id="assign-rule-stop" type="button" class="btn danger small" style="display:none;" data-i18n="schedule.endSeries">End series from date</button>
       </form>
 
-      <div id="modal-details" style="display:none;">
-        <div id="detail-info" class="modal-context"></div>
-        <div id="recurring-details" style="display:none;">
+      <div id="session-actions" style="display:none;">
+        <div id="occurrence-notes-section" style="display:none;">
           <label for="occurrence-notes" data-i18n="schedule.actualNote">Actual session note</label>
           <textarea id="occurrence-notes" rows="2"></textarea>
-          <button id="occurrence-notes-save" class="btn small ghost" data-i18n="schedule.noteSave">Save occurrence note</button>
+          <button id="occurrence-notes-save" type="button" class="btn small ghost" data-i18n="schedule.noteSave">Save occurrence note</button>
         </div>
         <div class="modal-actions">
-          <button id="session-edit" class="btn small" data-i18n="action.edit">Edit</button>
-          <button id="session-clone" class="btn small ghost" data-i18n="action.cloneWeekdays">Clone to weekdays</button>
-          <button class="btn small" data-status="completed" data-i18n="action.complete">✓ Complete</button>
-          <button class="btn small ghost" data-status="scheduled" data-i18n="action.reopen">↺ Reopen</button>
-          <button class="btn small ghost" data-status="cancelled" data-i18n="action.cancel">✕ Cancel</button>
-          <button id="session-delete" class="btn small danger" data-i18n="action.deleteDay">Delete this day</button>
-          <button id="session-end-series" class="btn small danger" style="display:none;" data-i18n="schedule.endSeries">End series from date</button>
+          <button id="session-clone" type="button" class="btn small ghost" data-i18n="action.cloneWeekdays">Clone to weekdays</button>
+          <button type="button" class="btn small" data-status="completed" data-i18n="action.complete">✓ Complete</button>
+          <button type="button" class="btn small ghost" data-status="scheduled" data-i18n="action.reopen">↺ Reopen</button>
+          <button type="button" class="btn small ghost" data-status="cancelled" data-i18n="action.cancel">✕ Cancel</button>
+          <button id="session-delete" type="button" class="btn small danger" data-i18n="action.deleteDay">Delete this day</button>
+          <button id="session-end-series" type="button" class="btn small danger" style="display:none;" data-i18n="schedule.endSeries">End series from date</button>
         </div>
       </div>
 

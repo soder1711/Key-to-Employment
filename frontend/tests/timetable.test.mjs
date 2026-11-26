@@ -543,6 +543,50 @@ test('editing a recurring occurrence defaults to its rule and can target only th
   assert.equal(writes[1].points, 6);
 });
 
+test('clicking a one-off task opens its editor directly', () => {
+  const { elements, context, run } = fixture();
+  const session = { session_id: 41, session_date: '2026-11-16', program_id: 4,
+    program_name: 'One-off task', program_code: 'ONCE', category: 'general',
+    points: 2, start_time: '09:00', end_time: '10:00', status: 'scheduled' };
+  context.testSession = session;
+  run('sessionById = new Map([[41, testSession]])');
+
+  run("openTaskEditorFromElement({dataset:{sessionId:'41'}})");
+
+  assert.equal(run('currentSession.session_id'), 41);
+  assert.equal(elements.get('session-modal').open, true);
+  assert.equal(elements.get('modal-assign-form').style.display, 'block');
+  assert.equal(elements.get('session-actions').style.display, 'block');
+  assert.equal(elements.get('assign-context').textContent, 'One-off task · Mon 16 November');
+  assert.equal(readFileSync(new URL('../index.html', import.meta.url), 'utf8').includes('id="modal-details"'), false);
+});
+
+test('clicking a recurring task opens its rule editor with occurrence actions', async () => {
+  const { elements, context, run } = fixture();
+  const occurrence = { session_id: 42, recurring_series_id: 8,
+    recurrence_date: '2026-11-16', session_date: '2026-11-16', is_recurring: true,
+    program_id: 4, program_name: 'Weekly task', program_code: 'WEEK', category: 'general',
+    points: 2, start_time: '09:00', end_time: '10:00', status: 'scheduled',
+    occurrence_notes: 'Done as planned' };
+  const rule = { series_id: 8, weekday: 1, program_id: 4, program_name: 'Weekly task',
+    points: 2, start_time: '09:00', end_time: '10:00', start_date: '2026-11-16',
+    effective_from: '2026-11-16', end_date: null };
+  context.testOccurrence = occurrence;
+  context.api = async () => ({ ok: true, json: async () => ({ entries: [rule] }) });
+  run("sessionByOccurrence = new Map([['8:2026-11-16', testOccurrence]])");
+
+  await run("openTaskEditorFromElement({dataset:{seriesId:'8', recurrenceDate:'2026-11-16'}})");
+
+  assert.equal(run('currentRule.series_id'), 8);
+  assert.equal(run('currentSession.session_id'), 42);
+  assert.equal(elements.get('session-modal').open, true);
+  assert.equal(elements.get('modal-assign-form').style.display, 'block');
+  assert.equal(elements.get('session-actions').style.display, 'block');
+  assert.equal(elements.get('occurrence-notes-section').style.display, 'block');
+  assert.equal(elements.get('occurrence-notes').value, 'Done as planned');
+  assert.equal(elements.get('session-end-series').style.display, 'inline-block');
+});
+
 test('old recurring occurrences show their historical rule values when edited', async () => {
   const { context, elements, run } = fixture();
   context.oldOccurrence = {

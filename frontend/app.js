@@ -297,7 +297,7 @@ document.getElementById('admin-schedule-grid').addEventListener('click', (e) => 
   }
   const chip = e.target.closest('.slot-chip');
   if (chip) {
-    openDetailsFromElement(chip);
+    openTaskEditorFromElement(chip);
     return;
   }
   const cell = e.target.closest('.grid-cell');
@@ -356,16 +356,11 @@ document.getElementById('plan-days').addEventListener('click', (e) => {
   }
   const taskLink = e.target.closest('.task-link');
   if (taskLink) {
-    if (taskLink.dataset.seriesId) {
-      openRecurringRuleFromOccurrence(taskLink.dataset.seriesId,
-        taskLink.dataset.recurrenceDate || taskLink.dataset.occurrenceDate);
-    } else {
-      openDetailsFromElement(taskLink);
-    }
+    openTaskEditorFromElement(taskLink);
     return;
   }
   const chip = e.target.closest('.person-chip.assigned');
-  if (chip) openDetailsFromElement(chip);
+  if (chip) openTaskEditorFromElement(chip);
 });
 
 function handleTimetableGridClick(event) {
@@ -525,10 +520,9 @@ document.getElementById('modal-assign-form').addEventListener('submit', async (e
   }
 });
 
-document.getElementById('session-edit').addEventListener('click', openSessionEdit);
 document.getElementById('session-clone').addEventListener('click', openSessionClone);
 document.getElementById('clone-back').addEventListener('click', () => {
-  if (currentSession) openDetailsModal(currentSession.session_id);
+  if (currentSession) openSessionEdit();
 });
 document.getElementById('clone-submit').addEventListener('click', async (e) => {
   if (!currentSession) return;
@@ -557,7 +551,7 @@ document.getElementById('clone-submit').addEventListener('click', async (e) => {
   }
 });
 
-document.querySelectorAll('#modal-details [data-status]').forEach(b => {
+document.querySelectorAll('#session-actions [data-status]').forEach(b => {
   b.addEventListener('click', async () => {
     if (!currentSession) return;
     if (currentSession.is_recurring && b.dataset.status === 'cancelled') {

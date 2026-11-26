@@ -61,7 +61,10 @@ function planCells(s, period) {
     ? assignees.map(assignee => {
       const name = planEmployeeName(assignee.employee_id);
       return currentUser?.isAdmin
-        ? `<span class="person-chip assigned" data-employee-id="${assignee.employee_id}"
+        ? `<span class="person-chip assigned" data-session-id="${s.session_id ?? ''}"
+                   data-series-id="${s.recurring_series_id ?? ''}"
+                   data-recurrence-date="${s.recurrence_date || s.session_date}"
+                   data-employee-id="${assignee.employee_id}"
                   title="${escapeHtml(t('plan.clickOptions'))}"><span class="chip-name">${escapeHtml(name)}</span>
                   <button type="button" class="assigned-remove" data-employee-id="${assignee.employee_id}"
                           aria-label="${escapeHtml(t('plan.removeAssignee', { name }))}"
