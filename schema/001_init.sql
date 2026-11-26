@@ -32,6 +32,7 @@ CREATE TABLE IF NOT EXISTS employees (
     first_name          TEXT NOT NULL,
     last_name           TEXT NOT NULL,
     email               TEXT UNIQUE NOT NULL,
+    gender              TEXT CHECK (gender IS NULL OR gender IN ('male', 'female')),
     picture_url         TEXT,
     cf_sub              TEXT UNIQUE,                    -- Google stable ID (added for self-OAuth)
     department          TEXT,

@@ -22,17 +22,19 @@ export async function handleAdminCreateEmployee(env, session, body) {
   const firstName = typeof body.firstName === 'string' ? body.firstName.trim() : '';
   const lastName = typeof body.lastName === 'string' ? body.lastName.trim() : '';
   const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
+  const gender = typeof body.gender === 'string' ? body.gender : '';
   if (!employeeCode || employeeCode.length > 32 ||
       !firstName || firstName.length > 100 ||
       !lastName || lastName.length > 100 ||
-      email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ||
+      !['male', 'female'].includes(gender)) {
     return new Response('Invalid employee', { status: 400 });
   }
   if (await findEmployeeByCodeOrEmail(env.DB, employeeCode, email)) {
     return new Response('Employee code or email already exists', { status: 409 });
   }
 
-  const result = await createEmployee(env.DB, { employeeCode, firstName, lastName, email });
+  const result = await createEmployee(env.DB, { employeeCode, firstName, lastName, email, gender });
   const employee = await getManagedEmployee(env.DB, result.meta.last_row_id);
   await logScheduleHistory(
     env.DB, session.email, 'create', 'employee', employee.employee_id,
@@ -52,11 +54,13 @@ export async function handleAdminUpdateEmployee(env, session, body) {
   const firstName = typeof body.firstName === 'string' ? body.firstName.trim() : '';
   const lastName = typeof body.lastName === 'string' ? body.lastName.trim() : '';
   const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
+  const gender = typeof body.gender === 'string' ? body.gender : '';
   if (!Number.isSafeInteger(employeeId) || employeeId < 1 ||
       !employeeCode || employeeCode.length > 32 ||
       !firstName || firstName.length > 100 ||
       !lastName || lastName.length > 100 ||
-      email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ||
+      !['male', 'female'].includes(gender)) {
     return new Response('Invalid employee', { status: 400 });
   }
 
@@ -66,12 +70,12 @@ export async function handleAdminUpdateEmployee(env, session, body) {
     return new Response('Employee code or email already exists', { status: 409 });
   }
 
-  const result = await updateEmployee(env.DB, employeeId, { employeeCode, firstName, lastName, email });
+  const result = await updateEmployee(env.DB, employeeId, { employeeCode, firstName, lastName, email, gender });
   if (result.meta.changes === 0) return new Response('Employee not found', { status: 404 });
   const updatedEmployee = await getManagedEmployee(env.DB, employeeId);
   await logScheduleHistory(
     env.DB, session.email, 'update', 'employee', employeeId,
-    'Updated staff ID, name, or work email'
+    'Updated staff ID, name, work email, or gender'
   );
   return Response.json({ employee: updatedEmployee });
 }

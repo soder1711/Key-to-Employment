@@ -182,7 +182,7 @@ test('new employees are created as non-admin and logged', async () => {
   const statements = [];
   const employee = {
     employee_id: 42, employee_code: 'KTE-42', first_name: 'Mai',
-    last_name: 'Nguyen', email: 'mai@example.com', is_active: 1, is_admin: 0,
+    last_name: 'Nguyen', email: 'mai@example.com', gender: 'female', is_active: 1, is_admin: 0,
   };
   const env = {
     DB: {
@@ -208,14 +208,15 @@ test('new employees are created as non-admin and logged', async () => {
   const response = await handleAdminCreateEmployee(env, {
     isAdmin: true, email: 'admin@example.com',
   }, {
-    employeeCode: 'KTE-42', firstName: 'Mai', lastName: 'Nguyen', email: ' MAI@EXAMPLE.COM ',
+    employeeCode: 'KTE-42', firstName: 'Mai', lastName: 'Nguyen', email: ' MAI@EXAMPLE.COM ', gender: 'female',
   });
 
   assert.equal(response.status, 201);
   assert.equal((await response.json()).employee.is_admin, 0);
   const insert = statements.find(item => item.sql.includes('INSERT INTO employees'));
-  assert.match(insert.sql, /VALUES \(\?, \?, \?, \?, 0, 1\)/);
+  assert.match(insert.sql, /VALUES \(\?, \?, \?, \?, \?, 0, 1\)/);
   assert.equal(insert.values[3], 'mai@example.com');
+  assert.equal(insert.values[4], 'female');
   assert.ok(statements.some(item => item.sql.includes('INSERT INTO schedule_history')));
 });
 
@@ -223,11 +224,11 @@ test('staff updates require an administrator and validated fields', async () => 
   let queryCount = 0;
   const env = { DB: { prepare() { queryCount++; throw new Error('must not query'); } } };
   const denied = await handleAdminUpdateEmployee(env, { isAdmin: false }, {
-    employeeId: 42, employeeCode: 'STAFF-42', firstName: 'Mai', lastName: 'Nguyen', email: 'mai@example.com',
+    employeeId: 42, employeeCode: 'STAFF-42', firstName: 'Mai', lastName: 'Nguyen', email: 'mai@example.com', gender: 'female',
   });
   assert.equal(denied.status, 403);
   const invalid = await handleAdminUpdateEmployee(env, { isAdmin: true }, {
-    employeeId: 42, employeeCode: 'STAFF-42', firstName: '', lastName: 'Nguyen', email: 'not-an-email',
+    employeeId: 42, employeeCode: 'STAFF-42', firstName: '', lastName: 'Nguyen', email: 'not-an-email', gender: 'other',
   });
   assert.equal(invalid.status, 400);
   assert.equal(queryCount, 0);
@@ -238,7 +239,7 @@ test('staff updates reject duplicates and persist normalized data with a privacy
   let conflict = true;
   const employee = {
     employee_id: 42, employee_code: 'STAFF-42', first_name: 'Mai',
-    last_name: 'Nguyen', email: 'mai@example.com', is_active: 1, is_admin: 0,
+    last_name: 'Nguyen', email: 'mai@example.com', gender: 'female', is_active: 1, is_admin: 0,
   };
   const env = {
     DB: {
@@ -259,6 +260,7 @@ test('staff updates reject duplicates and persist normalized data with a privacy
                   employee.first_name = values[1];
                   employee.last_name = values[2];
                   employee.email = values[3];
+                  employee.gender = values[4];
                   return { meta: { changes: 1 } };
                 },
               };
@@ -272,7 +274,7 @@ test('staff updates reject duplicates and persist normalized data with a privacy
   const session = { isAdmin: true, email: 'admin@example.com' };
   const body = {
     employeeId: 42, employeeCode: 'STAFF-NEW', firstName: ' Mai ',
-    lastName: 'Nguyen', email: ' MAI@EXAMPLE.COM ',
+    lastName: 'Nguyen', email: ' MAI@EXAMPLE.COM ', gender: 'male',
   };
 
   const duplicate = await handleAdminUpdateEmployee(env, session, body);
@@ -285,11 +287,11 @@ test('staff updates reject duplicates and persist normalized data with a privacy
   assert.equal(response.status, 200);
   assert.equal((await response.json()).employee.email, 'mai@example.com');
   const update = statements.find(item => item.sql.trimStart().startsWith('UPDATE employees'));
-  assert.deepEqual(update.values, ['STAFF-NEW', 'Mai', 'Nguyen', 'mai@example.com', 42]);
+  assert.deepEqual(update.values, ['STAFF-NEW', 'Mai', 'Nguyen', 'mai@example.com', 'male', 42]);
   assert.doesNotMatch(update.sql, /cf_sub/);
   const history = statements.find(item => item.sql.includes('INSERT INTO schedule_history'));
   assert.deepEqual(history.values, [
-    'admin@example.com', 'update', 'employee', 42, 'Updated staff ID, name, or work email',
+    'admin@example.com', 'update', 'employee', 42, 'Updated staff ID, name, work email, or gender',
   ]);
 });
 

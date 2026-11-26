@@ -218,6 +218,11 @@
             <div><label for="staff-first-name" data-i18n="staff.firstName">First name</label><input id="staff-first-name" type="text" maxlength="100" required></div>
             <div><label for="staff-last-name" data-i18n="staff.lastName">Last name</label><input id="staff-last-name" type="text" maxlength="100" required></div>
             <div><label for="staff-email" data-i18n="staff.email">Work email</label><input id="staff-email" type="email" maxlength="254" required></div>
+            <div><label for="staff-gender" data-i18n="staff.gender">Gender</label><select id="staff-gender" required>
+              <option value="" data-i18n="staff.selectGender">Select gender</option>
+              <option value="male" data-i18n="staff.male">Male</option>
+              <option value="female" data-i18n="staff.female">Female</option>
+            </select></div>
           </div>
           <button class="btn" type="submit" data-i18n="staff.add">Add staff member</button>
         </form>
@@ -226,6 +231,7 @@
             <thead><tr>
               <th data-i18n="staff.code">Staff ID</th>
               <th data-i18n="summary.employee">Employee</th>
+              <th data-i18n="staff.gender">Gender</th>
               <th data-i18n="staff.email">Work email</th>
               <th data-i18n="staff.action">Action</th>
               <th data-i18n="staff.edit">Edit</th>
@@ -249,6 +255,11 @@
               <div><label for="staff-edit-first-name" data-i18n="staff.firstName">First name</label><input id="staff-edit-first-name" type="text" maxlength="100" required></div>
               <div><label for="staff-edit-last-name" data-i18n="staff.lastName">Last name</label><input id="staff-edit-last-name" type="text" maxlength="100" required></div>
               <div><label for="staff-edit-email" data-i18n="staff.email">Work email</label><input id="staff-edit-email" type="email" maxlength="254" required></div>
+              <div><label for="staff-edit-gender" data-i18n="staff.gender">Gender</label><select id="staff-edit-gender" required>
+                <option value="" data-i18n="staff.selectGender">Select gender</option>
+                <option value="male" data-i18n="staff.male">Male</option>
+                <option value="female" data-i18n="staff.female">Female</option>
+              </select></div>
             </div>
             <p id="staff-edit-error" class="error" style="display:none;" role="alert"></p>
             <div class="modal-actions">

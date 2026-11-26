@@ -113,10 +113,16 @@ async function loadStaffDirectory() {
         : active
           ? `<button class="btn danger small" type="button" data-deactivate-employee="${Number(employee.employee_id)}">${escapeHtml(t('staff.deactivate'))}</button>`
           : `<button class="btn small" type="button" data-reactivate-employee="${Number(employee.employee_id)}">${escapeHtml(t('staff.reactivate'))}</button>`;
-      const edit = `<button class="btn ghost small" type="button" data-edit-employee-id="${Number(employee.employee_id)}" data-employee-code="${escapeHtml(employee.employee_code)}" data-first-name="${escapeHtml(employee.first_name)}" data-last-name="${escapeHtml(employee.last_name)}" data-email="${escapeHtml(employee.email)}">${escapeHtml(t('staff.edit'))}</button>`;
+      const gender = employee.gender === 'male'
+        ? t('staff.male')
+        : employee.gender === 'female'
+          ? t('staff.female')
+          : '—';
+      const edit = `<button class="btn ghost small" type="button" data-edit-employee-id="${Number(employee.employee_id)}" data-employee-code="${escapeHtml(employee.employee_code)}" data-first-name="${escapeHtml(employee.first_name)}" data-last-name="${escapeHtml(employee.last_name)}" data-email="${escapeHtml(employee.email)}" data-gender="${escapeHtml(employee.gender || '')}">${escapeHtml(t('staff.edit'))}</button>`;
       return `<tr>
         <td data-label="${escapeHtml(t('staff.code'))}">${escapeHtml(employee.employee_code)}</td>
         <td data-label="${escapeHtml(t('summary.employee'))}">${escapeHtml(name)}${Number(employee.is_admin) === 1 ? ` (${escapeHtml(t('plan.adminTag'))})` : ''}</td>
+        <td data-label="${escapeHtml(t('staff.gender'))}">${escapeHtml(gender)}</td>
         <td data-label="${escapeHtml(t('staff.email'))}">${escapeHtml(employee.email)}</td>
         <td data-label="${escapeHtml(t('staff.action'))}">${action}</td>
         <td data-label="${escapeHtml(t('staff.edit'))}">${edit}</td>
@@ -718,6 +724,7 @@ document.getElementById('staff-add-form').addEventListener('submit', async event
     firstName: document.getElementById('staff-first-name').value.trim(),
     lastName: document.getElementById('staff-last-name').value.trim(),
     email: document.getElementById('staff-email').value.trim(),
+    gender: document.getElementById('staff-gender').value,
   };
   try {
     const response = await api('/api/admin/employees', {
@@ -755,6 +762,7 @@ staffEditForm.addEventListener('submit', async event => {
     firstName: document.getElementById('staff-edit-first-name').value.trim(),
     lastName: document.getElementById('staff-edit-last-name').value.trim(),
     email: document.getElementById('staff-edit-email').value.trim(),
+    gender: document.getElementById('staff-edit-gender').value,
   };
   try {
     const response = await api('/api/admin/employees/update', {
@@ -785,6 +793,7 @@ document.getElementById('staff-entries').addEventListener('click', async event =
     document.getElementById('staff-edit-first-name').value = button.dataset.firstName;
     document.getElementById('staff-edit-last-name').value = button.dataset.lastName;
     document.getElementById('staff-edit-email').value = button.dataset.email;
+    document.getElementById('staff-edit-gender').value = button.dataset.gender;
     document.getElementById('staff-edit-error').style.display = 'none';
     staffEditDialog.showModal();
     return;

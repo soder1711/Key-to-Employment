@@ -9,7 +9,7 @@ export async function getEmployeeAuth(db, employeeId) {
 
 export async function getEmployeeDirectory(db) {
   const { results } = await db.prepare(`
-    SELECT employee_id, employee_code, first_name, last_name, email, is_active, is_admin
+    SELECT employee_id, employee_code, first_name, last_name, email, gender, is_active, is_admin
     FROM employees
     ORDER BY is_active DESC, first_name, last_name
   `).all();
@@ -18,7 +18,7 @@ export async function getEmployeeDirectory(db) {
 
 export async function getManagedEmployee(db, employeeId) {
   return await db.prepare(`
-    SELECT employee_id, employee_code, first_name, last_name, email, is_active, is_admin
+    SELECT employee_id, employee_code, first_name, last_name, email, gender, is_active, is_admin
     FROM employees
     WHERE employee_id = ?
     LIMIT 1
@@ -45,26 +45,28 @@ export async function findEmployeeConflictForUpdate(db, employeeCode, email, emp
 
 export async function createEmployee(db, employee) {
   return await db.prepare(`
-    INSERT INTO employees (employee_code, first_name, last_name, email, is_admin, is_active)
-    VALUES (?, ?, ?, ?, 0, 1)
+    INSERT INTO employees (employee_code, first_name, last_name, email, gender, is_admin, is_active)
+    VALUES (?, ?, ?, ?, ?, 0, 1)
   `).bind(
     employee.employeeCode,
     employee.firstName,
     employee.lastName,
     employee.email,
+    employee.gender,
   ).run();
 }
 
 export async function updateEmployee(db, employeeId, employee) {
   return await db.prepare(`
     UPDATE employees
-    SET employee_code = ?, first_name = ?, last_name = ?, email = ?
+    SET employee_code = ?, first_name = ?, last_name = ?, email = ?, gender = ?
     WHERE employee_id = ?
   `).bind(
     employee.employeeCode,
     employee.firstName,
     employee.lastName,
     employee.email,
+    employee.gender,
     employeeId,
   ).run();
 }
